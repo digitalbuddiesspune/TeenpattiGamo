@@ -175,6 +175,147 @@ function TableGameplayShellBackdrop() {
   );
 }
 
+const LOBBY_MENU_OPTIONS = [
+  {
+    id: "history",
+    label: "Transaction History",
+    hint: "View debit & credit rounds",
+  },
+  {
+    id: "rules",
+    label: "How to Play",
+    hint: "Variant rules overview",
+  },
+  {
+    id: "refresh",
+    label: "Refresh Balance",
+    hint: "Sync wallet from platform",
+  },
+];
+
+function LobbyMenuDropdown({ open, anchorRef, onSelect, onClose }) {
+  const panelRef = useRef(null);
+  const [coords, setCoords] = useState({ top: 0, right: 0 });
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    function updatePosition() {
+      const anchor = anchorRef?.current;
+      if (!anchor) {
+        return;
+      }
+      const rect = anchor.getBoundingClientRect();
+      setCoords({
+        top: Math.round(rect.bottom + 8),
+        right: Math.round(window.innerWidth - rect.right),
+      });
+    }
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open, anchorRef]);
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    function handlePointer(event) {
+      const target = event.target;
+      if (
+        panelRef.current?.contains(target) ||
+        anchorRef?.current?.contains(target)
+      ) {
+        return;
+      }
+      onClose();
+    }
+
+    function handleKey(event) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    // Defer so the opening click doesn't immediately close the menu.
+    const timer = window.setTimeout(() => {
+      document.addEventListener("pointerdown", handlePointer);
+    }, 0);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("pointerdown", handlePointer);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open, onClose, anchorRef]);
+
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div
+      className="lobby-menu"
+      ref={panelRef}
+      role="menu"
+      aria-label="Lobby menu"
+      style={{ top: `${coords.top}px`, right: `${coords.right}px` }}
+    >
+      {LOBBY_MENU_OPTIONS.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          role="menuitem"
+          className="lobby-menu__item"
+          onClick={() => onSelect(option.id)}
+        >
+          <strong>{option.label}</strong>
+          <span>{option.hint}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function LobbyRulesModal({ open, onClose }) {
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="lobby-rules" role="dialog" aria-modal="true" aria-label="How to play">
+      <button type="button" className="lobby-rules__backdrop" onClick={onClose} aria-label="Close rules" />
+      <div className="lobby-rules__panel">
+        <header className="lobby-rules__header">
+          <h2>How to Play</h2>
+          <button type="button" className="lobby-rules__close" onClick={onClose} aria-label="Close">
+            ×
+          </button>
+        </header>
+        <p className="lobby-rules__intro">
+          Pick a table variant below. Classic Teen Patti is the default; others change jokers or win conditions.
+        </p>
+        <ul className="lobby-rules__list">
+          {VARIANT_OPTIONS.map((variant) => (
+            <li key={variant.id}>
+              <strong>{variant.label}</strong>
+              <span>{variant.summary}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 function TableGameplayBackdrop({ className = "" }) {
   return (
     <div
@@ -266,6 +407,7 @@ function PublicTableJoiningScreen({ message, mode = "matchmaking" }) {
 
                 <div className="joining-screen__ring-core">
                   <span className="joining-screen__cards" aria-hidden="true">
+<<<<<<< Updated upstream
                     <Image
                       src="/newAssets/bg-remo-cards-Photoroom.png"
                       alt=""
@@ -274,6 +416,11 @@ function PublicTableJoiningScreen({ message, mode = "matchmaking" }) {
                       sizes="(max-width: 480px) 40px, 52px"
                       className="joining-screen__cards-img"
                     />
+=======
+                    <span />
+                    <span />
+                    <span />
+>>>>>>> Stashed changes
                   </span>
                   <span className="joining-screen__ring-label">
                     {isSync ? "Please wait" : "Search time"}
@@ -392,6 +539,9 @@ export default function GameClient({
   const [turnNow, setTurnNow] = useState(() => Date.now());
   const [selectedStake, setSelectedStake] = useState(0);
   const [isMobileDevice] = useState(true);
+  const [lobbyMenuOpen, setLobbyMenuOpen] = useState(false);
+  const [lobbyRulesOpen, setLobbyRulesOpen] = useState(false);
+  const lobbyMenuAnchorRef = useRef(null);
   const [platformProfile, setPlatformProfile] = useState(() => {
     if (typeof window === "undefined") {
       return null;
@@ -623,10 +773,30 @@ export default function GameClient({
   ]);
 
   function handleMenuAction(actionId) {
+    setLobbyMenuOpen(false);
+
     if (actionId === "history") {
       router.push(withLaunchQuery("/transactions/history"));
+      return;
+    }
+
+    if (actionId === "rules") {
+      setLobbyRulesOpen(true);
+      return;
+    }
+
+    if (actionId === "refresh") {
+      void syncPlatformProfile().catch(() => {});
     }
   }
+
+  const closeLobbyMenu = useCallback(() => {
+    setLobbyMenuOpen(false);
+  }, []);
+
+  const closeLobbyRules = useCallback(() => {
+    setLobbyRulesOpen(false);
+  }, []);
 
   const handleExitTable = useCallback(async () => {
     await leavePublicTable();
@@ -699,9 +869,6 @@ export default function GameClient({
     typeof displayedChipBalance === "number" ? displayedChipBalance : 0
   ).toLocaleString("en-IN");
   const walletBalanceLabel = `₹ ${headerChipBalanceLabel}`;
-  const lobbyChipsLabel = (
-    typeof visibleChipBalance === "number" ? visibleChipBalance : 0
-  ).toLocaleString("en-IN");
   const minimumBootAmount = publicTableState?.config?.bootAmount || round?.bootAmount || 0;
   const roundAllowsLowBalanceView = round?.status === "active" || round?.status === "starting" || round?.status === "dealing";
   const shouldKickForLowBalance = Boolean(
@@ -804,50 +971,54 @@ export default function GameClient({
 
                 <div className="lobby relative z-[1] h-dvh overflow-x-hidden overflow-y-auto overscroll-y-contain">
                   <header className="lobby-topbar">
-                    <div className="lobby-topbar__plate">
-                      <span className="lobby-topbar__avatar">
-                        <Image
-                          src="/newAssets/avatars/avatar2.png"
-                          alt="Player avatar"
-                          width={62}
-                          height={62}
-                        />
-                      </span>
+                    <span className="lobby-topbar__avatar">
                       <Image
-                        src="/newAssets/crown.png"
-                        alt=""
-                        width={26}
-                        height={32}
-                        className="lobby-topbar__crown"
-                        aria-hidden="true"
+                        src="/newAssets/avatars/avatar2.png"
+                        alt="Player avatar"
+                        width={70}
+                        height={70}
                       />
+                    </span>
 
-                      <span className="lobby-topbar__identity">
+                    <div className="lobby-topbar__plate">
+                      <div className="lobby-topbar__pod">
                         <strong className="lobby-topbar__name">
                           {platformProfile?.username || "Player"}
                         </strong>
-                        <span className="lobby-topbar__wallet">
-                          <Image src="/newAssets/Chip.png" alt="" width={17} height={17} aria-hidden="true" />
-                          {walletBalanceLabel}
-                          <span className="lobby-topbar__add" aria-hidden="true">+</span>
-                        </span>
-                      </span>
+                      </div>
 
-                      <span className="lobby-topbar__chips">{lobbyChipsLabel}</span>
+                      <div className="lobby-topbar__center">
+                        <span className="lobby-topbar__wallet">
+                          <Image src="/newAssets/Chip.png" alt="" width={22} height={22} aria-hidden="true" />
+                          <b>{walletBalanceLabel}</b>
+                        </span>
+                      </div>
                     </div>
 
-                    <button
-                      type="button"
-                      className="lobby-topbar__menu"
-                      onClick={() => handleMenuAction("history")}
-                      disabled={!platformLaunchContext}
-                      aria-label="Open transaction history"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-                        <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
-                      </svg>
-                    </button>
+                    <div className="lobby-topbar__menu-wrap" ref={lobbyMenuAnchorRef}>
+                      <button
+                        type="button"
+                        className="lobby-topbar__menu"
+                        onClick={() => setLobbyMenuOpen((open) => !open)}
+                        aria-label="Open menu"
+                        aria-expanded={lobbyMenuOpen}
+                        aria-haspopup="menu"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                          <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
+                        </svg>
+                      </button>
+                    </div>
                   </header>
+
+                  <LobbyMenuDropdown
+                    open={lobbyMenuOpen}
+                    anchorRef={lobbyMenuAnchorRef}
+                    onSelect={handleMenuAction}
+                    onClose={closeLobbyMenu}
+                  />
+
+                  <LobbyRulesModal open={lobbyRulesOpen} onClose={closeLobbyRules} />
 
                   <section className="lobby-grid">
                     {VARIANT_OPTIONS.map((variant) => (
