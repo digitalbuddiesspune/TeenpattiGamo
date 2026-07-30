@@ -1,0 +1,38 @@
+package org.teenpatti.server.config
+
+internal class AppEnvironment {
+    var production: Boolean = false
+    var port: Int = 0
+    var clientOrigin: String = ""
+    var mongoUri: String = ""
+    var mongoDbName: String = ""
+    var redisUrl: String = ""
+    var redisKeyPrefix: String = ""
+    var appNodeId: String = ""
+    var reconnectGraceMs: Long = 0L
+    var privateRoomTtlMs: Long = 0L
+    var tableId: String = ""
+    var bootAmount: Int = 0
+    var maxPotAmount: Int = 0
+    var minStake: Int = 0
+    var maxStake: Int = 0
+    var maxRoundsBeforeForcedShow: Int = 0
+    var playerCount: Int = 0
+    var publicTableMaxBots: Int = 0
+    var matchmakingWindowMs: Long = 0L
+    var matchmakingPvpThreshold: Int = 0
+    var casinoBootCommissionPercent: Int = 0
+    var casinoWinCommissionPercent: Int = 0
+    var initialBalance: Int = 0
+    var turnDurationMs: Int = 0
+    var platformEnabled: Boolean = false
+    var platformApiBase: String = ""
+    var platformDebitUrl: String = ""
+    var platformAmqpUrl: String = ""
+    var platformAmqpExchange: String = ""
+    var platformAmqpRoutingKey: String = ""
+    var platformPubKey: String = ""
+    var platformSecret: String = ""
+    var platformGameId: Int = 0
+    var platformLoginCallbackUrl: String = ""
+}

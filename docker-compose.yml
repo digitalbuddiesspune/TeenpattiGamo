@@ -1,0 +1,19 @@
+services:
+  api:
+    build:
+      context: ./server
+    env_file:
+      - ./serverJavaNew/.env
+    environment:
+      PORT: 4200
+      REDIS_URL: redis://redis:6379
+      CACHE_TTL_SECONDS: 30
+    ports:
+      - "4200:4200"
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"

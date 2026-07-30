@@ -1,0 +1,21 @@
+server:
+  port: ${PORT:4100}
+
+spring:
+  application:
+    name: teen-patti-server
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/${MONGODB_DB_NAME:teen_patti_casino}}
+      database: ${MONGODB_DB_NAME:teen_patti_casino}
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+
+management:
+  endpoints:
+    web:
+      base-path: /management

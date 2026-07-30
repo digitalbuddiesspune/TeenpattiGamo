@@ -1,0 +1,31 @@
+<svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="rim" x1="600" y1="20" x2="600" y2="740" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F6E6D8"/>
+      <stop offset="0.22" stop-color="#D2B39B"/>
+      <stop offset="0.55" stop-color="#9D765C"/>
+      <stop offset="1" stop-color="#4D352B"/>
+    </linearGradient>
+    <linearGradient id="felt" x1="600" y1="90" x2="600" y2="670" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#666075"/>
+      <stop offset="0.6" stop-color="#3B354B"/>
+      <stop offset="1" stop-color="#2A2436"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="330" y1="120" x2="875" y2="640" gradientUnits="userSpaceOnUse">
+      <stop stop-color="white" stop-opacity="0.48"/>
+      <stop offset="0.24" stop-color="white" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="white" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="shadow" x="110" y="54" width="980" height="646" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="24" stdDeviation="20" flood-color="#000000" flood-opacity="0.34"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <path d="M218 162C246 111 321 78 409 78H791C879 78 954 111 982 162C998 191 1015 237 1045 268C1069 293 1082 325 1082 358V476C1082 533 1035 579 978 579H222C165 579 118 533 118 476V358C118 325 131 293 155 268C185 237 202 191 218 162Z" fill="url(#rim)"/>
+    <path d="M242 188C267 143 332 114 409 114H791C868 114 933 143 958 188C971 211 985 248 1009 274C1029 296 1040 324 1040 351V467C1040 505 1009 536 971 536H229C191 536 160 505 160 467V351C160 324 171 296 191 274C215 248 229 211 242 188Z" fill="#64493C"/>
+    <path d="M255 203C278 163 338 138 409 138H791C862 138 922 163 945 203C956 222 969 254 991 278C1009 298 1018 322 1018 347V463C1018 489 997 510 971 510H229C203 510 182 489 182 463V347C182 322 191 298 209 278C231 254 244 222 255 203Z" fill="url(#felt)"/>
+    <path d="M281 258C306 229 346 214 412 214H788C854 214 894 229 919 258C939 281 950 313 950 349V423C950 451 927 474 899 474H301C273 474 250 451 250 423V349C250 313 261 281 281 258Z" stroke="#2D273A" stroke-opacity="0.42" stroke-width="12"/>
+    <path d="M240 188C265 144 330 114 409 114H791C870 114 935 144 960 188" stroke="url(#shine)" stroke-width="10" stroke-linecap="round"/>
+    <path d="M278 168C298 141 344 126 409 126H791C856 126 902 141 922 168" stroke="#F9F0E9" stroke-opacity="0.35" stroke-width="6" stroke-linecap="round"/>
+  </g>
+</svg>
