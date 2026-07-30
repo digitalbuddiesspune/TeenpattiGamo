@@ -36,8 +36,13 @@ internal class AppEnvironmentConfig {
         env.initialBalance = number(environment, "INITIAL_BALANCE", 30000000)
         env.turnDurationMs = number(environment, "TURN_DURATION_MS", 15000)
         env.platformEnabled = boolean(environment, "PLATFORM_ENABLED", false)
-        env.platformBalanceUrl = text(environment, "PLATFORM_BALANCE_URL", "")
-        env.platformDebitUrl = text(environment, "PLATFORM_DEBIT_URL", "")
+        env.appOperatorBaseUrl = text(environment, "APP_OPERATOR_BASE_URL", "")
+        env.appOperatorUserDetailPath = text(environment, "APP_OPERATOR_USER_DETAIL_PATH", "")
+        env.appOperatorBalancePath = text(environment, "APP_OPERATOR_BALANCE_PATH", "")
+        env.appOperatorLoginPath = text(environment, "APP_OPERATOR_LOGIN_PATH", "")
+        env.platformUserDetailUrl = joinUrl(env.appOperatorBaseUrl, env.appOperatorUserDetailPath)
+        env.platformDebitUrl = joinUrl(env.appOperatorBaseUrl, env.appOperatorBalancePath)
+        env.platformLoginUrl = joinUrl(env.appOperatorBaseUrl, env.appOperatorLoginPath)
         env.platformAmqpUrl = text(environment, "PLATFORM_AMQP_URL", "")
         env.platformAmqpExchange = text(environment, "PLATFORM_AMQP_EXCHANGE", "")
         env.platformAmqpRoutingKey =
@@ -45,7 +50,6 @@ internal class AppEnvironmentConfig {
         env.platformPubKey = text(environment, "PLATFORM_PUB_KEY", "")
         env.platformSecret = text(environment, "PLATFORM_SECRET", "")
         env.platformGameId = number(environment, "PLATFORM_GAME_ID", 0)
-        env.platformLoginCallbackUrl = text(environment, "PLATFORM_LOGIN_CALLBACK_URL", "")
         validatePublicTableBotConfig(env)
         validatePlatformConfig(env)
         return env
@@ -68,13 +72,30 @@ internal class AppEnvironmentConfig {
         if (!env.platformEnabled) {
             return
         }
-        check(env.platformBalanceUrl.isNotBlank()) { "PLATFORM_BALANCE_URL is required when PLATFORM_ENABLED=true." }
-        check(env.platformDebitUrl.isNotBlank()) { "PLATFORM_DEBIT_URL is required when PLATFORM_ENABLED=true." }
+        check(env.appOperatorBaseUrl.isNotBlank()) { "APP_OPERATOR_BASE_URL is required when PLATFORM_ENABLED=true." }
+        check(env.appOperatorUserDetailPath.isNotBlank()) {
+            "APP_OPERATOR_USER_DETAIL_PATH is required when PLATFORM_ENABLED=true."
+        }
+        check(env.appOperatorBalancePath.isNotBlank()) {
+            "APP_OPERATOR_BALANCE_PATH is required when PLATFORM_ENABLED=true."
+        }
+        check(env.appOperatorLoginPath.isNotBlank()) {
+            "APP_OPERATOR_LOGIN_PATH is required when PLATFORM_ENABLED=true."
+        }
         check(env.platformAmqpUrl.isNotBlank()) { "PLATFORM_AMQP_URL is required when PLATFORM_ENABLED=true." }
         check(env.platformAmqpExchange.isNotBlank()) { "PLATFORM_AMQP_EXCHANGE is required when PLATFORM_ENABLED=true." }
         check(env.platformAmqpRoutingKey.isNotBlank()) {
             "PLATFORM_AMQP_ROUTING_KEY or PLATFORM_AMQP_QUEUE_NAME is required when PLATFORM_ENABLED=true."
         }
+    }
+
+    private fun joinUrl(baseUrl: String, path: String): String {
+        val base = baseUrl.trim().trimEnd('/')
+        val normalizedPath = path.trim().let { if (it.startsWith("/")) it else "/$it" }
+        if (base.isBlank() || path.isBlank()) {
+            return ""
+        }
+        return base + normalizedPath
     }
 
     private fun number(environment: Environment, name: String, fallback: Int): Int {

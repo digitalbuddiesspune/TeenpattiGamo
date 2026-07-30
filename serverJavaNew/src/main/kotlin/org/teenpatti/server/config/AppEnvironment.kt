@@ -26,13 +26,17 @@ internal class AppEnvironment {
     var initialBalance: Int = 0
     var turnDurationMs: Int = 0
     var platformEnabled: Boolean = false
-    var platformBalanceUrl: String = ""
+    var appOperatorBaseUrl: String = ""
+    var appOperatorUserDetailPath: String = ""
+    var appOperatorBalancePath: String = ""
+    var appOperatorLoginPath: String = ""
+    var platformUserDetailUrl: String = ""
     var platformDebitUrl: String = ""
+    var platformLoginUrl: String = ""
     var platformAmqpUrl: String = ""
     var platformAmqpExchange: String = ""
     var platformAmqpRoutingKey: String = ""
     var platformPubKey: String = ""
     var platformSecret: String = ""
     var platformGameId: Int = 0
-    var platformLoginCallbackUrl: String = ""
 }

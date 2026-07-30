@@ -46,7 +46,7 @@ internal class PlatformIntegrationSmokeTest {
     @Test
     fun platformPublicSessionUsesIncomingTokenAndGameId() {
         withPlatformServer { server ->
-            server.respondJson("/operator/user/detail") { exchange ->
+            server.respondJson("/service/user/detail") { exchange ->
                 assertEquals("platform-token", exchange.requestHeaders.getFirst("token"))
                 """{"status":true,"data":{"id":"platform-user","name":"Platform Player","walletBalance":12345,"currency":"INR"}}"""
             }
@@ -76,7 +76,7 @@ internal class PlatformIntegrationSmokeTest {
     @Test
     fun platformPublicSessionAcceptsTopLevelUserDetail() {
         withPlatformServer { server ->
-            server.respondJson("/operator/user/detail") { exchange ->
+            server.respondJson("/service/user/detail") { exchange ->
                 assertEquals("platform-token", exchange.requestHeaders.getFirst("token"))
                 """{"status":true,"msg":"OK","user":{"name":"Platform Player","user_id":"platform-user","balance":"12345","avatar":null,"operatorId":"operator-1"}}"""
             }
@@ -107,7 +107,7 @@ internal class PlatformIntegrationSmokeTest {
     @Test
     fun platformProfileReturnsUserDetailForHomeBalance() {
         withPlatformServer { server ->
-            server.respondJson("/operator/user/detail") { exchange ->
+            server.respondJson("/service/user/detail") { exchange ->
                 assertEquals("platform-token", exchange.requestHeaders.getFirst("token"))
                 """{"status":true,"data":{"user":{"userId":"platform-user","username":"Platform Player","balance":"43210","currencyCode":"INR"}}}"""
             }
@@ -128,7 +128,7 @@ internal class PlatformIntegrationSmokeTest {
     @Test
     fun platformProfilePrefersWalletBalanceOverGenericBalanceWhenBothExist() {
         withPlatformServer { server ->
-            server.respondJson("/operator/user/detail") { exchange ->
+            server.respondJson("/service/user/detail") { exchange ->
                 assertEquals("platform-token", exchange.requestHeaders.getFirst("token"))
                 """{"status":true,"data":{"walletBalance":"250000","user":{"userId":"platform-user","username":"Platform Player","balance":"99000","currencyCode":"INR"}}}"""
             }
@@ -153,7 +153,7 @@ internal class PlatformIntegrationSmokeTest {
                     controller.createPublicSession(PlatformSessionRequest("", 456, clientSeed("platform-user"), "classic"), MockHttpServletRequest())
                 }
             assertEquals("platform_token_required", error.code)
-            assertEquals(0, server.requestCount("/operator/user/detail"))
+            assertEquals(0, server.requestCount("/service/user/detail"))
         }
     }
 
@@ -168,14 +168,14 @@ internal class PlatformIntegrationSmokeTest {
                     controller.createPublicSession(PlatformSessionRequest("platform-token", 0, clientSeed("platform-user"), "classic"), MockHttpServletRequest())
                 }
             assertEquals("platform_game_id_required", error.code)
-            assertEquals(0, server.requestCount("/operator/user/detail"))
+            assertEquals(0, server.requestCount("/service/user/detail"))
         }
     }
 
     @Test
     fun debitHistoryReturnsAuthenticatedPlatformUsersTransactionsNewestFirst() {
         withPlatformServer { server ->
-            server.respondJson("/operator/user/detail") { """{"status":true,"data":{"user":{"userId":"platform-user","username":"Platform Player","balance":"43210","currencyCode":"INR"}}}""" }
+            server.respondJson("/service/user/detail") { """{"status":true,"data":{"user":{"userId":"platform-user","username":"Platform Player","balance":"43210","currencyCode":"INR"}}}""" }
             val repository = InMemoryWalletTransactionRepository()
             repository.save(walletTransaction("debit-1", "platform-user", "debit", "2026-01-01T00:00:00Z", "Boot debited"))
             repository.save(walletTransaction("debit-2", "platform-user", "debit", "2026-01-03T00:00:00Z", "Call debited", roundId = "round-2", txnRefId = "ref-2"))
@@ -198,7 +198,7 @@ internal class PlatformIntegrationSmokeTest {
     @Test
     fun creditHistoryUsesAuthenticatedUserAndDescriptionFallback() {
         withPlatformServer { server ->
-            server.respondJson("/operator/user/detail") { """{"status":true,"data":{"user":{"userId":"platform-user","username":"Platform Player","balance":"43210","currencyCode":"INR"}}}""" }
+            server.respondJson("/service/user/detail") { """{"status":true,"data":{"user":{"userId":"platform-user","username":"Platform Player","balance":"43210","currencyCode":"INR"}}}""" }
             val repository = InMemoryWalletTransactionRepository()
             repository.save(walletTransaction("credit-1", "platform-user", "credit", "2026-01-02T00:00:00Z", "Payout credited", requestDescriptionOnly = true))
             repository.save(walletTransaction("credit-2", "platform-user", "credit", "2026-01-03T00:00:00Z", "Bonus credited"))
@@ -226,7 +226,7 @@ internal class PlatformIntegrationSmokeTest {
                 }
 
             assertEquals("platform_token_required", error.code)
-            assertEquals(0, server.requestCount("/operator/user/detail"))
+            assertEquals(0, server.requestCount("/service/user/detail"))
         }
     }
 
@@ -241,7 +241,7 @@ internal class PlatformIntegrationSmokeTest {
                 }
 
             assertEquals("platform_game_id_required", error.code)
-            assertEquals(0, server.requestCount("/operator/user/detail"))
+            assertEquals(0, server.requestCount("/service/user/detail"))
         }
     }
 
@@ -276,7 +276,7 @@ internal class PlatformIntegrationSmokeTest {
     @Test
     fun roundHistoryReturnsPerRoundOutcomeAndDealerTip() {
         withPlatformServer { server ->
-            server.respondJson("/operator/user/detail") { """{"status":true,"data":{"user":{"userId":"platform-user","username":"Platform Player","balance":"43210","currencyCode":"INR"}}}""" }
+            server.respondJson("/service/user/detail") { """{"status":true,"data":{"user":{"userId":"platform-user","username":"Platform Player","balance":"43210","currencyCode":"INR"}}}""" }
             val walletRepository = InMemoryWalletTransactionRepository()
             val roundRepository = InMemoryRoundHistoryRepository()
             walletRepository.save(walletTransaction("txn-1", "platform-user", "debit", "2026-01-03T00:00:00Z", "Boot", roundId = "round-1"))
@@ -441,8 +441,13 @@ internal class PlatformIntegrationSmokeTest {
     private fun platformEnv(baseUrl: String): AppEnvironment =
         AppEnvironment().also {
             it.platformEnabled = true
-            it.platformBalanceUrl = "$baseUrl/operator/user/detail"
+            it.appOperatorBaseUrl = baseUrl
+            it.appOperatorUserDetailPath = "/service/user/detail"
+            it.appOperatorBalancePath = "/service/operator/user/balance/v2"
+            it.appOperatorLoginPath = "/operator/user/login"
+            it.platformUserDetailUrl = "$baseUrl/service/user/detail"
             it.platformDebitUrl = "$baseUrl/service/operator/user/balance/v2"
+            it.platformLoginUrl = "$baseUrl/operator/user/login"
         }
 
     private fun platformController(
