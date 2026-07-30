@@ -336,6 +336,24 @@ internal class PlatformIntegrationSmokeTest {
     }
 
     @Test
+    fun walletSkipsGuestPlayersWithoutPlatformLinkage() {
+        withPlatformServer { server ->
+            server.respondJson("/service/operator/user/balance/v2") { """{"status":true,"msg":"OK"}""" }
+            val publisher = RecordingPlatformWalletPublisher()
+            val repository = InMemoryWalletTransactionRepository()
+            val wallet = PlatformWalletService(platformEnv(server.baseUrl()), publisher, repository, InMemoryRoundHistoryRepository(), FixedClock())
+            val guest = PlatformPlayerRef("player-1", null, null, null, null, "127.0.0.1", false)
+
+            wallet.debit(guest, "round-1", "round-1:player-1:boot", 1000, "Boot")
+            wallet.credit(guest, "round-1", "round-1:player-1:payout", 2000, "Payout")
+
+            assertEquals(0, server.requestCount("/service/operator/user/balance/v2"))
+            assertEquals(0, publisher.messages.size)
+            assertNull(repository.loadByOperationKey("round-1:player-1:boot"))
+        }
+    }
+
+    @Test
     fun walletDebitIsIdempotentForSucceededTransactions() {
         withPlatformServer { server ->
             server.respondJson("/service/operator/user/balance/v2") { """{"status":true,"msg":"OK"}""" }

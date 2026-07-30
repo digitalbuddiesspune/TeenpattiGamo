@@ -386,7 +386,7 @@ internal class PublicTableManager(
                 "playerCount" to eligible.size,
                 "distinctPlayerCount" to distinctPlayerCount,
             )
-            eligible.forEach { assignMatchmakingTable(listOf(it), true) }
+            eligible.forEach { session -> tryAssignMatchmakingTable(listOf(session), true) }
             return emptyList()
         }
         val groupSize = config.playerCount
@@ -401,7 +401,7 @@ internal class PublicTableManager(
             "queuedRemainder" to eligible.size - assignableCount,
         )
         groups.forEach { group ->
-            assignMatchmakingTable(group, false)
+            tryAssignMatchmakingTable(group, false)
         }
         val assignedIds = groups.flatten().map { it.id }.toSet()
         return eligible.filter { !assignedIds.contains(it.id) }.map { it.id }
@@ -454,6 +454,32 @@ internal class PublicTableManager(
         session.platformUserId?.trim()?.takeIf { it.isNotBlank() }
             ?.lowercase()
             ?: session.id
+
+    private fun tryAssignMatchmakingTable(sessions: List<PublicPlayerSessionState>, botFallback: Boolean) {
+        try {
+            assignMatchmakingTable(sessions, botFallback)
+        } catch (error: Exception) {
+            sessions.forEach { session -> failMatchmakingSession(session, error) }
+        }
+    }
+
+    private fun failMatchmakingSession(session: PublicPlayerSessionState, error: Exception) {
+        GameEventLog.error(
+            "matchmaking_assignment_failed",
+            error,
+            "variantId" to config.variant.id,
+            "playerId" to session.id,
+        )
+        matchmakingCoordinator?.remove(config.variant.id, session.id)
+        val current = loadSession(session.id) ?: return
+        current.connected = false
+        current.status = "left"
+        current.tableId = null
+        current.lastSeenAt = clockProvider.nowIso()
+        current.leftAt = current.lastSeenAt
+        current.expiresAt = clockProvider.isoFromMillis(clockProvider.now().toEpochMilli() + PUBLIC_SESSION_TTL_MS)
+        saveSession(current)
+    }
 
     private fun assignMatchmakingTable(sessions: List<PublicPlayerSessionState>, botFallback: Boolean) {
         val table = createTable()

@@ -77,7 +77,7 @@ internal class PlatformWalletService(
         amount: Int,
         description: String,
     ) {
-        if (!env.platformEnabled || player.isBot || amount <= 0) {
+        if (skipsWallet(player, amount)) {
             return
         }
         val platformUserId = requirePlatformUserId(player)
@@ -119,7 +119,7 @@ internal class PlatformWalletService(
         description: String,
         txnRefId: String? = null,
     ) {
-        if (!env.platformEnabled || player.isBot || amount <= 0) {
+        if (skipsWallet(player, amount)) {
             return
         }
         val platformUserId = requirePlatformUserId(player)
@@ -229,6 +229,9 @@ internal class PlatformWalletService(
         response.nextOffset = if (response.hasMore) normalizedOffset + response.items.size else null
         return response
     }
+
+    private fun skipsWallet(player: PlatformPlayerRef, amount: Int): Boolean =
+        !env.platformEnabled || player.isBot || amount <= 0 || !player.walletLinked
 
     private fun loadOrCreate(
         operationKey: String,

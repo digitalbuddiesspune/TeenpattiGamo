@@ -62,4 +62,12 @@ internal class PlatformPlayerRef(
     val platformOperatorId: String?,
     val ip: String?,
     val isBot: Boolean,
-)
+) {
+    /**
+     * Guest players join without a platform session, so they own no platform wallet and play with
+     * table chips only. Partial linkage still counts as linked so misconfigured platform players
+     * fail loudly instead of silently playing for free.
+     */
+    val walletLinked: Boolean
+        get() = !platformUserId.isNullOrBlank() || !platformToken.isNullOrBlank()
+}
