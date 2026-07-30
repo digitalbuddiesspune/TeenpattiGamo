@@ -120,24 +120,48 @@ function rotateSeatsForViewer(seats = []) {
   });
 }
 
-function StatusBanner({ title, message, tone = "default" }) {
+function StatusBanner({ title, message, tone = "default", timerLabel = null }) {
   const toneClass = tone === "error"
     ? "border-[#ffb4b4]/24 bg-[linear-gradient(180deg,rgba(88,24,24,0.94),rgba(44,14,14,0.98))]"
     : "border-[#ffffff14] bg-[linear-gradient(180deg,rgba(8,52,57,0.94),rgba(4,19,22,0.98))]";
 
   return (
     <div className={`mx-auto w-full rounded-[18px] border px-4 py-3 text-white shadow-[0_20px_42px_rgba(0,0,0,0.34)] backdrop-blur-md ${toneClass}`}>
-      <strong className={`block text-xs font-black uppercase tracking-[0.16em] sm:text-sm ${
-        tone === "error" ? "text-[#ffe0d6]" : "text-[#abfff5]"
-      }`}>
-        {title}
-      </strong>
+      <div className="flex items-start justify-between gap-3">
+        <strong className={`block text-xs font-black uppercase tracking-[0.16em] sm:text-sm ${
+          tone === "error" ? "text-[#ffe0d6]" : "text-[#abfff5]"
+        }`}>
+          {title}
+        </strong>
+        {timerLabel ? (
+          <span
+            className="shrink-0 font-mono text-sm font-black tracking-[0.06em] text-[#ffe6a0] tabular-nums"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {timerLabel}
+          </span>
+        ) : null}
+      </div>
       <span className={`mt-1.5 block text-xs sm:text-sm ${
         tone === "error" ? "text-white/78" : "text-white/72"
       }`}>
         {message}
       </span>
     </div>
+  );
+}
+
+function PublicTableJoiningDesktopBanner({ message }) {
+  const elapsedSeconds = useElapsedMatchmakingSeconds();
+  const timerLabel = formatMatchmakingTimer(elapsedSeconds);
+
+  return (
+    <StatusBanner
+      title="Joining table"
+      message={`${message} Search time ${timerLabel}.`}
+      timerLabel={timerLabel}
+    />
   );
 }
 
@@ -182,7 +206,33 @@ function TableGameplayBackdrop({ className = "" }) {
   );
 }
 
+function formatMatchmakingTimer(totalSeconds) {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function useElapsedMatchmakingSeconds() {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    const startedAt = Date.now();
+    setElapsedSeconds(0);
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return elapsedSeconds;
+}
+
 function PublicTableJoiningMobileScreen({ message }) {
+  const elapsedSeconds = useElapsedMatchmakingSeconds();
+  const timerLabel = formatMatchmakingTimer(elapsedSeconds);
+  const progressPercent = Math.min(92, 18 + elapsedSeconds * 8);
+
   return (
     <section className="menu-screen flex min-h-screen justify-center overflow-hidden bg-[linear-gradient(180deg,#041213,#010607_76%)]">
       <DesktopMenuBackdrop />
@@ -214,7 +264,7 @@ function PublicTableJoiningMobileScreen({ message }) {
               <div className="relative z-[1] px-5 pb-5 pt-5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="inline-flex items-center gap-2 rounded-full border border-[#43d8cc]/22 bg-[#081c1f]/72 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#abfff5]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#43d8cc]" />
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#43d8cc]" />
                     Public Table
                   </div>
                   <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/42">
@@ -222,31 +272,55 @@ function PublicTableJoiningMobileScreen({ message }) {
                   </div>
                 </div>
 
-                <div className="mt-6">
-                  <h1 className="text-[1.9rem] font-black leading-[0.98] tracking-[-0.02em] text-white">
-                    Joining the
-                    <br />
-                    table
-                  </h1>
-                  <p className="mt-3 max-w-[18rem] text-[0.82rem] leading-[1.5] text-white/66">
-                    {message}
-                  </p>
+                <div className="mt-5 flex items-end justify-between gap-4">
+                  <div>
+                    <h1 className="text-[1.9rem] font-black leading-[0.98] tracking-[-0.02em] text-white">
+                      Joining the
+                      <br />
+                      table
+                    </h1>
+                    <p className="mt-3 max-w-[16rem] text-[0.82rem] leading-[1.5] text-white/66">
+                      {message}
+                    </p>
+                  </div>
+
+                  <div
+                    className="shrink-0 rounded-[20px] border border-[#43d8cc]/22 bg-[rgba(8,36,40,0.88)] px-3.5 py-3 text-right shadow-[0_12px_28px_rgba(0,0,0,0.28)]"
+                    aria-live="polite"
+                    aria-atomic="true"
+                  >
+                    <div className="text-[9px] font-black uppercase tracking-[0.18em] text-[#abfff5]/78">
+                      Search time
+                    </div>
+                    <div className="mt-1 font-mono text-[1.85rem] font-black leading-none tracking-[0.04em] text-[#ffe6a0] tabular-nums">
+                      {timerLabel}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="mt-6 rounded-[22px] border border-white/8 bg-[rgba(3,18,21,0.52)] p-4">
                   <div className="flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.14em] text-white/54">
                     <span>Preparing seat</span>
-                    <span className="text-[#ffe6a0]">Please wait</span>
+                    <span className="text-[#ffe6a0]">{timerLabel}</span>
                   </div>
 
                   <div className="mt-3 h-[3px] w-full overflow-hidden rounded-full bg-white/8">
-                    <div className="h-full w-[46%] rounded-full bg-[linear-gradient(90deg,#2ac7bf_0%,#78efe5_48%,#efc24e_100%)] shadow-[0_0_18px_rgba(67,216,204,0.3)]" style={{ animation: "pulse 1.8s ease-in-out infinite" }} />
+                    <div
+                      className="h-full rounded-full bg-[linear-gradient(90deg,#2ac7bf_0%,#78efe5_48%,#efc24e_100%)] shadow-[0_0_18px_rgba(67,216,204,0.3)] transition-[width] duration-300 ease-out"
+                      style={{ width: `${progressPercent}%` }}
+                    />
                   </div>
 
                   <div className="mt-4 grid gap-2">
                     <div className="flex items-center justify-between rounded-[16px] border border-white/7 bg-[rgba(255,255,255,0.03)] px-3 py-2.5">
                       <span className="text-[11px] font-semibold text-white/74">Seat allocation</span>
                       <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#abfff5]">In progress</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-[16px] border border-white/7 bg-[rgba(255,255,255,0.03)] px-3 py-2.5">
+                      <span className="text-[11px] font-semibold text-white/74">Matchmaking timer</span>
+                      <span className="font-mono text-[11px] font-black tracking-[0.08em] text-[#ffe6a0] tabular-nums">
+                        {timerLabel}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between rounded-[16px] border border-white/7 bg-[rgba(255,255,255,0.03)] px-3 py-2.5">
                       <span className="text-[11px] font-semibold text-white/74">Balance sync</span>
@@ -257,10 +331,10 @@ function PublicTableJoiningMobileScreen({ message }) {
 
                 <div className="mt-5 flex items-center gap-3 rounded-[18px] border border-[#ffd778]/12 bg-[rgba(63,44,12,0.22)] px-3 py-3">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#ffd778]/18 bg-[rgba(255,214,120,0.08)]">
-                    <div className="h-2 w-2 rounded-full bg-[#efc24e] shadow-[0_0_14px_rgba(239,194,78,0.65)]" />
+                    <div className="h-2 w-2 animate-pulse rounded-full bg-[#efc24e] shadow-[0_0_14px_rgba(239,194,78,0.65)]" />
                   </div>
                   <p className="text-[11px] leading-[1.45] text-[#ffe6a0]/78">
-                    The table will open automatically once the session is ready.
+                    Searching for {timerLabel}. The table will open automatically once a match is ready.
                   </p>
                 </div>
               </div>
@@ -828,8 +902,7 @@ export default function GameClient({
               <section className="relative z-[1] flex min-h-screen items-center justify-center px-4">
                 <TableGameplayBackdrop />
                 <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,15,16,0.14),rgba(0,6,8,0.24)_68%,rgba(0,0,0,0.84))]" aria-hidden="true" />
-                <StatusBanner
-                  title="Joining table"
+                <PublicTableJoiningDesktopBanner
                   message={activeError || "Connecting you to the live table. Please wait a moment."}
                 />
               </section>
