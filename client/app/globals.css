@@ -642,36 +642,18 @@ body.app-body-portrait-blocked {
 
 .joining-screen__cards {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  height: 22px;
+  height: clamp(26px, 5.8vw, 36px);
   margin-bottom: 2px;
 }
 
-.joining-screen__cards span {
-  display: block;
-  width: 14px;
-  height: 20px;
-  border-radius: 3px;
-  border: 1px solid rgba(255, 230, 180, 0.55);
-  background: linear-gradient(180deg, #fff7e8, #efc24e 70%, #c48a1a);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.35);
-}
-
-.joining-screen__cards span:nth-child(1) {
-  transform: rotate(-18deg) translateY(2px);
-  z-index: 1;
-}
-
-.joining-screen__cards span:nth-child(2) {
-  transform: translateY(-2px);
-  z-index: 2;
-  margin: 0 -3px;
-}
-
-.joining-screen__cards span:nth-child(3) {
-  transform: rotate(18deg) translateY(2px);
-  z-index: 1;
+.joining-screen__cards-img {
+  width: auto;
+  height: clamp(26px, 5.8vw, 36px);
+  max-width: clamp(54px, 14vw, 76px);
+  object-fit: contain;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.45));
 }
 
 .joining-screen__ring-label {

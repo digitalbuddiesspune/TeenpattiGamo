@@ -266,9 +266,14 @@ function PublicTableJoiningScreen({ message, mode = "matchmaking" }) {
 
                 <div className="joining-screen__ring-core">
                   <span className="joining-screen__cards" aria-hidden="true">
-                    <span />
-                    <span />
-                    <span />
+                    <Image
+                      src="/newAssets/bg-remo-cards-Photoroom.png"
+                      alt=""
+                      width={52}
+                      height={48}
+                      sizes="(max-width: 480px) 40px, 52px"
+                      className="joining-screen__cards-img"
+                    />
                   </span>
                   <span className="joining-screen__ring-label">
                     {isSync ? "Please wait" : "Search time"}
