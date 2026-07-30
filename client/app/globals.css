@@ -651,7 +651,7 @@ body.app-body-portrait-blocked {
 .joining-screen__cards-img {
   width: auto;
   height: clamp(26px, 5.8vw, 36px);
-  max-width: clamp(54px, 14vw, 76px);
+  max-width: clamp(54px, 14vw, 74px);
   object-fit: contain;
   filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.45));
 }
