@@ -849,7 +849,6 @@ body.app-body-portrait-blocked {
 
 .joining-screen__cards {
   display: flex;
-<<<<<<< Updated upstream
   align-items: center;
   justify-content: center;
   height: clamp(26px, 5.8vw, 36px);
@@ -862,38 +861,6 @@ body.app-body-portrait-blocked {
   max-width: clamp(54px, 14vw, 74px);
   object-fit: contain;
   filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.45));
-=======
-  align-items: flex-end;
-  justify-content: center;
-  height: 22px;
-  margin-bottom: 2px;
-}
-
-.joining-screen__cards span {
-  display: block;
-  width: 14px;
-  height: 20px;
-  border-radius: 3px;
-  border: 1px solid rgba(255, 230, 180, 0.55);
-  background: linear-gradient(180deg, #fff7e8, #efc24e 70%, #c48a1a);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.35);
-}
-
-.joining-screen__cards span:nth-child(1) {
-  transform: rotate(-18deg) translateY(2px);
-  z-index: 1;
-}
-
-.joining-screen__cards span:nth-child(2) {
-  transform: translateY(-2px);
-  z-index: 2;
-  margin: 0 -3px;
-}
-
-.joining-screen__cards span:nth-child(3) {
-  transform: rotate(18deg) translateY(2px);
-  z-index: 1;
->>>>>>> Stashed changes
 }
 
 .joining-screen__ring-label {
@@ -1324,6 +1291,205 @@ body.app-body-portrait-blocked {
 
 .casino-page-table {
   padding: 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Public table board sizing.
+ *
+ * The board is sized from available HEIGHT, not width. The table art is a tall
+ * 1054x1492 portrait, so sizing it by width (the old `w-[84%] sm:w-full`) made
+ * it overflow the viewport vertically the moment the frame stopped being a
+ * fixed 430px phone column. Deriving width from the leftover height keeps the
+ * whole surface, the dealer, and the user's card fan on screen at every size.
+ * ------------------------------------------------------------------------- */
+:root {
+  --board-aspect: 0.7064; /* 1054 / 1492 */
+  --board-hud: 84px; /* sticky settings + balance row */
+  --board-controls: 132px; /* fixed action bar reserve */
+  --board-cards: 104px; /* user fan hanging below the surface */
+  --board-min: 244px;
+  --board-max: min(88vw, 340px);
+  --board-column: 460px;
+  --board-lift: 46px;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --board-controls: 168px;
+    --board-max: min(56vw, 400px);
+    --board-lift: 30px;
+  }
+}
+
+@media (min-width: 1024px) and (min-height: 860px) {
+  :root {
+    --board-max: min(46vw, 440px);
+    --board-column: 560px;
+  }
+}
+
+.casino-table-scene .app-frame-surface > div {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  width: 100%;
+  max-width: var(--board-column);
+  margin-inline: auto;
+  padding-inline: 12px;
+  padding-bottom: calc(var(--board-controls) + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 640px) {
+  .casino-table-scene .app-frame-surface > div {
+    padding-inline: 16px;
+  }
+}
+
+.casino-table-scene__stage {
+  margin-top: calc(var(--board-lift) * -1);
+}
+
+/*
+ * Width tracks the screen, height is the guard rail: take whichever of the two
+ * is smaller so the board grows with the viewport width but can never get so
+ * wide that the felt runs off the bottom of the screen.
+ */
+.casino-table-scene__viewport {
+  width: max(
+    var(--board-min),
+    min(
+      100%,
+      var(--board-max),
+      calc(
+        (100dvh - var(--board-hud) - var(--board-controls) - var(--board-cards)) *
+          var(--board-aspect)
+      )
+    )
+  );
+  margin-inline: auto;
+}
+
+/* Dealer scales with the board instead of jumping at one breakpoint. */
+.casino-table-scene__dealer > div {
+  width: clamp(104px, 44%, 150px);
+  height: auto;
+  aspect-ratio: 1;
+}
+
+/*
+ * Seat avatars are sized off the felt rather than fixed pixels, so they hold
+ * their proportion as the board grows. The surface is the query container, so
+ * 1cqw is 1% of the board width.
+ */
+.casino-table-scene__surface {
+  container-type: inline-size;
+  aspect-ratio: 1054 / 1492;
+}
+
+/* Portrait felt on phones/tablets, dedicated landscape art on desktop. */
+.casino-table-scene__felt--landscape {
+  display: none;
+}
+
+.table-seat .table-seat__avatar {
+  width: clamp(30px, 10.5cqw, 62px);
+  height: clamp(30px, 10.5cqw, 62px);
+}
+
+.table-seat--user .table-seat__avatar {
+  width: clamp(40px, 14cqw, 84px);
+  height: clamp(40px, 14cqw, 84px);
+}
+
+/* Keep the fixed action bar aligned with the board column on wide screens. */
+.table-controls {
+  width: 100%;
+  max-width: var(--board-column);
+}
+
+/* ---------------------------------------------------------------------------
+ * Desktop landscape board.
+ *
+ * Swaps in the dedicated 1536x1024 landscape felt and re-seats the players
+ * around it. Each opponent keeps the side of the table they already sat on, so
+ * the card fan rotations baked into `seatLayouts` stay correct.
+ * ------------------------------------------------------------------------- */
+@media (min-width: 1024px) and (orientation: landscape) {
+  :root {
+    --board-aspect: 1.5; /* 1536 / 1024 */
+    --board-hud: 92px;
+    --board-controls: 150px;
+    --board-cards: 112px;
+    --board-min: 520px;
+    --board-max: min(78vw, 1040px);
+    --board-column: min(1160px, 94vw);
+    --board-lift: 6px;
+  }
+
+  .casino-table-scene .casino-table-scene__surface {
+    container-type: size;
+    aspect-ratio: 1536 / 1024;
+  }
+
+  .casino-table-scene__felt--portrait {
+    display: none;
+  }
+
+  .casino-table-scene__felt--landscape {
+    display: block;
+  }
+
+  .casino-table-scene__viewport .table-seat--index-0 {
+    bottom: 4%;
+  }
+
+  .casino-table-scene__viewport .table-seat--index-1 {
+    left: 2%;
+    bottom: 27%;
+  }
+
+  .casino-table-scene__viewport .table-seat--index-2 {
+    left: 2%;
+    top: 16%;
+  }
+
+  .casino-table-scene__viewport .table-seat--index-3 {
+    right: 2%;
+    top: 16%;
+  }
+
+  .casino-table-scene__viewport .table-seat--index-4 {
+    right: 2%;
+    bottom: 27%;
+  }
+
+  .casino-table-scene__viewport .casino-table-scene__dealer {
+    top: 8%;
+    transform: translate(-50%, -84%);
+  }
+
+  .casino-table-scene__viewport .casino-table-scene__dealer > div {
+    width: clamp(120px, 15%, 176px);
+  }
+
+  .casino-table-scene__viewport .casino-table-scene__pot {
+    top: 44%;
+  }
+
+  .casino-table-scene__deck {
+    top: 34%;
+  }
+
+  /* The landscape board is wide but short, so seats track its height. */
+  .table-seat .table-seat__avatar {
+    width: clamp(34px, 15cqh, 68px);
+    height: clamp(34px, 15cqh, 68px);
+  }
+
+  .table-seat--user .table-seat__avatar {
+    width: clamp(44px, 20cqh, 92px);
+    height: clamp(44px, 20cqh, 92px);
+  }
 }
 
 .ambient-glow {

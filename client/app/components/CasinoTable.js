@@ -500,8 +500,8 @@ export default function CasinoTable({
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,15,16,0.06),rgba(0,6,8,0.18)_68%,rgba(0,0,0,0.62))]" />
       </div>
 
-      <div className="app-frame app-frame-surface relative z-[20] mx-auto h-dvh overflow-x-hidden overflow-y-auto overscroll-y-contain sm:overflow-y-hidden">
-        <div className="flex min-h-full w-full flex-col px-3 pb-[148px] sm:px-4 sm:pb-[200px]">
+      <div className="app-frame app-frame-surface relative z-[20] mx-auto h-dvh overflow-x-hidden overflow-y-auto overscroll-y-contain">
+        <div>
           <div className="sticky top-0 z-[40] -mx-3 px-3 pb-2 pt-[max(10px,env(safe-area-inset-top))] sm:mx-0 sm:px-0 sm:pb-3 sm:pt-[18px]">
             <div className="relative flex items-start justify-between">
               <div className="relative" onPointerDown={(event) => event.stopPropagation()}>
@@ -539,10 +539,10 @@ export default function CasinoTable({
             </div>
           </div>
 
-          <div className="relative mx-auto mt-[-62px] flex w-full flex-none items-start justify-center sm:mt-[-38px] sm:flex-1">
-          <div className="casino-table-scene__viewport relative w-[84%] max-w-[19rem] sm:w-full sm:max-w-none">
+          <div className="casino-table-scene__stage relative mx-auto flex w-full flex-none items-start justify-center sm:flex-1">
+          <div className="casino-table-scene__viewport relative">
             <div className="casino-table-scene__dealer absolute left-1/2 top-[11.5%] z-[22] -translate-x-1/2 -translate-y-[96%]">
-              <div className="relative h-[138px] w-[138px] sm:h-[164px] sm:w-[164px]">
+              <div className="relative">
                 <Image
                   src="/newAssets/dealer.png"
                   alt="Dealer"
@@ -553,13 +553,20 @@ export default function CasinoTable({
               </div>
             </div>
 
-            <div ref={surfaceRef} className="casino-table-scene__surface relative aspect-[1500/2644]">
+            <div ref={surfaceRef} className="casino-table-scene__surface relative">
               <Image
-                src="/newAssets/centerTable.png"
+                src="/newAssets/newPhotoroom.png"
                 alt="Teen Patti table"
                 fill
-                className="object-contain drop-shadow-[0_30px_50px_rgba(0,0,0,0.46)]"
+                className="casino-table-scene__felt casino-table-scene__felt--portrait object-contain drop-shadow-[0_30px_50px_rgba(0,0,0,0.46)]"
                 priority
+              />
+              <Image
+                src="/newAssets/landscape-light.png"
+                alt=""
+                fill
+                aria-hidden="true"
+                className="casino-table-scene__felt casino-table-scene__felt--landscape object-contain drop-shadow-[0_30px_50px_rgba(0,0,0,0.46)]"
               />
 
               {centeredNotification ? (

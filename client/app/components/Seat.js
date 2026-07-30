@@ -308,7 +308,7 @@ export default function Seat({
           </div>
         </div>
 
-        <div className={`${layout.avatarShell} relative`}>
+        <div className={`table-seat__avatar ${layout.avatarShell} relative`}>
           {seat.isTurn ? (
             <TurnClock
               turnClock={turnClock}
