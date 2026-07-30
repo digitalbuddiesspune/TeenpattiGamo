@@ -317,11 +317,17 @@ body.app-body-portrait-blocked {
   align-content: center;
 }
 
+/*
+ * `background-clip: text` paints within the element box, so a tight line-height
+ * would shear the ascenders off this serif face. The extra leading and padding
+ * keep the whole glyph inside the gradient.
+ */
 .variant-card__title {
   font-family: var(--font-option-title), serif;
   font-size: clamp(1.5rem, 3vw, 1.95rem);
   font-weight: 900;
-  line-height: 1;
+  line-height: 1.24;
+  padding-block: 2px;
   letter-spacing: 0.02em;
   background: linear-gradient(180deg, #fff3c8 10%, #ffcf68 52%, #d59418 100%);
   -webkit-background-clip: text;
@@ -4017,3 +4023,4 @@ body.app-body-portrait-blocked {
     filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.22));
   }
 }
+

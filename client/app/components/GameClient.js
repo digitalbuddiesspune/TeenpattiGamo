@@ -376,7 +376,7 @@ function AceFan() {
   return (
     <span className="variant-card__fan" aria-hidden="true">
       <Image
-        src="/newAssets/cards.png"
+        src="/newAssets/bg-remo-cards-Photoroom.png"
         alt=""
         width={132}
         height={124}
