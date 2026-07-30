@@ -460,6 +460,420 @@ body.app-body-portrait-blocked {
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * Public table joining / matchmaking — modern red theme (responsive).
+ * ------------------------------------------------------------------------- */
+.joining-screen {
+  display: flex;
+  min-height: 100%;
+  min-height: 100dvh;
+  overflow: hidden;
+  color: #fff4e8;
+  background:
+    radial-gradient(ellipse 80% 55% at 50% -10%, #8b1520 0%, transparent 58%),
+    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(240, 58, 45, 0.22), transparent 48%),
+    radial-gradient(ellipse 60% 40% at 0% 80%, rgba(160, 20, 30, 0.35), transparent 45%),
+    linear-gradient(180deg, #2a070c 0%, #140306 55%, #0a0204 100%);
+}
+
+.joining-screen__frame {
+  position: relative;
+  height: 100dvh;
+  width: 100%;
+}
+
+.joining-screen__atmosphere {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.joining-screen__orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(48px);
+  opacity: 0.55;
+  animation: joining-orb 9s ease-in-out infinite;
+}
+
+.joining-screen__orb--a {
+  top: 8%;
+  left: 12%;
+  width: min(42vw, 280px);
+  height: min(42vw, 280px);
+  background: rgba(240, 58, 45, 0.45);
+}
+
+.joining-screen__orb--b {
+  right: 6%;
+  bottom: 18%;
+  width: min(48vw, 320px);
+  height: min(48vw, 320px);
+  background: rgba(239, 194, 78, 0.18);
+  animation-delay: -3s;
+}
+
+.joining-screen__orb--c {
+  left: 40%;
+  bottom: -8%;
+  width: min(56vw, 360px);
+  height: min(56vw, 360px);
+  background: rgba(167, 20, 19, 0.5);
+  animation-delay: -5.5s;
+}
+
+.joining-screen__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  padding:
+    max(20px, env(safe-area-inset-top))
+    clamp(16px, 4vw, 32px)
+    max(20px, env(safe-area-inset-bottom));
+}
+
+.joining-screen__stage {
+  display: flex;
+  width: 100%;
+  max-width: 36rem;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: joining-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.joining-screen__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: clamp(18px, 4vh, 28px);
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 236, 210, 0.9);
+}
+
+.joining-screen__chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff5a4a;
+  box-shadow: 0 0 0 4px rgba(255, 90, 74, 0.18), 0 0 16px rgba(255, 90, 74, 0.7);
+  animation: joining-pulse 1.8s ease-in-out infinite;
+}
+
+.joining-screen__ring-wrap {
+  position: relative;
+  margin-bottom: clamp(18px, 4vh, 28px);
+}
+
+.joining-screen__ring {
+  position: relative;
+  width: clamp(190px, 48vw, 230px);
+  height: clamp(190px, 48vw, 230px);
+}
+
+.joining-screen__ring-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.joining-screen__ring-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 5;
+}
+
+.joining-screen__ring-value {
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.35s ease-out;
+  filter: drop-shadow(0 0 10px rgba(255, 90, 74, 0.55));
+}
+
+.joining-screen__spinner {
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: rgba(255, 214, 120, 0.85);
+  border-right-color: rgba(255, 107, 90, 0.35);
+  animation: joining-spin 1.15s linear infinite;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.joining-screen__ring-core {
+  position: absolute;
+  inset: 14%;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 220, 170, 0.18);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 90, 74, 0.2), transparent 55%),
+    linear-gradient(160deg, rgba(90, 14, 22, 0.95), rgba(28, 6, 10, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -12px 24px rgba(0, 0, 0, 0.28),
+    0 16px 36px rgba(0, 0, 0, 0.4);
+}
+
+.joining-screen__cards {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 22px;
+  margin-bottom: 2px;
+}
+
+.joining-screen__cards span {
+  display: block;
+  width: 14px;
+  height: 20px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 230, 180, 0.55);
+  background: linear-gradient(180deg, #fff7e8, #efc24e 70%, #c48a1a);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.35);
+}
+
+.joining-screen__cards span:nth-child(1) {
+  transform: rotate(-18deg) translateY(2px);
+  z-index: 1;
+}
+
+.joining-screen__cards span:nth-child(2) {
+  transform: translateY(-2px);
+  z-index: 2;
+  margin: 0 -3px;
+}
+
+.joining-screen__cards span:nth-child(3) {
+  transform: rotate(18deg) translateY(2px);
+  z-index: 1;
+}
+
+.joining-screen__ring-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 230, 200, 0.62);
+}
+
+.joining-screen__ring-time {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: clamp(1.7rem, 6.5vw, 2.15rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: #ffe7b0;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 24px rgba(239, 194, 78, 0.4);
+}
+
+.joining-screen__ring-pct {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(255, 150, 130, 0.9);
+}
+
+.joining-screen__title {
+  margin: 0;
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: clamp(1.55rem, 5.5vw, 2.05rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  color: #fff7ec;
+}
+
+.joining-screen__message {
+  margin: 14px 0 0;
+  max-width: min(100%, 36rem);
+  width: 100%;
+  font-size: clamp(1.2rem, 4vw, 1.45rem);
+  line-height: 1.5;
+  font-weight: 600;
+  color: rgba(255, 236, 214, 0.86);
+}
+
+.joining-screen__steps {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
+  list-style: none;
+  margin: clamp(20px, 4vh, 28px) 0 0;
+  padding: 0;
+  width: 100%;
+}
+
+.joining-screen__step {
+  display: inline-flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: clamp(0.95rem, 2.8vw, 1.1rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(255, 236, 214, 0.42);
+  transition: color 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+}
+
+.joining-screen__step-num {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: rgba(255, 236, 214, 0.55);
+}
+
+.joining-screen__step.is-done,
+.joining-screen__step.is-active {
+  border-color: rgba(255, 107, 90, 0.4);
+  background: rgba(240, 58, 45, 0.16);
+  color: #ffd2c8;
+}
+
+.joining-screen__step.is-done .joining-screen__step-num,
+.joining-screen__step.is-active .joining-screen__step-num {
+  background: linear-gradient(180deg, #ff6b5a, #c61d1a);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(255, 107, 90, 0.45);
+}
+
+.joining-screen__hint {
+  margin: clamp(16px, 3vh, 22px) 0 0;
+  font-size: clamp(0.75rem, 2.3vw, 0.84rem);
+  line-height: 1.45;
+  color: rgba(255, 230, 180, 0.5);
+}
+
+@keyframes joining-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes joining-orb {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(2%, -3%, 0) scale(1.08);
+  }
+}
+
+@keyframes joining-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes joining-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (min-width: 768px) {
+  .joining-screen__stage {
+    max-width: 40rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .joining-screen__step {
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 6px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-height: 640px) {
+  .joining-screen__content {
+    align-items: flex-start;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .joining-screen__chip {
+    margin-bottom: 14px;
+  }
+
+  .joining-screen__ring {
+    width: 160px;
+    height: 160px;
+  }
+
+  .joining-screen__ring-wrap {
+    margin-bottom: 14px;
+  }
+
+  .joining-screen__steps {
+    margin-top: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .joining-screen__chip-dot,
+  .joining-screen__orb,
+  .joining-screen__spinner,
+  .joining-screen__stage {
+    animation: none;
+  }
+}
+
 /* ---- ace fan artwork ---- */
 .variant-card__fan {
   position: relative;

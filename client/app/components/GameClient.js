@@ -124,13 +124,13 @@ function rotateSeatsForViewer(seats = []) {
 function StatusBanner({ title, message, tone = "default", timerLabel = null }) {
   const toneClass = tone === "error"
     ? "border-[#ffb4b4]/24 bg-[linear-gradient(180deg,rgba(88,24,24,0.94),rgba(44,14,14,0.98))]"
-    : "border-[#ffffff14] bg-[linear-gradient(180deg,rgba(8,52,57,0.94),rgba(4,19,22,0.98))]";
+    : "border-[#e8b53c]/35 bg-[linear-gradient(180deg,rgba(125,16,25,0.94),rgba(61,7,13,0.98))]";
 
   return (
-    <div className={`mx-auto w-full rounded-[18px] border px-4 py-3 text-white shadow-[0_20px_42px_rgba(0,0,0,0.34)] backdrop-blur-md ${toneClass}`}>
+    <div className={`mx-auto w-full max-w-xl rounded-[18px] border px-4 py-3 text-white shadow-[0_20px_42px_rgba(0,0,0,0.34)] backdrop-blur-md ${toneClass}`}>
       <div className="flex items-start justify-between gap-3">
         <strong className={`block text-xs font-black uppercase tracking-[0.16em] sm:text-sm ${
-          tone === "error" ? "text-[#ffe0d6]" : "text-[#abfff5]"
+          tone === "error" ? "text-[#ffe0d6]" : "text-[#ffe6a0]"
         }`}>
           {title}
         </strong>
@@ -150,19 +150,6 @@ function StatusBanner({ title, message, tone = "default", timerLabel = null }) {
         {message}
       </span>
     </div>
-  );
-}
-
-function PublicTableJoiningDesktopBanner({ message }) {
-  const elapsedSeconds = useElapsedMatchmakingSeconds();
-  const timerLabel = formatMatchmakingTimer(elapsedSeconds);
-
-  return (
-    <StatusBanner
-      title="Joining table"
-      message={`${message} Search time ${timerLabel}.`}
-      timerLabel={timerLabel}
-    />
   );
 }
 
@@ -219,117 +206,106 @@ function useElapsedMatchmakingSeconds() {
   return elapsedSeconds;
 }
 
-function PublicTableJoiningMobileScreen({ message }) {
+function PublicTableJoiningScreen({ message, mode = "matchmaking" }) {
   const elapsedSeconds = useElapsedMatchmakingSeconds();
   const timerLabel = formatMatchmakingTimer(elapsedSeconds);
-  const progressPercent = Math.min(92, 18 + elapsedSeconds * 8);
+  const progressPercent = mode === "matchmaking"
+    ? Math.min(92, 18 + elapsedSeconds * 8)
+    : 54;
+  const isSync = mode === "sync";
+  const ring = 2 * Math.PI * 54;
 
   return (
-    <section className="menu-screen flex min-h-screen overflow-hidden bg-[linear-gradient(180deg,#041213,#010607_76%)]">
-      <DesktopMenuBackdrop />
-      <div className="app-frame app-frame-surface app-frame-clip relative h-dvh">
-        <TableGameplayBackdrop />
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,15,16,0.14),rgba(0,6,8,0.24)_68%,rgba(0,0,0,0.84))]" aria-hidden="true" />
+    <section className="joining-screen menu-screen">
+      <div className="app-frame app-frame-surface app-frame-clip joining-screen__frame">
+        <div className="joining-screen__atmosphere" aria-hidden="true">
+          <span className="joining-screen__orb joining-screen__orb--a" />
+          <span className="joining-screen__orb joining-screen__orb--b" />
+          <span className="joining-screen__orb joining-screen__orb--c" />
+        </div>
 
-        <div className="relative z-[1] flex h-dvh flex-col overflow-hidden">
-          <header className="relative h-[138px] w-full pt-[max(16px,env(safe-area-inset-top))]">
-            <Image
-              src="/newAssets/homeTopBg.png"
-              alt=""
-              fill
-              priority
-              sizes="(max-width: 640px) 100vw, 500px"
-              className="object-cover object-top"
-              aria-hidden="true"
-            />
-          </header>
+        <div className="joining-screen__content">
+          <div className="joining-screen__stage">
+            <div className="joining-screen__chip">
+              <span className="joining-screen__chip-dot" />
+              {isSync ? "Syncing session" : "Public table"}
+            </div>
 
-          <div className="relative flex flex-1 items-center justify-center px-[14px] pb-[max(20px,env(safe-area-inset-bottom))] pt-2">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(59,231,222,0.08),transparent_24%),radial-gradient(circle_at_50%_74%,rgba(239,194,78,0.08),transparent_22%)]" aria-hidden="true" />
+            <div className="joining-screen__ring-wrap" aria-live="polite" aria-atomic="true">
+              <div className="joining-screen__ring">
+                <svg className="joining-screen__ring-svg" viewBox="0 0 140 140" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="joiningRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#ff8a72" />
+                      <stop offset="55%" stopColor="#f03a2d" />
+                      <stop offset="100%" stopColor="#efc24e" />
+                    </linearGradient>
+                  </defs>
+                  <circle
+                    className="joining-screen__ring-track"
+                    cx="70"
+                    cy="70"
+                    r="54"
+                    fill="none"
+                  />
+                  <circle
+                    className="joining-screen__ring-value"
+                    cx="70"
+                    cy="70"
+                    r="54"
+                    fill="none"
+                    stroke="url(#joiningRingGrad)"
+                    style={{
+                      strokeDasharray: `${ring}`,
+                      strokeDashoffset: `${ring * (1 - progressPercent / 100)}`,
+                    }}
+                  />
+                </svg>
 
-            <div className="relative w-full overflow-hidden rounded-[28px] border border-[#ffffff14] bg-[linear-gradient(180deg,rgba(7,44,48,0.9),rgba(3,16,19,0.96))] shadow-[0_24px_44px_rgba(0,0,0,0.36)] backdrop-blur-[10px]">
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_36%)]" aria-hidden="true" />
-              <div className="absolute left-0 top-0 h-full w-px bg-[linear-gradient(180deg,transparent,rgba(67,216,204,0.28),transparent)]" aria-hidden="true" />
-              <div className="absolute right-0 top-0 h-full w-px bg-[linear-gradient(180deg,transparent,rgba(239,194,78,0.18),transparent)]" aria-hidden="true" />
+                <div className="joining-screen__spinner" aria-hidden="true" />
 
-              <div className="relative z-[1] px-5 pb-5 pt-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-[#43d8cc]/22 bg-[#081c1f]/72 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#abfff5]">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#43d8cc]" />
-                    Public Table
-                  </div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/42">
-                    Live Matchmaking
-                  </div>
-                </div>
-
-                <div className="mt-5 flex items-end justify-between gap-4">
-                  <div>
-                    <h1 className="text-[1.9rem] font-black leading-[0.98] tracking-[-0.02em] text-white">
-                      Joining the
-                      <br />
-                      table
-                    </h1>
-                    <p className="mt-3 max-w-[16rem] text-[0.82rem] leading-[1.5] text-white/66">
-                      {message}
-                    </p>
-                  </div>
-
-                  <div
-                    className="shrink-0 rounded-[20px] border border-[#43d8cc]/22 bg-[rgba(8,36,40,0.88)] px-3.5 py-3 text-right shadow-[0_12px_28px_rgba(0,0,0,0.28)]"
-                    aria-live="polite"
-                    aria-atomic="true"
-                  >
-                    <div className="text-[9px] font-black uppercase tracking-[0.18em] text-[#abfff5]/78">
-                      Search time
-                    </div>
-                    <div className="mt-1 font-mono text-[1.85rem] font-black leading-none tracking-[0.04em] text-[#ffe6a0] tabular-nums">
-                      {timerLabel}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 rounded-[22px] border border-white/8 bg-[rgba(3,18,21,0.52)] p-4">
-                  <div className="flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.14em] text-white/54">
-                    <span>Preparing seat</span>
-                    <span className="text-[#ffe6a0]">{timerLabel}</span>
-                  </div>
-
-                  <div className="mt-3 h-[3px] w-full overflow-hidden rounded-full bg-white/8">
-                    <div
-                      className="h-full rounded-full bg-[linear-gradient(90deg,#2ac7bf_0%,#78efe5_48%,#efc24e_100%)] shadow-[0_0_18px_rgba(67,216,204,0.3)] transition-[width] duration-300 ease-out"
-                      style={{ width: `${progressPercent}%` }}
-                    />
-                  </div>
-
-                  <div className="mt-4 grid gap-2">
-                    <div className="flex items-center justify-between rounded-[16px] border border-white/7 bg-[rgba(255,255,255,0.03)] px-3 py-2.5">
-                      <span className="text-[11px] font-semibold text-white/74">Seat allocation</span>
-                      <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#abfff5]">In progress</span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-[16px] border border-white/7 bg-[rgba(255,255,255,0.03)] px-3 py-2.5">
-                      <span className="text-[11px] font-semibold text-white/74">Matchmaking timer</span>
-                      <span className="font-mono text-[11px] font-black tracking-[0.08em] text-[#ffe6a0] tabular-nums">
-                        {timerLabel}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-[16px] border border-white/7 bg-[rgba(255,255,255,0.03)] px-3 py-2.5">
-                      <span className="text-[11px] font-semibold text-white/74">Balance sync</span>
-                      <span className="text-[10px] font-black uppercase tracking-[0.14em] text-white/42">Queued</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-5 flex items-center gap-3 rounded-[18px] border border-[#ffd778]/12 bg-[rgba(63,44,12,0.22)] px-3 py-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#ffd778]/18 bg-[rgba(255,214,120,0.08)]">
-                    <div className="h-2 w-2 animate-pulse rounded-full bg-[#efc24e] shadow-[0_0_14px_rgba(239,194,78,0.65)]" />
-                  </div>
-                  <p className="text-[11px] leading-[1.45] text-[#ffe6a0]/78">
-                    Searching for {timerLabel}. The table will open automatically once a match is ready.
-                  </p>
+                <div className="joining-screen__ring-core">
+                  <span className="joining-screen__cards" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                  <span className="joining-screen__ring-label">
+                    {isSync ? "Please wait" : "Search time"}
+                  </span>
+                  <strong className="joining-screen__ring-time">
+                    {isSync ? "--:--" : timerLabel}
+                  </strong>
+                  <span className="joining-screen__ring-pct">{Math.round(progressPercent)}%</span>
                 </div>
               </div>
             </div>
+
+            <h1 className="joining-screen__title">
+              {isSync ? "Loading table" : "Finding your table"}
+            </h1>
+            <p className="joining-screen__message">{message}</p>
+
+            <ol className="joining-screen__steps">
+              <li className="joining-screen__step is-done">
+                <span className="joining-screen__step-num">1</span>
+                {isSync ? "Recover" : "Seat"}
+              </li>
+              <li className={`joining-screen__step ${progressPercent > 40 ? "is-active" : ""}`}>
+                <span className="joining-screen__step-num">2</span>
+                {isSync ? "Sync" : "Match"}
+              </li>
+              <li className={`joining-screen__step ${progressPercent > 75 ? "is-active" : ""}`}>
+                <span className="joining-screen__step-num">3</span>
+                Ready
+              </li>
+            </ol>
+
+            <p className="joining-screen__hint">
+              {isSync
+                ? "Your table will reopen automatically."
+                : `Searching ${timerLabel} · opens when a seat is ready`}
+            </p>
           </div>
         </div>
       </div>
@@ -792,115 +768,16 @@ export default function GameClient({
   if (screen !== null) {
     if (activeLoading) {
       const publicJoinMessage = activeError || "Connecting you to the live table. Please wait a moment.";
-      const showPublicJoiningScreen = screen === "table" && isMobileDevice;
 
       pageContent = (
         <main className={`casino-page ${screen === "table" ? "casino-page-table" : "casino-page-menu"}`}>
-          {screen === "table" && !showPublicJoiningScreen ? <TableGameplayShellBackdrop /> : null}
           {screen === "table" ? (
-            showPublicJoiningScreen ? (
-              <PublicTableJoiningMobileScreen message={publicJoinMessage} />
-            ) : (
-              <section className="relative z-[1] flex min-h-screen items-center justify-center px-4">
-                <TableGameplayBackdrop />
-                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,15,16,0.14),rgba(0,6,8,0.24)_68%,rgba(0,0,0,0.84))]" aria-hidden="true" />
-                <PublicTableJoiningDesktopBanner
-                  message={activeError || "Connecting you to the live table. Please wait a moment."}
-                />
-              </section>
-            )
+            <PublicTableJoiningScreen message={publicJoinMessage} />
           ) : (
-            <section className="menu-screen flex min-h-screen overflow-hidden bg-[linear-gradient(180deg,#041213,#010607_76%)]">
-              <DesktopMenuBackdrop />
-              <div className="app-frame app-frame-surface app-frame-clip relative h-dvh">
-                <div
-                  className="pointer-events-none absolute inset-0 bg-cover bg-top bg-no-repeat"
-                  aria-hidden="true"
-                  style={{
-                    backgroundImage:
-                      "linear-gradient(180deg, rgba(0, 15, 16, 0.08), rgba(0, 6, 8, 0.26) 68%, rgba(0, 0, 0, 0.88))",
-                  }}
-                />
-
-                <div className="relative z-[1] flex h-dvh flex-col overflow-hidden">
-                  <header className="relative h-[138px] w-full pt-[max(16px,env(safe-area-inset-top))]">
-                    <Image
-                      src="/newAssets/homeTopBg.png"
-                      alt=""
-                      fill
-                      priority
-                      sizes="(max-width: 640px) 100vw, 500px"
-                      className="object-cover object-top"
-                      aria-hidden="true"
-                    />
-                  </header>
-
-                  <div className="relative flex flex-1 items-center justify-center px-[14px] pb-[max(20px,env(safe-area-inset-bottom))] pt-2">
-                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_36%,rgba(59,231,222,0.12),transparent_24%),radial-gradient(circle_at_50%_74%,rgba(239,194,78,0.08),transparent_22%)]" aria-hidden="true" />
-
-                    <div className="relative w-full overflow-hidden rounded-[28px] border border-[#ffffff14] bg-[linear-gradient(180deg,rgba(7,44,48,0.92),rgba(3,16,19,0.97))] shadow-[0_24px_44px_rgba(0,0,0,0.36)] backdrop-blur-[10px]">
-                      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_36%)]" aria-hidden="true" />
-                      <div className="absolute left-0 top-0 h-full w-px bg-[linear-gradient(180deg,transparent,rgba(67,216,204,0.28),transparent)]" aria-hidden="true" />
-                      <div className="absolute right-0 top-0 h-full w-px bg-[linear-gradient(180deg,transparent,rgba(239,194,78,0.18),transparent)]" aria-hidden="true" />
-
-                      <div className="relative z-[1] px-5 pb-5 pt-5">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="inline-flex items-center gap-2 rounded-full border border-[#43d8cc]/22 bg-[#081c1f]/72 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#abfff5]">
-                            <span className="h-1.5 w-1.5 rounded-full bg-[#43d8cc]" />
-                            Teen Patti
-                          </div>
-                          <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/42">
-                            Syncing
-                          </div>
-                        </div>
-
-                        <div className="mt-6">
-                          <h1 className="text-[1.9rem] font-black leading-[0.98] tracking-[-0.02em] text-white">
-                            Loading
-                            <br />
-                            table
-                          </h1>
-                          <p className="mt-3 max-w-[18rem] text-[0.82rem] leading-[1.5] text-white/66">
-                            {activeError || "Preparing the live table and syncing your player session."}
-                          </p>
-                        </div>
-
-                        <div className="mt-6 rounded-[22px] border border-white/8 bg-[rgba(3,18,21,0.52)] p-4">
-                          <div className="flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.14em] text-white/54">
-                            <span>Table sync</span>
-                            <span className="text-[#ffe6a0]">Please wait</span>
-                          </div>
-
-                          <div className="mt-3 h-[3px] w-full overflow-hidden rounded-full bg-white/8">
-                            <div className="h-full w-[54%] rounded-full bg-[linear-gradient(90deg,#2ac7bf_0%,#78efe5_48%,#efc24e_100%)] shadow-[0_0_18px_rgba(67,216,204,0.3)]" style={{ animation: "pulse 1.8s ease-in-out infinite" }} />
-                          </div>
-
-                          <div className="mt-4 grid gap-2">
-                            <div className="flex items-center justify-between rounded-[16px] border border-white/7 bg-[rgba(255,255,255,0.03)] px-3 py-2.5">
-                              <span className="text-[11px] font-semibold text-white/74">Session recovery</span>
-                              <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#abfff5]">In progress</span>
-                            </div>
-                            <div className="flex items-center justify-between rounded-[16px] border border-white/7 bg-[rgba(255,255,255,0.03)] px-3 py-2.5">
-                              <span className="text-[11px] font-semibold text-white/74">Table state sync</span>
-                              <span className="text-[10px] font-black uppercase tracking-[0.14em] text-white/42">Queued</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="mt-5 flex items-center gap-3 rounded-[18px] border border-[#43d8cc]/14 bg-[rgba(9,54,58,0.28)] px-3 py-3">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#43d8cc]/18 bg-[rgba(67,216,204,0.08)]">
-                            <div className="h-2 w-2 rounded-full bg-[#43d8cc] shadow-[0_0_14px_rgba(67,216,204,0.65)]" />
-                          </div>
-                          <p className="text-[11px] leading-[1.45] text-[#d8fffb]/72">
-                            The table will reopen automatically as soon as the game state is ready.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
+            <PublicTableJoiningScreen
+              mode="sync"
+              message={activeError || "Preparing the live table and syncing your player session."}
+            />
           )}
         </main>
       );
