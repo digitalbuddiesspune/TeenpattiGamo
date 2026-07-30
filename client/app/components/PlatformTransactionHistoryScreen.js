@@ -174,25 +174,24 @@ export default function PlatformTransactionHistoryScreen() {
 
   return (
     <main className="casino-page casino-page-menu min-h-screen overflow-hidden bg-[linear-gradient(180deg,#041213,#010607_76%)]">
-      <div className="relative flex min-h-screen justify-center overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 bg-[url('/newAssets/homeBg.png')] bg-cover bg-center opacity-35" aria-hidden="true" />
+      <div className="relative flex min-h-screen overflow-hidden">
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,15,16,0.08),rgba(0,6,8,0.26)_68%,rgba(0,0,0,0.88))]" aria-hidden="true" />
 
-        <div ref={scrollContainerRef} className="relative h-dvh w-full overflow-y-auto sm:w-[min(calc((100vh-28px)*0.465),430px)] sm:max-w-[430px]">
+        <div ref={scrollContainerRef} className="app-frame app-frame-surface relative h-dvh overflow-y-auto">
           <header className="sticky top-0 z-[5] h-[138px] pt-[max(16px,env(safe-area-inset-top))]">
             <Image
               src="/newAssets/homeTopBg.png"
               alt=""
               fill
               priority
-              sizes="(max-width: 430px) 100vw, 430px"
+              sizes="(max-width: 640px) 100vw, 500px"
               className="object-cover object-top"
               aria-hidden="true"
             />
             <div className="relative z-[1] flex items-start justify-between px-4 pt-2">
               <button
                 type="button"
-                onClick={() => router.push(withLaunchQuery("/"))}
+                onClick={() => router.push(withLaunchQuery("/public"))}
                 className="grid h-9 w-9 place-items-center rounded-full bg-[rgba(4,20,20,0.24)] text-[#f3dfab]"
                 aria-label="Back to home"
               >

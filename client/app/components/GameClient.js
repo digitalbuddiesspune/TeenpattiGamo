@@ -4,7 +4,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import CasinoTable from "./CasinoTable";
-import GameplaySoundController, { GAMEPLAY_SFX_STORAGE_KEY } from "./GameplaySoundController";
+import GameplaySoundController from "./GameplaySoundController";
+import HomeIntroSound from "./HomeIntroSound";
 import TableControls, { buildStakeControlState } from "./TableControls";
 import { clearStoredPublicSession, useTeenPattiGame } from "../hooks/useTeenPattiGame";
 import { fetchPlatformProfile } from "../lib/api";
@@ -167,17 +168,13 @@ function PublicTableJoiningDesktopBanner({ message }) {
 
 function GameplayBackdrop() {
   return (
-    <>
-      <div className="absolute inset-0 bg-[url('/newAssets/homeBg.png')] bg-cover bg-top opacity-38 md:hidden" />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,15,16,0.06),rgba(0,6,8,0.18)_68%,rgba(0,0,0,0.62))] md:hidden" />
-    </>
+    <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,15,16,0.06),rgba(0,6,8,0.18)_68%,rgba(0,0,0,0.62))] md:hidden" />
   );
 }
 
 function DesktopMenuBackdrop() {
   return (
     <div className="pointer-events-none absolute inset-0 hidden md:block" aria-hidden="true">
-      <div className="absolute inset-0 bg-[url('/newAssets/homeBg.png')] bg-cover bg-center opacity-38" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,15,16,0.06),rgba(0,6,8,0.18)_68%,rgba(0,0,0,0.62))]" />
     </div>
   );
@@ -186,7 +183,6 @@ function DesktopMenuBackdrop() {
 function TableGameplayShellBackdrop() {
   return (
     <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-      <div className="absolute inset-0 bg-[url('/newAssets/homeBg.png')] bg-cover bg-center opacity-38" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,15,16,0.06),rgba(0,6,8,0.18)_68%,rgba(0,0,0,0.62))]" />
     </div>
   );
@@ -194,15 +190,10 @@ function TableGameplayShellBackdrop() {
 
 function TableGameplayBackdrop({ className = "" }) {
   return (
-    <div className={`pointer-events-none absolute inset-y-0 left-1/2 w-[calc(100vh*1500/3248)] min-w-0 -translate-x-1/2 ${className}`} aria-hidden="true">
-      <Image
-        src="/newAssets/gameplayBg.png"
-        alt=""
-        fill
-        className="object-contain object-top"
-        priority
-      />
-    </div>
+    <div
+      className={`pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(59,231,222,0.1),transparent_46%),linear-gradient(180deg,rgba(0,15,16,0.2),rgba(0,6,8,0.6)_62%,rgba(0,0,0,0.9))] ${className}`}
+      aria-hidden="true"
+    />
   );
 }
 
@@ -234,9 +225,9 @@ function PublicTableJoiningMobileScreen({ message }) {
   const progressPercent = Math.min(92, 18 + elapsedSeconds * 8);
 
   return (
-    <section className="menu-screen flex min-h-screen justify-center overflow-hidden bg-[linear-gradient(180deg,#041213,#010607_76%)]">
+    <section className="menu-screen flex min-h-screen overflow-hidden bg-[linear-gradient(180deg,#041213,#010607_76%)]">
       <DesktopMenuBackdrop />
-      <div className="relative h-dvh w-full sm:w-[min(calc((100vh-28px)*0.465),430px)] sm:max-w-[430px]">
+      <div className="app-frame app-frame-surface app-frame-clip relative h-dvh">
         <TableGameplayBackdrop />
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,15,16,0.14),rgba(0,6,8,0.24)_68%,rgba(0,0,0,0.84))]" aria-hidden="true" />
 
@@ -247,7 +238,7 @@ function PublicTableJoiningMobileScreen({ message }) {
               alt=""
               fill
               priority
-              sizes="(max-width: 430px) 100vw, 430px"
+              sizes="(max-width: 640px) 100vw, 500px"
               className="object-cover object-top"
               aria-hidden="true"
             />
@@ -256,7 +247,7 @@ function PublicTableJoiningMobileScreen({ message }) {
           <div className="relative flex flex-1 items-center justify-center px-[14px] pb-[max(20px,env(safe-area-inset-bottom))] pt-2">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(59,231,222,0.08),transparent_24%),radial-gradient(circle_at_50%_74%,rgba(239,194,78,0.08),transparent_22%)]" aria-hidden="true" />
 
-            <div className="relative w-full max-w-[392px] overflow-hidden rounded-[28px] border border-[#ffffff14] bg-[linear-gradient(180deg,rgba(7,44,48,0.9),rgba(3,16,19,0.96))] shadow-[0_24px_44px_rgba(0,0,0,0.36)] backdrop-blur-[10px]">
+            <div className="relative w-full overflow-hidden rounded-[28px] border border-[#ffffff14] bg-[linear-gradient(180deg,rgba(7,44,48,0.9),rgba(3,16,19,0.96))] shadow-[0_24px_44px_rgba(0,0,0,0.36)] backdrop-blur-[10px]">
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_36%)]" aria-hidden="true" />
               <div className="absolute left-0 top-0 h-full w-px bg-[linear-gradient(180deg,transparent,rgba(67,216,204,0.28),transparent)]" aria-hidden="true" />
               <div className="absolute right-0 top-0 h-full w-px bg-[linear-gradient(180deg,transparent,rgba(239,194,78,0.18),transparent)]" aria-hidden="true" />
@@ -381,77 +372,33 @@ function HomeHeaderIcon({ type }) {
     );
   }
 
-function HistoryMenuButton({ onClick, disabled = false }) {
+function AceFan() {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label="Open history"
-      className={`relative flex h-[52px] w-[52px] items-center justify-center rounded-full border border-[#d99f1a] bg-[radial-gradient(circle_at_30%_30%,#fff0b9,#e0a31b_62%,#8a5900)] shadow-[0_10px_22px_rgba(0,0,0,0.24)] transition ${
-        disabled ? "cursor-default opacity-45" : "active:translate-y-[1px]"
-      }`}
-    >
-      <div className="flex flex-col gap-[4px]">
-        <span className="block h-[2.5px] w-[18px] rounded-full bg-[#2c1800]" />
-        <span className="block h-[2.5px] w-[18px] rounded-full bg-[#2c1800]" />
-        <span className="block h-[2.5px] w-[18px] rounded-full bg-[#2c1800]" />
-      </div>
-    </button>
+    <span className="variant-card__fan" aria-hidden="true">
+      <Image
+        src="/newAssets/cards.png"
+        alt=""
+        width={132}
+        height={124}
+        sizes="132px"
+        priority
+      />
+    </span>
   );
 }
 
-function HomeMenuCard({ title, description, onClick }) {
+function VariantCard({ title, onClick }) {
   return (
-    <button
-      className="group relative block w-full bg-transparent text-left"
-      type="button"
-      onClick={onClick}
-    >
-      <div
-        className="relative aspect-[1308/831] w-full overflow-hidden rounded-[28px] bg-cover bg-center bg-no-repeat shadow-[0_20px_32px_rgba(0,0,0,0.3)] transition-transform duration-150 group-hover:-translate-y-1"
-        style={{
-          backgroundImage: "url('/newAssets/variationsBg.png')",
-          boxShadow: "0 20px 32px rgba(0,0,0,0.3)",
-        }}
-      >
-        <div className="relative z-[1] flex h-full flex-col justify-center gap-2 pl-[23%] pb-[14%] pr-[27%] pt-[25%]">
-          <strong
-            className="max-w-[220px] text-[1.56rem] leading-[1.02] tracking-[0.03em] text-[#f1dfac]"
-            style={{
-              fontFamily: "var(--font-option-title), serif",
-              textShadow: "0px 0px 22.18px #ECD5A0, 0px 2px 10px rgba(0,0,0,0.32)",
-            }}
-          >
-            {title}
-          </strong>
-          <p className="max-w-[180px] text-[0.62rem] leading-[1.3] text-[#f1dba5] [text-shadow:0_1px_4px_rgba(0,0,0,0.24)]">
-            {description}
-          </p>
-        </div>
-      </div>
-    </button>
-  );
-}
+    <button type="button" className="variant-card" onClick={onClick}>
+      <AceFan />
 
-function MenuBackButton({ onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="grid h-8 w-8 place-items-center rounded-full bg-[rgba(4,20,20,0.18)] text-[#f3dfab]"
-      aria-label="Back to home"
-    >
-      <svg viewBox="0 0 20 20" aria-hidden="true" className="h-5 w-5">
-        <path
-          d="M11.8 4.6 6.4 10l5.4 5.4"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <span className="variant-card__body">
+        <strong className="variant-card__title">{title}</strong>
+      </span>
+
+      <span className="variant-card__chip" aria-hidden="true">
+        <span>♠</span>
+      </span>
     </button>
   );
 }
@@ -464,8 +411,6 @@ export default function GameClient({
   const [turnNow, setTurnNow] = useState(() => Date.now());
   const [selectedStake, setSelectedStake] = useState(0);
   const [isMobileDevice] = useState(true);
-  const [gameplaySfxEnabled, setGameplaySfxEnabled] = useState(true);
-  const [gameplaySfxReady, setGameplaySfxReady] = useState(false);
   const [platformProfile, setPlatformProfile] = useState(() => {
     if (typeof window === "undefined") {
       return null;
@@ -485,7 +430,6 @@ export default function GameClient({
     playDealCard() {},
   });
 
-  const isHomeView = view === "home";
   const isPublicMenuView = view === "public-menu";
   const isPublicTableView = view === "public-table";
   const activeMenuItem = "public";
@@ -500,7 +444,6 @@ export default function GameClient({
     leaveTable: leavePublicTable,
   } = game;
   const screen = isPublicTableView ? "table" : "menu";
-  const menuView = isHomeView ? "home" : "variants";
   const isPublicWaiting = publicTableState?.playerStatus === "waiting_for_next_round";
   const waitingForSeat = isPublicWaiting;
 
@@ -600,7 +543,7 @@ export default function GameClient({
         commitPlatformProfile(profile);
       })
       .catch(() => {
-        if (!cancelled && requestId === platformProfileRequestIdRef.current && isHomeView) {
+        if (!cancelled && requestId === platformProfileRequestIdRef.current && isPublicMenuView) {
           setPlatformProfile(null);
         }
       });
@@ -609,7 +552,7 @@ export default function GameClient({
       cancelled = true;
     };
   }, [
-    isHomeView,
+    isPublicMenuView,
     platformLaunchGameId,
     platformLaunchToken,
     screen,
@@ -672,42 +615,6 @@ export default function GameClient({
   ]);
 
   useEffect(() => {
-    let readyTimer = null;
-
-    try {
-      const storedValue = window.localStorage.getItem(GAMEPLAY_SFX_STORAGE_KEY);
-      const nextValue = storedValue !== "false";
-
-      readyTimer = window.setTimeout(() => {
-        setGameplaySfxEnabled(nextValue);
-        setGameplaySfxReady(true);
-      }, 0);
-    } catch {}
-
-    if (!readyTimer) {
-      readyTimer = window.setTimeout(() => {
-        setGameplaySfxReady(true);
-      }, 0);
-    }
-
-    return () => {
-      if (readyTimer) {
-        window.clearTimeout(readyTimer);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!gameplaySfxReady) {
-      return;
-    }
-
-    try {
-      window.localStorage.setItem(GAMEPLAY_SFX_STORAGE_KEY, gameplaySfxEnabled ? "true" : "false");
-    } catch {}
-  }, [gameplaySfxEnabled, gameplaySfxReady]);
-
-  useEffect(() => {
     if (
       !activeTurnDeadline &&
       !activeStartCountdown &&
@@ -735,18 +642,9 @@ export default function GameClient({
   ]);
 
   function handleMenuAction(actionId) {
-    if (actionId === "public") {
-      router.push(withLaunchQuery("/public"));
-      return;
-    }
-
     if (actionId === "history") {
       router.push(withLaunchQuery("/transactions/history"));
     }
-  }
-
-  function handleBackToHomeMenu() {
-    router.push(withLaunchQuery("/"));
   }
 
   const handleExitTable = useCallback(async () => {
@@ -818,6 +716,10 @@ export default function GameClient({
     : visibleChipBalance;
   const headerChipBalanceLabel = (
     typeof displayedChipBalance === "number" ? displayedChipBalance : 0
+  ).toLocaleString("en-IN");
+  const walletBalanceLabel = `₹ ${headerChipBalanceLabel}`;
+  const lobbyChipsLabel = (
+    typeof visibleChipBalance === "number" ? visibleChipBalance : 0
   ).toLocaleString("en-IN");
   const minimumBootAmount = publicTableState?.config?.bootAmount || round?.bootAmount || 0;
   const roundAllowsLowBalanceView = round?.status === "active" || round?.status === "starting" || round?.status === "dealing";
@@ -908,15 +810,15 @@ export default function GameClient({
               </section>
             )
           ) : (
-            <section className="menu-screen flex min-h-screen justify-center overflow-hidden bg-[linear-gradient(180deg,#041213,#010607_76%)]">
+            <section className="menu-screen flex min-h-screen overflow-hidden bg-[linear-gradient(180deg,#041213,#010607_76%)]">
               <DesktopMenuBackdrop />
-              <div className="relative h-dvh w-full sm:w-[min(calc((100vh-28px)*0.465),430px)] sm:max-w-[430px]">
+              <div className="app-frame app-frame-surface app-frame-clip relative h-dvh">
                 <div
                   className="pointer-events-none absolute inset-0 bg-cover bg-top bg-no-repeat"
                   aria-hidden="true"
                   style={{
                     backgroundImage:
-                      "linear-gradient(180deg, rgba(0, 15, 16, 0.08), rgba(0, 6, 8, 0.26) 68%, rgba(0, 0, 0, 0.88)), url('/newAssets/homeBg.png')",
+                      "linear-gradient(180deg, rgba(0, 15, 16, 0.08), rgba(0, 6, 8, 0.26) 68%, rgba(0, 0, 0, 0.88))",
                   }}
                 />
 
@@ -927,7 +829,7 @@ export default function GameClient({
                       alt=""
                       fill
                       priority
-                      sizes="(max-width: 430px) 100vw, 430px"
+                      sizes="(max-width: 640px) 100vw, 500px"
                       className="object-cover object-top"
                       aria-hidden="true"
                     />
@@ -936,7 +838,7 @@ export default function GameClient({
                   <div className="relative flex flex-1 items-center justify-center px-[14px] pb-[max(20px,env(safe-area-inset-bottom))] pt-2">
                     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_36%,rgba(59,231,222,0.12),transparent_24%),radial-gradient(circle_at_50%_74%,rgba(239,194,78,0.08),transparent_22%)]" aria-hidden="true" />
 
-                    <div className="relative w-full max-w-[392px] overflow-hidden rounded-[28px] border border-[#ffffff14] bg-[linear-gradient(180deg,rgba(7,44,48,0.92),rgba(3,16,19,0.97))] shadow-[0_24px_44px_rgba(0,0,0,0.36)] backdrop-blur-[10px]">
+                    <div className="relative w-full overflow-hidden rounded-[28px] border border-[#ffffff14] bg-[linear-gradient(180deg,rgba(7,44,48,0.92),rgba(3,16,19,0.97))] shadow-[0_24px_44px_rgba(0,0,0,0.36)] backdrop-blur-[10px]">
                       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_36%)]" aria-hidden="true" />
                       <div className="absolute left-0 top-0 h-full w-px bg-[linear-gradient(180deg,transparent,rgba(67,216,204,0.28),transparent)]" aria-hidden="true" />
                       <div className="absolute right-0 top-0 h-full w-px bg-[linear-gradient(180deg,transparent,rgba(239,194,78,0.18),transparent)]" aria-hidden="true" />
@@ -1006,114 +908,74 @@ export default function GameClient({
       pageContent = (
         <main className={`casino-page ${screen === "table" ? "casino-page-table" : "casino-page-menu"}`}>
           {screen === "menu" ? (
-            <section className="menu-screen flex min-h-screen justify-center overflow-hidden bg-[linear-gradient(180deg,#041213,#010607_76%)]">
+            <section className="menu-screen flex min-h-screen overflow-hidden bg-[linear-gradient(180deg,#041213,#010607_76%)]">
               <DesktopMenuBackdrop />
-              <div className="relative h-dvh w-full sm:w-[min(calc((100vh-28px)*0.465),430px)] sm:max-w-[430px]">
+              <div className="app-frame app-frame-surface app-frame-clip relative h-dvh">
                 <div
                   className="pointer-events-none absolute inset-0 bg-cover bg-top bg-no-repeat"
                   aria-hidden="true"
                   style={{
                     backgroundImage:
-                      "linear-gradient(180deg, rgba(0, 15, 16, 0.06), rgba(0, 6, 8, 0.3) 68%, rgba(0, 0, 0, 0.9)), url('/newAssets/homeBg.png')",
+                      "linear-gradient(180deg, rgba(0, 15, 16, 0.06), rgba(0, 6, 8, 0.3) 68%, rgba(0, 0, 0, 0.9))",
                   }}
                 />
 
-                <div className="relative z-[1] h-dvh overflow-x-hidden overflow-y-auto overscroll-y-contain shadow-[0_0_0_1px_rgba(255,239,195,0.05)]">
+                <div className="lobby relative z-[1] h-dvh overflow-x-hidden overflow-y-auto overscroll-y-contain">
+                  <header className="lobby-topbar">
+                    <div className="lobby-topbar__plate">
+                      <span className="lobby-topbar__avatar">
+                        <Image
+                          src="/newAssets/avatars/avatar2.png"
+                          alt="Player avatar"
+                          width={62}
+                          height={62}
+                        />
+                      </span>
+                      <Image
+                        src="/newAssets/crown.png"
+                        alt=""
+                        width={26}
+                        height={32}
+                        className="lobby-topbar__crown"
+                        aria-hidden="true"
+                      />
 
-                  <header className="sticky top-0 z-[4] h-[138px] w-full pt-[max(16px,env(safe-area-inset-top))]">
-                    <Image
-                      src="/newAssets/homeTopBg.png"
-                      alt=""
-                      fill
-                      priority
-                      sizes="(max-width: 430px) 100vw, 430px"
-                      className="object-cover object-top"
-                      aria-hidden="true"
-                    />
+                      <span className="lobby-topbar__identity">
+                        <strong className="lobby-topbar__name">
+                          {platformProfile?.username || "Player"}
+                        </strong>
+                        <span className="lobby-topbar__wallet">
+                          <Image src="/newAssets/Chip.png" alt="" width={17} height={17} aria-hidden="true" />
+                          {walletBalanceLabel}
+                          <span className="lobby-topbar__add" aria-hidden="true">+</span>
+                        </span>
+                      </span>
 
-                    <div className="relative z-[1] px-3 pt-2">
-                      <div className="mx-auto w-full max-w-[392px] pt-0.5" aria-label="Current player">
-                        <div className="relative mx-auto h-[68px] w-full">
-                          <div
-                            className="absolute left-[74px] right-[72px] top-1/2 h-[42px] -translate-y-1/2 rounded-full bg-[linear-gradient(90deg,#df9a04,#fbe86d)] shadow-[0_10px_26px_rgba(0,0,0,0.22)]"
-                            aria-hidden="true"
-                          />
-
-                          <div className="relative z-[1] grid h-full grid-cols-[64px_minmax(0,1fr)_60px] items-center gap-0 px-10">
-                            <div className="relative h-[64px] w-[64px]">
-                              <div className="absolute left-0 top-0 h-[64px] w-[64px] rounded-full border-[4px] border-[#dd9f18] bg-white shadow-[0_6px_12px_rgba(0,0,0,0.18)]" />
-                              <Image
-                                src="/newAssets/avatars/avatar2.png"
-                                alt="Player avatar"
-                                width={54}
-                                height={54}
-                                className="absolute left-[5px] top-[5px] h-[54px] w-[54px] rounded-full object-cover"
-                              />
-                              <Image
-                                src="/newAssets/crown.png"
-                                alt=""
-                                width={28}
-                                height={34}
-                                className="absolute left-[36px] top-[-14px] z-[1] h-auto w-[28px]"
-                                aria-hidden="true"
-                              />
-                            </div>
-
-                            <span className="block min-w-0 truncate px-1 text-center text-[0.98rem] font-medium tracking-[0.01em] text-black">
-                              {headerChipBalanceLabel}
-                            </span>
-
-                            <div className="relative flex h-[60px] items-center justify-end pr-2">
-                              <HistoryMenuButton
-                                onClick={() => handleMenuAction("history")}
-                                disabled={!platformLaunchContext}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {menuView !== "home" ? (
-                        <div className="absolute bottom-3 left-4 z-[2]">
-                          <MenuBackButton onClick={handleBackToHomeMenu} />
-                        </div>
-                      ) : null}
+                      <span className="lobby-topbar__chips">{lobbyChipsLabel}</span>
                     </div>
+
+                    <button
+                      type="button"
+                      className="lobby-topbar__menu"
+                      onClick={() => handleMenuAction("history")}
+                      disabled={!platformLaunchContext}
+                      aria-label="Open transaction history"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                        <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
+                      </svg>
+                    </button>
                   </header>
 
-                  {/* <div
-                    className="relative z-[1] mx-auto mt-[-18px] h-6 w-[62%] rounded-full"
-                    aria-hidden="true"
-                    style={{
-                      background:
-                        "radial-gradient(circle at center, rgba(215,255,255,0.9), rgba(194,247,255,0.28) 52%, transparent 70%)",
-                      boxShadow: "0 0 26px rgba(196,250,255,0.95), 0 0 72px rgba(118,232,236,0.58)",
-                      filter: "blur(1px)",
-                    }}
-                  /> */}
-
-                  {menuView === "variants" ? (
-                    <section className="relative z-[2] px-[14px] pb-20 pt-6">
-                      <div className="flex flex-col gap-[24px]">
-                        {VARIANT_OPTIONS.map((variant) => (
-                          <HomeMenuCard
-                            key={variant.id}
-                            title={variant.label}
-                            description={variant.summary}
-                            onClick={() => handleSelectVariant(variant.id)}
-                          />
-                        ))}
-                      </div>
-                    </section>
-                  ) : (
-                    <section className="relative z-[2] flex min-h-0 flex-1 flex-col justify-center gap-6 px-[14px] pb-[max(20px,env(safe-area-inset-bottom))] pt-8">
-                      <HomeMenuCard
-                        title="Teen Patti"
-                        description="Join a classic table and start playing instantly."
-                        onClick={() => handleMenuAction("public")}
+                  <section className="lobby-grid">
+                    {VARIANT_OPTIONS.map((variant) => (
+                      <VariantCard
+                        key={variant.id}
+                        title={variant.label}
+                        onClick={() => handleSelectVariant(variant.id)}
                       />
-                    </section>
-                  )}
+                    ))}
+                  </section>
                 </div>
               </div>
 
@@ -1128,7 +990,6 @@ export default function GameClient({
                 seats={displaySeats}
                 turnClock={turnClock}
                 viewerSeatId={userSeat?.id || null}
-                enabled={gameplaySfxEnabled}
                 apiRef={gameplaySoundApiRef}
               />
               <CasinoTable
@@ -1151,8 +1012,6 @@ export default function GameClient({
                   "You will join automatically when the next round starts."
                 }
                 onDealCard={handleDealCardSound}
-                soundEnabled={gameplaySfxEnabled}
-                onToggleSound={() => setGameplaySfxEnabled((current) => !current)}
                 variant={publicTableState?.config?.variant || null}
                 variantState={round?.variantState || null}
                 chipBalance={displayedChipBalance || 0}
@@ -1170,7 +1029,7 @@ export default function GameClient({
                 />
               ) : waitingForSeat ? null : (
                 <div className="table-screen__status pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:px-6 sm:pb-5">
-                  <div className="w-full sm:w-[min(calc((100vh-28px)*0.465),430px)] sm:max-w-[430px]">
+                  <div className="app-frame">
                   {shouldKickForLowBalance ? (
                     <StatusBanner
                       title="Not enough balance"
@@ -1222,6 +1081,7 @@ export default function GameClient({
 
   return (
     <div className={shellClassName}>
+      <HomeIntroSound enabled={isPublicMenuView} />
       <div className="app-shell__content">
         {pageContent}
       </div>

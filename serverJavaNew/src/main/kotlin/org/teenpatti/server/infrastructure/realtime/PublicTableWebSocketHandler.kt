@@ -5,10 +5,14 @@ import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.CloseStatus
+import org.springframework.web.socket.PingMessage
+import org.springframework.web.socket.PongMessage
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.TextWebSocketHandler
 import org.teenpatti.server.common.ApiSupport
+import org.teenpatti.server.common.AppException
+import org.teenpatti.server.common.ScheduledTask
 import org.teenpatti.server.common.Scheduler
 import org.teenpatti.server.common.GameEventLog
 import org.teenpatti.server.config.AppEnvironment
@@ -34,14 +38,23 @@ internal class PublicTableWebSocketHandler(
     private val authenticatedSessions = ConcurrentHashMap<String, AuthenticatedPublicSession>()
     private val tableSessions = ConcurrentHashMap<String, MutableSet<String>>()
     private var consumerId: String? = null
+    private var heartbeatTask: ScheduledTask? = null
+
+    @Volatile
+    private var running = false
 
     @PostConstruct
     fun start() {
         consumerId = bus.registerEventConsumer(::handleEvent)
+        running = true
+        scheduleHeartbeat()
     }
 
     @PreDestroy
     fun stop() {
+        running = false
+        heartbeatTask?.cancel()
+        heartbeatTask = null
         consumerId?.let(bus::removeEventConsumer)
     }
 
@@ -50,18 +63,79 @@ internal class PublicTableWebSocketHandler(
     }
 
     override fun handleTextMessage(session: WebSocketSession, message: TextMessage) {
-        val request = objectMapper.readValue(message.payload, PublicSocketRequest::class.java)
+        val request =
+            try {
+                objectMapper.readValue(message.payload, PublicSocketRequest::class.java)
+            } catch (error: Exception) {
+                GameEventLog.error("public_websocket_payload_invalid", error)
+                sendError(session, null, "invalid_websocket_payload", "Unable to read the websocket payload.")
+                return
+            }
         try {
             when (request.type) {
                 "public_table:authenticate" -> authenticate(session, request)
                 "public_table:action" -> handleAction(session, request)
                 "public_table:leave" -> handleLeave(session, request)
+                "public_table:ping" -> handlePing(session, request)
                 else -> sendError(session, request.requestId, "unsupported_public_websocket_event", "Unsupported websocket event.")
             }
         } catch (error: Exception) {
             GameEventLog.error("public_websocket_event_failed", error, "eventType" to request.type)
             sendError(session, request.requestId, ApiSupport.errorCode(error), error.message ?: "Request failed.")
         }
+    }
+
+    override fun handlePongMessage(session: WebSocketSession, message: PongMessage) {
+        refreshPresence(session)
+    }
+
+    /**
+     * Idle websocket connections are dropped by reverse proxies and load balancers
+     * (nginx and ALB default to a 60s idle timeout), so keep a frame flowing in both
+     * directions and re-arm the Redis presence key, which expires on the same order.
+     */
+    private fun scheduleHeartbeat() {
+        heartbeatTask =
+            scheduler.schedule(HEARTBEAT_INTERVAL_MS) {
+                try {
+                    sendHeartbeats()
+                } catch (error: Exception) {
+                    GameEventLog.error("public_websocket_heartbeat_failed", error)
+                } finally {
+                    if (running) {
+                        scheduleHeartbeat()
+                    }
+                }
+            }
+    }
+
+    private fun sendHeartbeats() {
+        for ((sessionId, session) in liveSessions) {
+            if (!session.isOpen) {
+                liveSessions.remove(sessionId)
+                continue
+            }
+            refreshPresence(session)
+            synchronized(session) {
+                try {
+                    session.sendMessage(PingMessage())
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
+
+    private fun refreshPresence(session: WebSocketSession) {
+        val auth = authenticatedSessions[session.id] ?: return
+        try {
+            presenceService.markConnected("public", auth.playerId, "${env.appNodeId}:${session.id}")
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun handlePing(session: WebSocketSession, request: PublicSocketRequest) {
+        refreshPresence(session)
+        sendAck(session, request.requestId, mapOf("pong" to true))
     }
 
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
@@ -91,7 +165,12 @@ internal class PublicTableWebSocketHandler(
                 mapOf("playerId" to playerId, "playerToken" to playerToken),
             )
         val snapshot = result.data ?: linkedMapOf()
-        val tableId = snapshot["tableId"] as String
+        val tableId =
+            snapshot["tableId"] as? String
+                ?: throw AppException.badRequest(
+                    "public_table_not_assigned",
+                    "Matchmaking has not assigned a table for this session yet.",
+                )
         authenticatedSessions[session.id] = AuthenticatedPublicSession(variant, tableId, playerId, playerToken)
         tableSessions.computeIfAbsent(tableId) { ConcurrentHashMap.newKeySet() }.add(session.id)
         presenceService.markConnected("public", playerId, "${env.appNodeId}:${session.id}")
@@ -228,5 +307,9 @@ internal class PublicTableWebSocketHandler(
             } catch (_: Exception) {
             }
         }
+    }
+
+    private companion object {
+        const val HEARTBEAT_INTERVAL_MS = 25_000L
     }
 }

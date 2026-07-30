@@ -1,36 +1,54 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
-export const GAMEPLAY_SFX_STORAGE_KEY = "teen-patti-sfx-enabled";
+import { useAudioUnlocked } from "../lib/audioUnlock";
 
 const SOUND_LIBRARY = {
   shuffle: {
     src: "/sounds/card-shuffle.mp3",
-    volume: 0.2,
+    volume: 0.35,
     loop: true,
   },
   deal: {
     src: "/sounds/card-deal.mp3",
-    volume: 0.16,
+    volume: 0.45,
   },
   turn: {
     src: "/sounds/turn-change.mp3",
-    volume: 0.18,
+    volume: 0.5,
   },
   ticking: {
     src: "/sounds/clock-ticking.mp3",
-    volume: 0.12,
+    volume: 0.3,
     loop: true,
   },
   win: {
     src: "/sounds/win-round.mp3",
-    volume: 0.22,
+    volume: 0.7,
   },
   lose: {
     src: "/sounds/lose-round.mp3",
-    volume: 0.2,
+    volume: 0.6,
   },
+  chaal: {
+    src: "/sounds/Chaal.mp3",
+    volume: 0.8,
+  },
+  pack: {
+    src: "/sounds/Pack.mp3",
+    volume: 0.8,
+  },
+  show: {
+    src: "/sounds/show.mp3",
+    volume: 0.85,
+  },
+};
+
+const ACTION_SOUND_BY_TYPE = {
+  chaal: "chaal",
+  pack: "pack",
+  show: "show",
 };
 
 function createAudio({ src, volume, loop = false }) {
@@ -61,14 +79,15 @@ export default function GameplaySoundController({
   seats,
   turnClock,
   viewerSeatId,
-  enabled,
   apiRef,
 }) {
-  const [isUnlocked, setIsUnlocked] = useState(false);
+  const isUnlocked = useAudioUnlocked();
   const soundsRef = useRef({});
   const lastResultKeyRef = useRef("");
   const lastTurnSeatIdRef = useRef(null);
   const turnReadyRef = useRef(false);
+  const lastActionKeyRef = useRef("");
+  const actionSoundsReadyRef = useRef(false);
 
   useEffect(() => {
     const sounds = Object.fromEntries(
@@ -87,7 +106,7 @@ export default function GameplaySoundController({
   }, []);
 
   const playSound = useCallback((soundKey, { clone = false } = {}) => {
-    if (!enabled || !isUnlocked) {
+    if (!isUnlocked) {
       return;
     }
 
@@ -107,7 +126,7 @@ export default function GameplaySoundController({
 
     safelyStop(audio);
     safelyPlay(audio);
-  }, [enabled, isUnlocked]);
+  }, [isUnlocked]);
 
   const stopTicking = useCallback(() => {
     const tickingAudio = soundsRef.current.ticking;
@@ -130,20 +149,6 @@ export default function GameplaySoundController({
   }, []);
 
   useEffect(() => {
-    function unlockAudio() {
-      setIsUnlocked(true);
-    }
-
-    document.addEventListener("pointerdown", unlockAudio, true);
-    document.addEventListener("keydown", unlockAudio, true);
-
-    return () => {
-      document.removeEventListener("pointerdown", unlockAudio, true);
-      document.removeEventListener("keydown", unlockAudio, true);
-    };
-  }, []);
-
-  useEffect(() => {
     if (!apiRef) {
       return undefined;
     }
@@ -162,16 +167,7 @@ export default function GameplaySoundController({
   }, [apiRef, playSound]);
 
   useEffect(() => {
-    if (enabled) {
-      return;
-    }
-
-    stopTicking();
-    stopShuffle();
-  }, [enabled, stopShuffle, stopTicking]);
-
-  useEffect(() => {
-    if (!enabled || !isUnlocked) {
+    if (!isUnlocked) {
       stopTicking();
       return;
     }
@@ -189,10 +185,10 @@ export default function GameplaySoundController({
     }
 
     safelyStop(tickingAudio);
-  }, [enabled, isUnlocked, round?.id, round?.status, stopTicking, turnClock?.isCritical]);
+  }, [isUnlocked, round?.id, round?.status, stopTicking, turnClock?.isCritical]);
 
   useEffect(() => {
-    if (!enabled || !isUnlocked) {
+    if (!isUnlocked) {
       stopShuffle();
       return;
     }
@@ -213,7 +209,7 @@ export default function GameplaySoundController({
     }
 
     safelyStop(shuffleAudio);
-  }, [enabled, isUnlocked, round?.id, round?.status, stopShuffle]);
+  }, [isUnlocked, round?.id, round?.status, stopShuffle]);
 
   useEffect(() => {
     const activeTurnSeatId =
@@ -243,6 +239,39 @@ export default function GameplaySoundController({
 
     lastTurnSeatIdRef.current = activeTurnSeatId;
   }, [playSound, round?.id, round?.status, seats]);
+
+  useEffect(() => {
+    const actionLog = Array.isArray(round?.actionLog) ? round.actionLog : [];
+    const roundId = round?.id || "";
+
+    if (!roundId) {
+      lastActionKeyRef.current = "";
+      actionSoundsReadyRef.current = false;
+      return;
+    }
+
+    const latestAction = actionLog[actionLog.length - 1] || null;
+    const actionKey = latestAction
+      ? `${roundId}:${latestAction.id || actionLog.length}:${latestAction.actionType}:${latestAction.timestamp || ""}`
+      : `${roundId}:empty`;
+
+    if (!actionSoundsReadyRef.current || !lastActionKeyRef.current.startsWith(`${roundId}:`)) {
+      lastActionKeyRef.current = actionKey;
+      actionSoundsReadyRef.current = true;
+      return;
+    }
+
+    if (actionKey === lastActionKeyRef.current) {
+      return;
+    }
+
+    lastActionKeyRef.current = actionKey;
+
+    const soundKey = ACTION_SOUND_BY_TYPE[latestAction?.actionType];
+    if (soundKey) {
+      playSound(soundKey);
+    }
+  }, [playSound, round?.actionLog, round?.id]);
 
   useEffect(() => {
     if (round?.status !== "complete" || !round?.id || !round?.result?.winnerId || !viewerSeatId) {

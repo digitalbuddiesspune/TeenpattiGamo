@@ -69,8 +69,6 @@ function TopHudButton({ children, label, onClick, active }) {
 
 function SettingsPanel({
   open,
-  soundEnabled,
-  onToggleSound,
   onExitTable,
 }) {
   if (!open) {
@@ -82,14 +80,6 @@ function SettingsPanel({
       <button
         type="button"
         className="flex w-full items-center justify-between rounded-[12px] px-3 py-2 text-left text-[12px] font-black uppercase tracking-[0.1em] text-white/88 transition hover:bg-white/6"
-        onClick={onToggleSound}
-      >
-        <span>Sound</span>
-        <span className="text-[#8ff8ea]">{soundEnabled ? "On" : "Off"}</span>
-      </button>
-      <button
-        type="button"
-        className="mt-1 flex w-full items-center justify-between rounded-[12px] px-3 py-2 text-left text-[12px] font-black uppercase tracking-[0.1em] text-white/88 transition hover:bg-white/6"
         onClick={onExitTable}
       >
         <span>Leave Table</span>
@@ -168,8 +158,6 @@ export default function CasinoTable({
   waitingForSeat = false,
   waitingMessage = "",
   onDealCard,
-  soundEnabled = true,
-  onToggleSound,
   variantState,
   variant,
   chipBalance = 0,
@@ -509,22 +497,10 @@ export default function CasinoTable({
   return (
     <section className="casino-table-scene relative h-dvh overflow-hidden bg-black text-white">
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-        <div className="absolute inset-0 bg-[url('/newAssets/homeBg.png')] bg-cover bg-center opacity-38" />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,15,16,0.06),rgba(0,6,8,0.18)_68%,rgba(0,0,0,0.62))]" />
       </div>
 
-      <div className="absolute inset-y-0 left-1/2 w-[calc(100vh*1500/3248)] min-w-0 -translate-x-1/2">
-        <Image
-          src="/newAssets/gameplayBg.png"
-          alt=""
-          fill
-          className="object-contain object-top"
-          priority
-          aria-hidden="true"
-        />
-      </div>
-
-      <div className="relative z-[20] mx-auto h-dvh w-full overflow-x-hidden overflow-y-auto overscroll-y-contain sm:w-[min(calc((100vh-28px)*0.465),430px)] sm:max-w-[430px] sm:overflow-y-hidden">
+      <div className="app-frame app-frame-surface relative z-[20] mx-auto h-dvh overflow-x-hidden overflow-y-auto overscroll-y-contain sm:overflow-y-hidden">
         <div className="flex min-h-full w-full flex-col px-3 pb-[148px] sm:px-4 sm:pb-[200px]">
           <div className="sticky top-0 z-[40] -mx-3 px-3 pb-2 pt-[max(10px,env(safe-area-inset-top))] sm:mx-0 sm:px-0 sm:pb-3 sm:pt-[18px]">
             <div className="relative flex items-start justify-between">
@@ -544,8 +520,6 @@ export default function CasinoTable({
                 </TopHudButton>
                 <SettingsPanel
                   open={settingsOpen}
-                  soundEnabled={soundEnabled}
-                  onToggleSound={onToggleSound}
                   onExitTable={onExitTable}
                 />
               </div>

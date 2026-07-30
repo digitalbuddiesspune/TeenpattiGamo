@@ -59,6 +59,448 @@ body.app-body-portrait-blocked {
   touch-action: none;
 }
 
+/*
+ * Single source of truth for the play column.
+ * Every screen (menu, table, controls, history, joining) sizes off `.app-frame`
+ * so the fixed action bar can never drift out of alignment with the table.
+ */
+.app-frame {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Frames whose children are absolutely positioned backgrounds need clipping. */
+.app-frame-clip {
+  overflow: hidden;
+}
+
+/*
+ * Menu cards flow into as many columns as the viewport can hold.
+ * `auto-fill` (rather than `auto-fit`) keeps the empty tracks alive so a lone
+ * card stays card-sized instead of stretching across the whole screen, and the
+ * `min()` guards narrow phones where a fixed 320px track would overflow.
+ */
+.menu-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 24px;
+  width: 100%;
+  align-content: center;
+}
+
+@media (min-width: 1024px) {
+  .menu-card-grid {
+    gap: 28px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Public lobby — red casino theme.
+ * ------------------------------------------------------------------------- */
+.lobby {
+  position: relative;
+  min-height: 100%;
+  background:
+    radial-gradient(circle at 50% -10%, #7d1119 0%, #4e0a11 42%, #2c060a 74%, #1a0407 100%);
+}
+
+.lobby-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: max(10px, env(safe-area-inset-top)) 14px 12px;
+  background: linear-gradient(180deg, #4a0a11 0%, #350710 72%, rgba(30, 5, 8, 0) 100%);
+}
+
+.lobby-topbar__plate {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  height: 56px;
+  padding: 0 18px 0 62px;
+  border-radius: 12px;
+  border: 2px solid #e8b53c;
+  background:
+    linear-gradient(112deg, transparent 40%, rgba(255, 243, 208, 0.26) 48%, transparent 56%)
+      -60% 0 / 220% 100% no-repeat,
+    linear-gradient(90deg, #a51824 0%, #8c1520 42%, #6d0f18 100%);
+  animation: lobby-plate-sheen 6.5s ease-in-out infinite;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 236, 184, 0.34),
+    inset 0 1px 0 rgba(255, 214, 150, 0.24),
+    0 0 12px rgba(232, 181, 60, 0.18),
+    0 10px 22px rgba(0, 0, 0, 0.42);
+}
+
+.lobby-topbar__avatar {
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border-radius: 999px;
+  border: 3px solid #f0b528;
+  background: #240509;
+  overflow: hidden;
+  transform: translateY(-50%);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+}
+
+.lobby-topbar__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lobby-topbar__crown {
+  position: absolute;
+  left: 30px;
+  top: -12px;
+  z-index: 2;
+  width: 26px;
+  height: auto;
+}
+
+.lobby-topbar__identity {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.lobby-topbar__name {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff6e6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lobby-topbar__wallet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  color: #ffe9b0;
+}
+
+.lobby-topbar__wallet img {
+  width: 17px;
+  height: 17px;
+  object-fit: contain;
+}
+
+.lobby-topbar__add {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  color: #4a1408;
+  background: linear-gradient(180deg, #ffe08f, #e09a12);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+}
+
+.lobby-topbar__chips {
+  flex: 1;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff2d6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lobby-topbar__menu {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  border: 3px solid #f0b528;
+  background: linear-gradient(180deg, #a51824, #6d0f18);
+  color: #ffdf9c;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.42);
+}
+
+.lobby-topbar__menu:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.lobby-topbar__menu svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* ---- variant cards ---- */
+.lobby-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 18px;
+  padding: 12px 14px calc(28px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 1024px) {
+  .lobby-grid {
+    gap: 22px;
+    padding-inline: clamp(16px, 3vw, 40px);
+  }
+}
+
+.variant-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(96px, 34%) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 158px;
+  padding: 18px 16px;
+  border-radius: 16px;
+  border: 2px solid #e8b53c;
+  background:
+    radial-gradient(circle at 82% 22%, rgba(255, 120, 110, 0.14), transparent 52%),
+    linear-gradient(160deg, #7d1019 0%, #5a0c14 46%, #3d070d 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 236, 184, 0.32),
+    inset 0 1px 0 rgba(255, 214, 150, 0.18),
+    0 0 14px rgba(232, 181, 60, 0.16),
+    0 16px 30px rgba(0, 0, 0, 0.44);
+  color: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  text-align: left;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.variant-card:hover {
+  transform: translateY(-3px);
+  border-color: #ffd66e;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 240, 198, 0.42),
+    inset 0 1px 0 rgba(255, 214, 150, 0.24),
+    0 0 20px rgba(240, 190, 74, 0.28),
+    0 22px 38px rgba(0, 0, 0, 0.5);
+}
+
+/* Hairline of light along the top edge, brightest at the centre. */
+.variant-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #ff6a5a 22%, #ffd88a 50%, #ff6a5a 78%, transparent);
+  opacity: 0.9;
+}
+
+.variant-card__body {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  align-content: center;
+}
+
+.variant-card__title {
+  font-family: var(--font-option-title), serif;
+  font-size: clamp(1.5rem, 3vw, 1.95rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  background: linear-gradient(180deg, #fff3c8 10%, #ffcf68 52%, #d59418 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.42));
+}
+
+/* ---- sparkle / sheen ---- */
+@keyframes lobby-sheen {
+  0% {
+    transform: translateX(-140%) skewX(-18deg);
+    opacity: 0;
+  }
+
+  6% {
+    opacity: 0.6;
+  }
+
+  34% {
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateX(340%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+@keyframes lobby-twinkle {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.8);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Light sweeping across the gold, offset per card so they never flash in unison. */
+.variant-card::after {
+  content: "";
+  position: absolute;
+  top: -25%;
+  bottom: -25%;
+  left: 0;
+  width: 38%;
+  background: linear-gradient(90deg, transparent, rgba(255, 243, 208, 0.34), transparent);
+  filter: blur(7px);
+  pointer-events: none;
+  animation: lobby-sheen 5.2s ease-in-out infinite;
+}
+
+.variant-card:nth-child(2)::after {
+  animation-delay: 1.1s;
+}
+
+.variant-card:nth-child(3)::after {
+  animation-delay: 2.2s;
+}
+
+.variant-card:nth-child(4)::after {
+  animation-delay: 3.1s;
+}
+
+.variant-card:nth-child(5)::after {
+  animation-delay: 4s;
+}
+
+/* Static ancestor, so this positions against the card itself. */
+.variant-card__body::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, rgba(255, 248, 222, 0.95) 0 1.3px, transparent 2.2px),
+    radial-gradient(circle, rgba(255, 232, 172, 0.9) 0 1px, transparent 1.9px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.9) 0 1px, transparent 1.8px),
+    radial-gradient(circle, rgba(255, 222, 150, 0.85) 0 1.1px, transparent 2px);
+  background-repeat: no-repeat;
+  background-position: 16% 24%, 78% 30%, 58% 80%, 90% 68%;
+  animation: lobby-twinkle 3s ease-in-out infinite;
+}
+
+.variant-card:nth-child(2) .variant-card__body::after {
+  background-position: 24% 72%, 68% 22%, 88% 56%, 44% 36%;
+  animation-delay: 0.7s;
+}
+
+.variant-card:nth-child(3) .variant-card__body::after {
+  background-position: 82% 26%, 30% 40%, 62% 74%, 12% 66%;
+  animation-delay: 1.4s;
+}
+
+.variant-card:nth-child(4) .variant-card__body::after {
+  background-position: 40% 20%, 86% 62%, 20% 78%, 66% 44%;
+  animation-delay: 2.1s;
+}
+
+.variant-card:nth-child(5) .variant-card__body::after {
+  background-position: 70% 18%, 18% 52%, 92% 80%, 46% 66%;
+  animation-delay: 2.6s;
+}
+
+/*
+ * The plate can't use a sweeping child: the avatar deliberately overhangs its
+ * left edge, so `overflow: hidden` would clip it. Animating a background layer
+ * keeps the highlight inside the box without clipping anything.
+ */
+@keyframes lobby-plate-sheen {
+  0% {
+    background-position: -60% 0, 0 0;
+  }
+
+  55%,
+  100% {
+    background-position: 160% 0, 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .variant-card::after,
+  .variant-card__body::after,
+  .lobby-topbar__plate {
+    animation: none;
+  }
+}
+
+/* ---- ace fan artwork ---- */
+.variant-card__fan {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.variant-card__fan img {
+  width: 100%;
+  max-width: 132px;
+  height: auto;
+  transform: rotate(-8deg);
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.5));
+}
+
+/* ---- decorative poker chip ---- */
+.variant-card__chip {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background:
+    repeating-conic-gradient(#f4f1ea 0deg 18deg, #c1121f 18deg 36deg);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.44);
+}
+
+.variant-card__chip::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 214, 130, 0.85);
+  background: radial-gradient(circle at 50% 34%, #9c1420, #6d0d16);
+}
+
+.variant-card__chip span {
+  position: relative;
+  z-index: 1;
+  font-size: 19px;
+  line-height: 1;
+  color: #ffd88a;
+}
+
 .app-shell {
   position: relative;
   min-height: 100vh;

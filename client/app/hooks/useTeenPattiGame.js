@@ -11,6 +11,7 @@ import {
 import { createClientSeed } from "../lib/clientSeed";
 
 const INITIAL_PUBLIC_LOADING_DELAY_MS = 0;
+const SOCKET_HEARTBEAT_INTERVAL_MS = 25000;
 const pendingPublicSessionRequests = new Map();
 
 function createWindowId() {
@@ -189,6 +190,7 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
   const socketRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptRef = useRef(0);
+  const heartbeatIntervalRef = useRef(null);
   const manualCloseRef = useRef(false);
   const pendingRequestsRef = useRef(new Map());
   const requestSequenceRef = useRef(1);
@@ -229,6 +231,27 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
     }
   }
 
+  function clearHeartbeat() {
+    if (heartbeatIntervalRef.current) {
+      window.clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+  }
+
+  // Proxies and load balancers drop websockets that sit idle for ~60s, so keep a
+  // client-originated frame flowing even when the table has no activity.
+  function startHeartbeat(socket) {
+    clearHeartbeat();
+    heartbeatIntervalRef.current = window.setInterval(() => {
+      if (socket.readyState !== WebSocket.OPEN) {
+        return;
+      }
+      try {
+        socket.send(JSON.stringify({ type: "public_table:ping", payload: {} }));
+      } catch {}
+    }, SOCKET_HEARTBEAT_INTERVAL_MS);
+  }
+
   async function emitWithAck(type, payload = {}) {
     const socket = socketRef.current;
 
@@ -255,6 +278,7 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
     if (!enabled) {
       manualCloseRef.current = true;
       clearReconnectTimer();
+      clearHeartbeat();
       socketRef.current?.close();
       socketRef.current = null;
       rejectPendingRequests("Public table connection closed.");
@@ -282,6 +306,7 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
 
       socket.addEventListener("open", () => {
         reconnectAttemptRef.current = 0;
+        startHeartbeat(socket);
         const requestId = nextRequestId();
         pendingRequestsRef.current.set(requestId, {
           resolve: () => {
@@ -358,6 +383,7 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
           socketRef.current = null;
         }
 
+        clearHeartbeat();
         rejectPendingRequests("Public table connection closed.");
 
         if (cancelled || manualCloseRef.current || !sessionRef.current) {
@@ -477,6 +503,7 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
       cancelled = true;
       manualCloseRef.current = true;
       clearReconnectTimer();
+      clearHeartbeat();
       rejectPendingRequests("Public table connection closed.");
       socketRef.current?.close();
       socketRef.current = null;
