@@ -9,19 +9,15 @@ import org.teenpatti.server.config.AppEnvironment
 internal class PlatformGatewayClient(
     private val env: AppEnvironment,
 ) {
-    private val restClient: RestClient? =
-        if (env.platformApiBase.isBlank()) {
-            null
-        } else {
-            RestClient.builder().baseUrl(env.platformApiBase.trim().trimEnd('/')).build()
-        }
+    private val balanceClient: RestClient? =
+        env.platformBalanceUrl.trim().takeIf { it.isNotBlank() }?.let { RestClient.builder().build() }
 
     fun getUserDetail(token: String): PlatformUser {
         requireEnabled()
         val response =
             client()
                 .get()
-                .uri("/user/detail")
+                .uri(env.platformBalanceUrl.trim())
                 .header("token", token)
                 .retrieve()
                 .body(PlatformEnvelope::class.java)
@@ -67,7 +63,8 @@ internal class PlatformGatewayClient(
     }
 
     private fun client(): RestClient =
-        restClient ?: throw AppException.badRequest("platform_api_base_missing", "Platform API base is not configured.")
+        balanceClient
+            ?: throw AppException.badRequest("platform_balance_url_missing", "Platform balance URL is not configured.")
 
     private fun mapValue(value: Any?): Map<*, *>? = value as? Map<*, *>
 

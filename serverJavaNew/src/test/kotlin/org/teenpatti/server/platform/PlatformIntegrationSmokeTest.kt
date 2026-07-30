@@ -441,7 +441,7 @@ internal class PlatformIntegrationSmokeTest {
     private fun platformEnv(baseUrl: String): AppEnvironment =
         AppEnvironment().also {
             it.platformEnabled = true
-            it.platformApiBase = "$baseUrl/operator"
+            it.platformBalanceUrl = "$baseUrl/operator/user/detail"
             it.platformDebitUrl = "$baseUrl/service/operator/user/balance/v2"
         }
 

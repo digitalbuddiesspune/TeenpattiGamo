@@ -26,7 +26,7 @@ internal class AppEnvironment {
     var initialBalance: Int = 0
     var turnDurationMs: Int = 0
     var platformEnabled: Boolean = false
-    var platformApiBase: String = ""
+    var platformBalanceUrl: String = ""
     var platformDebitUrl: String = ""
     var platformAmqpUrl: String = ""
     var platformAmqpExchange: String = ""

@@ -45,11 +45,25 @@ internal class ConfigSmokeTest {
     }
 
     @Test
+    fun appEnvironmentRequiresPlatformBalanceUrlWhenPlatformEnabled() {
+        val appConfig = AppEnvironmentConfig()
+        val environment = MockEnvironment()
+        environment.setProperty("PLATFORM_ENABLED", "true")
+        environment.setProperty("PLATFORM_AMQP_URL", "amqp://guest:guest@localhost:5672/")
+        environment.setProperty("PLATFORM_AMQP_EXCHANGE", "/games/admin")
+        environment.setProperty("PLATFORM_AMQP_ROUTING_KEY", "games_cashout")
+        environment.setProperty("PLATFORM_DEBIT_URL", "https://platform.example/service/operator/user/balance/v2")
+
+        val error = assertThrows(IllegalStateException::class.java) { appConfig.appEnvironment(environment) }
+        assertEquals("PLATFORM_BALANCE_URL is required when PLATFORM_ENABLED=true.", error.message)
+    }
+
+    @Test
     fun appEnvironmentRequiresPlatformDebitUrlWhenPlatformEnabled() {
         val appConfig = AppEnvironmentConfig()
         val environment = MockEnvironment()
         environment.setProperty("PLATFORM_ENABLED", "true")
-        environment.setProperty("PLATFORM_API_BASE", "https://platform.example/operator")
+        environment.setProperty("PLATFORM_BALANCE_URL", "https://platform.example/operator/user/detail")
         environment.setProperty("PLATFORM_AMQP_URL", "amqp://guest:guest@localhost:5672/")
         environment.setProperty("PLATFORM_AMQP_EXCHANGE", "/games/admin")
         environment.setProperty("PLATFORM_AMQP_ROUTING_KEY", "games_cashout")
@@ -63,7 +77,7 @@ internal class ConfigSmokeTest {
         val appConfig = AppEnvironmentConfig()
         val environment = MockEnvironment()
         environment.setProperty("PLATFORM_ENABLED", "true")
-        environment.setProperty("PLATFORM_API_BASE", "https://platform.example/operator")
+        environment.setProperty("PLATFORM_BALANCE_URL", "https://platform.example/operator/user/detail")
         environment.setProperty("PLATFORM_DEBIT_URL", "https://platform.example/service/operator/user/balance/v2")
         environment.setProperty("PLATFORM_AMQP_EXCHANGE", "/games/admin")
         environment.setProperty("PLATFORM_AMQP_ROUTING_KEY", "games_cashout")
@@ -77,7 +91,7 @@ internal class ConfigSmokeTest {
         val appConfig = AppEnvironmentConfig()
         val environment = MockEnvironment()
         environment.setProperty("PLATFORM_ENABLED", "true")
-        environment.setProperty("PLATFORM_API_BASE", "https://platform.example/operator")
+        environment.setProperty("PLATFORM_BALANCE_URL", "https://platform.example/operator/user/detail")
         environment.setProperty("PLATFORM_DEBIT_URL", "https://platform.example/service/operator/user/balance/v2")
         environment.setProperty("PLATFORM_AMQP_URL", "amqp://guest:guest@localhost:5672/")
         environment.setProperty("PLATFORM_AMQP_ROUTING_KEY", "games_cashout")
@@ -91,7 +105,7 @@ internal class ConfigSmokeTest {
         val appConfig = AppEnvironmentConfig()
         val environment = MockEnvironment()
         environment.setProperty("PLATFORM_ENABLED", "true")
-        environment.setProperty("PLATFORM_API_BASE", "https://platform.example/operator")
+        environment.setProperty("PLATFORM_BALANCE_URL", "https://platform.example/operator/user/detail")
         environment.setProperty("PLATFORM_DEBIT_URL", "https://platform.example/service/operator/user/balance/v2")
         environment.setProperty("PLATFORM_AMQP_URL", "amqp://guest:guest@localhost:5672/")
         environment.setProperty("PLATFORM_AMQP_EXCHANGE", "/games/admin")

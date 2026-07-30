@@ -36,7 +36,7 @@ internal class AppEnvironmentConfig {
         env.initialBalance = number(environment, "INITIAL_BALANCE", 30000000)
         env.turnDurationMs = number(environment, "TURN_DURATION_MS", 15000)
         env.platformEnabled = boolean(environment, "PLATFORM_ENABLED", false)
-        env.platformApiBase = text(environment, "PLATFORM_API_BASE", "")
+        env.platformBalanceUrl = text(environment, "PLATFORM_BALANCE_URL", "")
         env.platformDebitUrl = text(environment, "PLATFORM_DEBIT_URL", "")
         env.platformAmqpUrl = text(environment, "PLATFORM_AMQP_URL", "")
         env.platformAmqpExchange = text(environment, "PLATFORM_AMQP_EXCHANGE", "")
@@ -68,7 +68,7 @@ internal class AppEnvironmentConfig {
         if (!env.platformEnabled) {
             return
         }
-        check(env.platformApiBase.isNotBlank()) { "PLATFORM_API_BASE is required when PLATFORM_ENABLED=true." }
+        check(env.platformBalanceUrl.isNotBlank()) { "PLATFORM_BALANCE_URL is required when PLATFORM_ENABLED=true." }
         check(env.platformDebitUrl.isNotBlank()) { "PLATFORM_DEBIT_URL is required when PLATFORM_ENABLED=true." }
         check(env.platformAmqpUrl.isNotBlank()) { "PLATFORM_AMQP_URL is required when PLATFORM_ENABLED=true." }
         check(env.platformAmqpExchange.isNotBlank()) { "PLATFORM_AMQP_EXCHANGE is required when PLATFORM_ENABLED=true." }
