@@ -78,9 +78,17 @@ export function buildStakeControlState({
 }
 
 function ActionButton({ label, onClick, disabled, busy = false, tone = "primary", className = "" }) {
-  const isLongLabel = String(label).length >= 8;
-  const isSideShowLabel = String(label).toLowerCase() === "side show";
   const toneClasses = {
+    pack:
+      "border-[#ff8f7a]/55 bg-[linear-gradient(180deg,#d43a2a_0%,#9a1610_55%,#6a0c0a_100%)] text-[#fff1e4] shadow-[inset_0_1px_0_rgba(255,210,190,0.28),0_10px_18px_rgba(70,8,6,0.45)]",
+    blind:
+      "border-[#8eb6ff]/55 bg-[linear-gradient(180deg,#3d6fe0_0%,#2448a8_55%,#152a72_100%)] text-[#f3f7ff] shadow-[inset_0_1px_0_rgba(210,225,255,0.28),0_10px_18px_rgba(12,28,80,0.45)]",
+    chaal:
+      "border-[#6dff9a]/55 bg-[linear-gradient(180deg,#22c45a_0%,#148a3a_55%,#0b5a26_100%)] text-[#f0fff4] shadow-[inset_0_1px_0_rgba(210,255,220,0.28),0_10px_18px_rgba(6,50,20,0.45)]",
+    sideshow:
+      "border-[#ffd56a]/55 bg-[linear-gradient(180deg,#e8a820_0%,#b87410_55%,#7a4a08_100%)] text-[#fff8e6] shadow-[inset_0_1px_0_rgba(255,240,190,0.3),0_10px_18px_rgba(60,35,4,0.45)]",
+    show:
+      "border-[#f0a0ff]/55 bg-[linear-gradient(180deg,#b44ad8_0%,#7a28a8_55%,#4e1872_100%)] text-[#fdf0ff] shadow-[inset_0_1px_0_rgba(240,210,255,0.28),0_10px_18px_rgba(50,12,70,0.45)]",
     danger:
       "border-[#ffb68d]/48 bg-[linear-gradient(135deg,rgba(124,37,26,0.98)_0%,rgba(91,22,18,0.98)_48%,rgba(58,11,12,1)_100%)] text-[#fff0d6] shadow-[inset_0_1px_0_rgba(255,221,199,0.24),0_14px_22px_rgba(46,7,8,0.45)]",
     info:
@@ -96,10 +104,8 @@ function ActionButton({ label, onClick, disabled, busy = false, tone = "primary"
       type="button"
       aria-busy={busy}
       className={[
-        "table-controls__button relative inline-flex h-[42px] min-w-0 flex-1 items-center justify-center overflow-hidden rounded-[13px] border px-2 text-[8px] font-black uppercase tracking-[0.04em] text-[#f3e6a7] whitespace-nowrap transition sm:h-[48px] sm:text-[8px]",
-        isLongLabel ? "flex-[1.3] px-1.5 text-[7px] tracking-[0.01em] sm:px-2 sm:text-[7.5px]" : "px-2 sm:px-2.5",
-        isSideShowLabel ? "min-w-[74px] text-[6.5px] sm:min-w-[88px] sm:text-[7px]" : "",
-        toneClasses[tone],
+        "table-controls__button relative inline-flex h-[46px] min-w-0 flex-1 items-center justify-center overflow-hidden rounded-[14px] border px-1.5 text-[9px] font-black uppercase tracking-[0.04em] whitespace-nowrap transition sm:h-[52px] sm:text-[10px] sm:tracking-[0.06em]",
+        toneClasses[tone] || toneClasses.primary,
         className,
         busy
           ? "cursor-wait"
@@ -110,13 +116,7 @@ function ActionButton({ label, onClick, disabled, busy = false, tone = "primary"
       onClick={onClick}
       disabled={disabled || busy}
     >
-      <span
-        className={[
-          busy ? "opacity-0" : "",
-          "block max-w-full text-center leading-none",
-          isLongLabel ? "px-0.5 tracking-[0.005em] sm:px-1" : ""
-        ].join(" ")}
-      >
+      <span className={["block max-w-full text-center leading-tight", busy ? "opacity-0" : ""].join(" ")}>
         {label}
       </span>
       {busy ? (
@@ -141,7 +141,7 @@ function StakeDisplay({ amount, compact = false }) {
       ].join(" ")}
     >
       <Image
-        src="/newAssets/Chip.png"
+        src="/newAssets/chip.png"
         alt=""
         width={22}
         height={22}
@@ -249,14 +249,26 @@ export default function TableControls({
   const previousActiveSeat = getPreviousActiveSeat(effectiveRound, userSeat);
   const canPack = isTurn && userSeat && !userSeat.packed;
   const canSee = isTurn && viewerLegalActions.has("see");
+  const canBlind =
+    isTurn &&
+    !userSeat?.seen &&
+    canAffordCall &&
+    (viewerLegalActions.has("blind") || viewerLegalActions.has("raise"));
+  const canChaal =
+    isTurn &&
+    userSeat?.seen &&
+    canAffordCall &&
+    (viewerLegalActions.has("chaal") || viewerLegalActions.has("raise"));
   const canSideshow =
     isTurn && viewerLegalActions.has("sideshow") && userSeat?.seen && activePlayers > 2 && previousActiveSeat?.seen && !hasPendingSideShow;
-  const callLabel = userSeat?.seen ? "Chaal" : "Blind";
   const canShow = isTurn && viewerLegalActions.has("show") && activePlayers === 2 && canAffordCall;
-  const sideLabel = canShow ? "Show" : "Side Show";
   const canUseSideAction = canShow || canSideshow;
   const actionBlocked = hasPendingSideShow || sideShowViewerRole === "target";
   const controlsDisabled = acting || actionBlocked;
+  const isRaisedStake = displayStake > minimumStake;
+  const blindLabel = isRaisedStake ? "Raise" : "Blind";
+  const chaalLabel = isRaisedStake ? "Raise" : "Chaal";
+  const sideLabel = canShow ? "Show" : "Side Show";
 
   useEffect(() => {
     if (!acting) {
@@ -277,19 +289,24 @@ export default function TableControls({
     }
   }
 
-  async function handleBet() {
-    if (roundInactive || !isTurn || controlsDisabled || !displayStake) {
+  async function handleBlind() {
+    if (roundInactive || !canBlind || controlsDisabled || !displayStake) {
       return;
     }
+    await triggerAction(isRaisedStake ? "raise" : "blind");
+  }
 
-    const isRaisedStake = displayStake > minimumStake;
-    await triggerAction(isRaisedStake ? "raise" : userSeat?.seen ? "chaal" : "blind");
+  async function handleChaal() {
+    if (roundInactive || !canChaal || controlsDisabled || !displayStake) {
+      return;
+    }
+    await triggerAction(isRaisedStake ? "raise" : "chaal");
   }
 
   return (
-    <section className="table-controls app-frame pointer-events-none fixed bottom-0 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:px-4 sm:pb-4">
-      <div className="flex w-full flex-col items-center gap-1.5 sm:gap-2.5">
-        <div className="pointer-events-auto flex w-full justify-start sm:justify-center">
+    <section className="table-controls app-frame pointer-events-none fixed bottom-0 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center px-2 pb-[calc(env(safe-area-inset-bottom)+10px)] sm:px-4 sm:pb-4">
+      <div className="flex w-full flex-col items-center gap-1.5 sm:gap-2">
+        <div className="pointer-events-auto flex w-full items-center justify-between gap-2">
           <StakeSelector
             amount={displayStake}
             canIncreaseStake={canIncreaseStake}
@@ -297,25 +314,6 @@ export default function TableControls({
             onAdjustStake={onAdjustStake}
             acting={acting}
             compact
-            className="mr-auto sm:mx-auto"
-          />
-        </div>
-        <div className="pointer-events-auto flex w-full items-center justify-center gap-1.5 rounded-[20px] border border-[#f2ddb3]/12 bg-[linear-gradient(180deg,rgba(8,21,24,0.7),rgba(6,14,17,0.86))] px-2 py-1.5 shadow-[0_18px_30px_rgba(0,0,0,0.32)] backdrop-blur-md sm:gap-2 sm:py-2">
-          <ActionButton
-            label="Pack"
-            tone="danger"
-            onClick={() => triggerAction("pack")}
-            disabled={roundInactive || !canPack || controlsDisabled}
-            busy={acting && pendingAction === "pack"}
-            className="flex-[0.88]"
-          />
-          <ActionButton
-            label={sideLabel}
-            tone="gold"
-            onClick={() => triggerAction(canShow ? "show" : "sideshow")}
-            disabled={roundInactive || !canUseSideAction || controlsDisabled}
-            busy={acting && pendingAction === (canShow ? "show" : "sideshow")}
-            className="flex-[1.52]"
           />
           <ActionButton
             label="See"
@@ -323,21 +321,38 @@ export default function TableControls({
             onClick={() => triggerAction("see")}
             disabled={controlsDisabled || !canSee}
             busy={acting && pendingAction === "see"}
-            className="flex-[0.78]"
+            className="!flex-none min-w-[64px] max-w-[88px] sm:min-w-[76px]"
+          />
+        </div>
+
+        <div className="pointer-events-auto grid w-full grid-cols-4 gap-1.5 rounded-[18px] border border-[#f2ddb3]/14 bg-[linear-gradient(180deg,rgba(8,12,18,0.78),rgba(4,8,12,0.9))] px-1.5 py-1.5 shadow-[0_18px_30px_rgba(0,0,0,0.38)] backdrop-blur-md sm:gap-2 sm:px-2 sm:py-2">
+          <ActionButton
+            label="Pack"
+            tone="pack"
+            onClick={() => triggerAction("pack")}
+            disabled={roundInactive || !canPack || controlsDisabled}
+            busy={acting && pendingAction === "pack"}
           />
           <ActionButton
-            label={displayStake > minimumStake ? "Raise" : callLabel}
-            tone="primary"
-            onClick={handleBet}
-            disabled={
-              roundInactive ||
-              !isTurn ||
-              !canAffordCall ||
-              controlsDisabled ||
-              (!viewerLegalActions.has(userSeat?.seen ? "chaal" : "blind") && !viewerLegalActions.has("raise"))
-            }
-            busy={acting && ["blind", "chaal", "raise"].includes(pendingAction)}
-            className="flex-[1.02]"
+            label={blindLabel}
+            tone="blind"
+            onClick={handleBlind}
+            disabled={roundInactive || !canBlind || controlsDisabled}
+            busy={acting && ["blind", "raise"].includes(pendingAction) && !userSeat?.seen}
+          />
+          <ActionButton
+            label={chaalLabel}
+            tone="chaal"
+            onClick={handleChaal}
+            disabled={roundInactive || !canChaal || controlsDisabled}
+            busy={acting && ["chaal", "raise"].includes(pendingAction) && Boolean(userSeat?.seen)}
+          />
+          <ActionButton
+            label={sideLabel}
+            tone={canShow ? "show" : "sideshow"}
+            onClick={() => triggerAction(canShow ? "show" : "sideshow")}
+            disabled={roundInactive || !canUseSideAction || controlsDisabled}
+            busy={acting && pendingAction === (canShow ? "show" : "sideshow")}
           />
         </div>
       </div>

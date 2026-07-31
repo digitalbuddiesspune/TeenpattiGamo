@@ -12,7 +12,6 @@ html {
   --foreground: #f7ecd1;
   --gold: #efc24e;
   --gold-deep: #8f5a13;
-  --casino-background: url("/casino-background.jpg");
   --blue-a: #4478e7;
   --blue-b: #2048a8;
   --green-a: #33d552;
@@ -39,9 +38,7 @@ body {
   margin: 0;
   font-family: var(--font-body), sans-serif;
   color: var(--foreground);
-  background:
-    linear-gradient(rgba(16, 8, 4, 0.68), rgba(16, 8, 4, 0.82)),
-    var(--casino-background) center center / cover no-repeat;
+  background: #041213;
 }
 
 button {
@@ -1164,11 +1161,8 @@ body.app-body-portrait-blocked {
   place-items: center;
   width: clamp(28px, 5vh, 40px);
   height: clamp(28px, 5vh, 40px);
-  border-radius: 999px;
-  background:
-    repeating-conic-gradient(#f7f0e6 0deg 18deg, #b01018 18deg 36deg);
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4);
-  opacity: 0.92;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.4));
+  opacity: 0.96;
   transition: transform 0.22s ease, opacity 0.22s ease;
 }
 
@@ -1177,21 +1171,24 @@ body.app-body-portrait-blocked {
   opacity: 1;
 }
 
-.variant-card__chip::after {
-  content: "";
-  position: absolute;
-  inset: 18%;
-  border-radius: 999px;
-  border: 1.5px solid rgba(255, 214, 130, 0.75);
-  background: radial-gradient(circle at 50% 34%, #9c1420, #5a0a12);
+.variant-card__chip img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
-.variant-card__chip span {
-  position: relative;
-  z-index: 1;
-  font-size: clamp(11px, 2vh, 15px);
-  line-height: 1;
-  color: #ffd88a;
+@media (min-width: 1024px) {
+  .variant-card__chip {
+    width: clamp(40px, 4.2vw, 56px);
+    height: clamp(40px, 4.2vw, 56px);
+    right: clamp(12px, 1.5vw, 18px);
+    bottom: clamp(12px, 1.5vw, 16px);
+  }
+
+  .lobby-topbar__wallet img {
+    width: 24px;
+    height: 24px;
+  }
 }
 
 .app-shell {
@@ -1246,8 +1243,7 @@ body.app-body-portrait-blocked {
     max(20px, env(safe-area-inset-left));
   background:
     radial-gradient(circle at top, rgba(240, 194, 78, 0.16), transparent 26%),
-    linear-gradient(180deg, rgba(16, 8, 12, 0.98), rgba(7, 4, 7, 0.99)),
-    var(--casino-background) center center / cover no-repeat;
+    linear-gradient(180deg, rgba(16, 8, 12, 0.98), rgba(7, 4, 7, 0.99));
 }
 
 .mobile-orientation-blocker__panel {
@@ -1357,9 +1353,7 @@ body.app-body-portrait-blocked {
 
 .casino-page-menu,
 .casino-page-table {
-  background:
-    linear-gradient(rgba(18, 10, 5, 0.5), rgba(18, 10, 5, 0.74)),
-    var(--casino-background) center center / cover no-repeat;
+  background: linear-gradient(rgba(18, 10, 5, 0.5), rgba(18, 10, 5, 0.74)), #180e09;
 }
 
 .casino-page-menu {
@@ -1385,27 +1379,27 @@ body.app-body-portrait-blocked {
  * ------------------------------------------------------------------------- */
 :root {
   --board-aspect: 0.7064; /* 1054 / 1492 */
-  --board-hud: 84px; /* sticky settings + balance row */
-  --board-controls: 132px; /* fixed action bar reserve */
-  --board-cards: 104px; /* user fan hanging below the surface */
-  --board-min: 244px;
-  --board-max: min(88vw, 340px);
-  --board-column: 460px;
-  --board-lift: 46px;
+  --board-hud: 72px; /* sticky settings + balance row */
+  --board-controls: 120px; /* fixed action bar reserve */
+  --board-cards: 92px; /* user fan hanging below the surface */
+  --board-min: 280px;
+  --board-max: min(96vw, 420px);
+  --board-column: 100%;
+  --board-lift: 36px;
 }
 
 @media (min-width: 640px) {
   :root {
-    --board-controls: 168px;
-    --board-max: min(56vw, 400px);
-    --board-lift: 30px;
+    --board-controls: 148px;
+    --board-max: min(72vw, 480px);
+    --board-lift: 24px;
   }
 }
 
 @media (min-width: 1024px) and (min-height: 860px) {
   :root {
-    --board-max: min(46vw, 440px);
-    --board-column: 560px;
+    --board-max: min(52vw, 520px);
+    --board-column: 640px;
   }
 }
 
@@ -1416,38 +1410,49 @@ body.app-body-portrait-blocked {
   width: 100%;
   max-width: var(--board-column);
   margin-inline: auto;
-  padding-inline: 12px;
+  padding-inline: 0;
   padding-bottom: calc(var(--board-controls) + env(safe-area-inset-bottom));
 }
 
 @media (min-width: 640px) {
   .casino-table-scene .app-frame-surface > div {
-    padding-inline: 16px;
+    padding-inline: 0;
   }
+}
+
+/*
+ * Portrait: stretch the board to fill leftover space so the felt uses the full
+ * width and height. Landscape desktop keeps its own aspect-locked sizing.
+ */
+.casino-table-scene__viewport {
+  width: 100%;
+  max-width: none;
+  height: calc(
+    100dvh - var(--board-hud) - var(--board-controls) - env(safe-area-inset-bottom)
+  );
+  min-height: 360px;
+  margin-inline: auto;
 }
 
 .casino-table-scene__stage {
   margin-top: calc(var(--board-lift) * -1);
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
 }
 
-/*
- * Width tracks the screen, height is the guard rail: take whichever of the two
- * is smaller so the board grows with the viewport width but can never get so
- * wide that the felt runs off the bottom of the screen.
- */
-.casino-table-scene__viewport {
-  width: max(
-    var(--board-min),
-    min(
-      100%,
-      var(--board-max),
-      calc(
-        (100dvh - var(--board-hud) - var(--board-controls) - var(--board-cards)) *
-          var(--board-aspect)
-      )
-    )
-  );
-  margin-inline: auto;
+.casino-table-scene__surface {
+  container-type: size;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+}
+
+.casino-table-scene__felt--portrait {
+  object-fit: fill !important;
 }
 
 /* Dealer scales with the board instead of jumping at one breakpoint. */
@@ -1455,16 +1460,6 @@ body.app-body-portrait-blocked {
   width: clamp(104px, 44%, 150px);
   height: auto;
   aspect-ratio: 1;
-}
-
-/*
- * Seat avatars are sized off the felt rather than fixed pixels, so they hold
- * their proportion as the board grows. The surface is the query container, so
- * 1cqw is 1% of the board width.
- */
-.casino-table-scene__surface {
-  container-type: inline-size;
-  aspect-ratio: 1054 / 1492;
 }
 
 /* Portrait felt on phones/tablets, dedicated landscape art on desktop. */
@@ -1507,8 +1502,26 @@ body.app-body-portrait-blocked {
     --board-lift: 6px;
   }
 
+  .casino-table-scene__viewport {
+    width: max(
+      var(--board-min),
+      min(
+        100%,
+        var(--board-max),
+        calc(
+          (100dvh - var(--board-hud) - var(--board-controls) - var(--board-cards)) *
+            var(--board-aspect)
+        )
+      )
+    );
+    height: auto;
+    min-height: 0;
+  }
+
   .casino-table-scene .casino-table-scene__surface {
     container-type: size;
+    width: 100%;
+    height: auto;
     aspect-ratio: 1536 / 1024;
   }
 
@@ -1518,6 +1531,7 @@ body.app-body-portrait-blocked {
 
   .casino-table-scene__felt--landscape {
     display: block;
+    object-fit: contain;
   }
 
   .casino-table-scene__viewport .table-seat--index-0 {
@@ -2785,46 +2799,11 @@ body.app-body-portrait-blocked {
 }
 
 
-.coin-dot {
-  width: 20px;
-  height: 20px;
-  display: inline-block;
-  border-radius: 999px;
-  background: radial-gradient(
-    circle at 30% 30%,
-    #fff2ab,
-    #edb320 58%,
-    #a36515 100%
-  );
-}
-
 .pot-bundle-image {
   width: clamp(84px, 9vw, 132px);
   height: auto;
   display: block;
   margin: 0 auto -10px;
-}
-
-.coin-icon {
-  display: inline-block;
-  width: auto;
-  height: auto;
-  flex: none;
-}
-
-.coin-icon-pot {
-  width: 24px;
-  height: 24px;
-}
-
-.coin-icon-balance {
-  width: 18px;
-  height: 18px;
-}
-
-.coin-icon-stake {
-  width: 22px;
-  height: 22px;
 }
 
 .pot-value {
