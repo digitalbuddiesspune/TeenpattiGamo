@@ -159,14 +159,6 @@ function GameplayBackdrop() {
   );
 }
 
-function DesktopMenuBackdrop() {
-  return (
-    <div className="pointer-events-none absolute inset-0 hidden md:block" aria-hidden="true">
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,15,16,0.06),rgba(0,6,8,0.18)_68%,rgba(0,0,0,0.62))]" />
-    </div>
-  );
-}
-
 function TableGameplayShellBackdrop() {
   return (
     <div className="pointer-events-none absolute inset-0" aria-hidden="true">
@@ -509,13 +501,14 @@ function AceFan() {
   );
 }
 
-function VariantCard({ title, onClick }) {
+function VariantCard({ title, summary, onClick }) {
   return (
     <button type="button" className="variant-card" onClick={onClick}>
       <AceFan />
 
       <span className="variant-card__body">
         <strong className="variant-card__title">{title}</strong>
+        {summary ? <span className="variant-card__summary">{summary}</span> : null}
       </span>
 
       <span className="variant-card__chip" aria-hidden="true">
@@ -951,26 +944,19 @@ export default function GameClient({
       pageContent = (
         <main className={`casino-page ${screen === "table" ? "casino-page-table" : "casino-page-menu"}`}>
           {screen === "menu" ? (
-            <section className="menu-screen flex min-h-screen overflow-hidden bg-[linear-gradient(180deg,#041213,#010607_76%)]">
-              <DesktopMenuBackdrop />
-              <div className="app-frame app-frame-surface app-frame-clip relative h-dvh">
-                <div
-                  className="pointer-events-none absolute inset-0 bg-cover bg-top bg-no-repeat"
-                  aria-hidden="true"
-                  style={{
-                    backgroundImage:
-                      "linear-gradient(180deg, rgba(0, 15, 16, 0.06), rgba(0, 6, 8, 0.3) 68%, rgba(0, 0, 0, 0.9))",
-                  }}
-                />
+            <section className="menu-screen flex h-dvh overflow-hidden bg-[#120308]">
+              <div className="app-frame app-frame-surface app-frame-clip relative h-dvh w-full">
+                <div className="lobby relative z-[1] h-dvh overflow-hidden">
+                  <div className="lobby__glow lobby__glow--a" aria-hidden="true" />
+                  <div className="lobby__glow lobby__glow--b" aria-hidden="true" />
 
-                <div className="lobby relative z-[1] h-dvh overflow-x-hidden overflow-y-auto overscroll-y-contain">
                   <header className="lobby-topbar">
                     <span className="lobby-topbar__avatar">
                       <Image
                         src="/newAssets/avatars/avatar2.png"
                         alt="Player avatar"
-                        width={70}
-                        height={70}
+                        width={52}
+                        height={52}
                       />
                     </span>
 
@@ -1014,15 +1000,18 @@ export default function GameClient({
 
                   <LobbyRulesModal open={lobbyRulesOpen} onClose={closeLobbyRules} />
 
-                  <section className="lobby-grid">
-                    {VARIANT_OPTIONS.map((variant) => (
-                      <VariantCard
-                        key={variant.id}
-                        title={variant.label}
-                        onClick={() => handleSelectVariant(variant.id)}
-                      />
-                    ))}
-                  </section>
+                  <div className="lobby-main">
+                    <section className="lobby-grid" aria-label="Game variants">
+                      {VARIANT_OPTIONS.map((variant) => (
+                        <VariantCard
+                          key={variant.id}
+                          title={variant.label}
+                          summary={variant.summary}
+                          onClick={() => handleSelectVariant(variant.id)}
+                        />
+                      ))}
+                    </section>
+                  </div>
                 </div>
               </div>
 
