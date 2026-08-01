@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import PlayingCard from "./PlayingCard";
 import Seat from "./Seat";
 
-const DEAL_SEQUENCE_ORDER = [2, 3, 4, 0, 1];
+const DEAL_SEQUENCE_ORDER = [5, 3, 4, 0, 1, 2];
 const FALLBACK_DEALING_WINDOW_MS = 1800;
 
 function HiddenDealCard({ className = "" }) {
@@ -549,18 +549,6 @@ export default function CasinoTable({
 
           <div className="casino-table-scene__stage relative mx-auto flex w-full flex-none items-start justify-center sm:flex-1">
           <div className="casino-table-scene__viewport relative">
-            <div className="casino-table-scene__dealer absolute left-1/2 top-[11.5%] z-[22] -translate-x-1/2 -translate-y-[96%]">
-              <div className="relative">
-                <Image
-                  src="/newAssets/dealer.png"
-                  alt="Dealer"
-                  fill
-                  className="object-contain drop-shadow-[0_22px_40px_rgba(0,0,0,0.42)]"
-                  priority
-                />
-              </div>
-            </div>
-
             <div ref={surfaceRef} className="casino-table-scene__surface relative">
               <Image
                 src="/newAssets/portraitTable.png"
@@ -577,6 +565,18 @@ export default function CasinoTable({
                 aria-hidden="true"
                 className="casino-table-scene__felt casino-table-scene__felt--landscape object-contain drop-shadow-[0_30px_50px_rgba(0,0,0,0.46)]"
               />
+
+              <div className="casino-table-scene__dealer absolute left-1/2 top-0 z-[22] -translate-x-1/2 -translate-y-[58%]">
+                <div className="relative">
+                  <Image
+                    src="/newAssets/dealer.png"
+                    alt="Dealer"
+                    fill
+                    className="object-contain object-center drop-shadow-[0_22px_40px_rgba(0,0,0,0.42)]"
+                    priority
+                  />
+                </div>
+              </div>
 
               {centeredNotification ? (
                 <div className="casino-table-scene__message absolute left-1/2 top-[16.5%] z-[36] w-[72%] -translate-x-1/2 rounded-[16px] border border-[#ffffff14] bg-[linear-gradient(180deg,rgba(7,44,48,0.95),rgba(5,24,27,0.98))] px-3 py-2 text-center text-[11px] font-semibold text-white/82 shadow-[0_18px_36px_rgba(0,0,0,0.32)] backdrop-blur-sm">

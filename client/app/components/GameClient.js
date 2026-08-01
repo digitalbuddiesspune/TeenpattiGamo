@@ -8,7 +8,7 @@ import GameplaySoundController from "./GameplaySoundController";
 import HomeIntroSound from "./HomeIntroSound";
 import TableControls, { buildStakeControlState } from "./TableControls";
 import { clearStoredPublicSession, useTeenPattiGame } from "../hooks/useTeenPattiGame";
-import { fetchPlatformProfile } from "../lib/api";
+import { fetchPlatformProfile, fetchPublicLobbyConfig } from "../lib/api";
 import {
   getPlatformLaunchContext,
   PLATFORM_LAUNCH_CONTEXT_STORAGE_KEY,
@@ -102,23 +102,38 @@ function getNextRoundDecision(round, nowMs) {
   };
 }
 
+// Visual slots around the oval (user always 0 at bottom).
+// Opponents are assigned in mirrored pairs so they sit opposite each other.
+// 1 = left-bottom, 2 = left-top, 3 = right-top, 4 = right-bottom, 5 = top-center.
+const OPPONENT_DISPLAY_SLOTS = {
+  1: [5],
+  2: [2, 3],
+  3: [2, 5, 3],
+  4: [1, 2, 3, 4],
+};
+
 function rotateSeatsForViewer(seats = []) {
   if (!seats.length) {
     return [];
   }
 
   const viewerIndex = seats.findIndex((seat) => seat.isUser);
-  if (viewerIndex <= 0) {
-    return seats;
-  }
+  const ordered =
+    viewerIndex <= 0
+      ? seats
+      : seats.map((_, index) => seats[(viewerIndex + index) % seats.length]);
 
-  return seats.map((_, index) => {
-    const sourceSeat = seats[(viewerIndex + index) % seats.length];
-    return {
-      ...sourceSeat,
-      seatIndex: index
-    };
-  });
+  const viewer = ordered.find((seat) => seat.isUser) || ordered[0];
+  const opponents = ordered.filter((seat) => seat !== viewer);
+  const opponentSlots = OPPONENT_DISPLAY_SLOTS[opponents.length] || [1, 2, 3, 4];
+
+  return [
+    { ...viewer, seatIndex: 0 },
+    ...opponents.map((seat, index) => ({
+      ...seat,
+      seatIndex: opponentSlots[index] ?? index + 1,
+    })),
+  ];
 }
 
 function StatusBanner({ title, message, tone = "default", timerLabel = null }) {
@@ -548,6 +563,7 @@ export default function GameClient({
       return null;
     }
   });
+  const [lobbyInitialBalance, setLobbyInitialBalance] = useState(null);
   const publicDecisionHandledRef = useRef(false);
   const publicDecisionPendingExitRef = useRef(false);
   const platformProfileRequestIdRef = useRef(0);
@@ -634,6 +650,26 @@ export default function GameClient({
       window.clearTimeout(timer);
     };
   }, [platformLaunchGameId, platformLaunchToken]);
+
+  useEffect(() => {
+    if (!isPublicMenuView) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    fetchPublicLobbyConfig()
+      .then((config) => {
+        if (cancelled || typeof config?.initialBalance !== "number") {
+          return;
+        }
+        setLobbyInitialBalance(config.initialBalance);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isPublicMenuView]);
 
   const syncPlatformProfile = useCallback(async () => {
     if (!platformLaunchToken || !platformLaunchGameId) {
@@ -859,7 +895,9 @@ export default function GameClient({
     ? platformProfile.balance
     : typeof platformBalanceFallback === "number"
       ? platformBalanceFallback
-    : visibleChipBalance;
+    : typeof visibleChipBalance === "number"
+      ? visibleChipBalance
+    : lobbyInitialBalance;
   const headerChipBalanceLabel = (
     typeof displayedChipBalance === "number" ? displayedChipBalance : 0
   ).toLocaleString("en-IN");

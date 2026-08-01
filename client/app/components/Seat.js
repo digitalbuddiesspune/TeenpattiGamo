@@ -53,7 +53,7 @@ const seatLayouts = [
     ]
   },
   {
-    wrapper: "left-[1.2%] top-[25%] z-[18] w-[20%] min-w-[92px] max-w-[122px]",
+    wrapper: "left-[1.2%] top-[38%] z-[18] w-[20%] min-w-[92px] max-w-[122px] -translate-y-1/2",
     avatarShell: "mx-auto h-[33px] w-[33px] rounded-full border-[2px] border-[#ffe3a2] bg-[linear-gradient(180deg,#f4be66_0%,#915d18_100%)] p-[2px] shadow-[0_8px_12px_rgba(0,0,0,0.24)] sm:h-[37px] sm:w-[37px]",
     avatarInner: "rounded-full border border-white/55",
     label: "mt-1 mx-auto w-fit min-w-[60px] rounded-[8px] border border-[#d8bd78] bg-[linear-gradient(180deg,#fee58d_0%,#d3a83b_100%)] px-1 py-0.5 text-center text-[#5b3500] shadow-[0_6px_10px_rgba(0,0,0,0.18)]",
@@ -74,7 +74,7 @@ const seatLayouts = [
     ]
   },
   {
-    wrapper: "right-[1.2%] top-[25%] z-[18] w-[20%] min-w-[92px] max-w-[122px]",
+    wrapper: "right-[1.2%] top-[38%] z-[18] w-[20%] min-w-[92px] max-w-[122px] -translate-y-1/2",
     avatarShell: "mx-auto h-[33px] w-[33px] rounded-full border-[2px] border-[#ffe3a2] bg-[linear-gradient(180deg,#f4be66_0%,#915d18_100%)] p-[2px] shadow-[0_8px_12px_rgba(0,0,0,0.24)] sm:h-[37px] sm:w-[37px]",
     avatarInner: "rounded-full border border-white/55",
     label: "mt-1 mx-auto w-fit min-w-[60px] rounded-[8px] border border-[#d8bd78] bg-[linear-gradient(180deg,#fee58d_0%,#d3a83b_100%)] px-1 py-0.5 text-center text-[#5b3500] shadow-[0_6px_10px_rgba(0,0,0,0.18)]",
@@ -113,6 +113,28 @@ const seatLayouts = [
       { transform: "translate(0, -3px) rotate(-88deg)", zIndex: 1 },
       { transform: "translate(0, 0) rotate(-90deg)", zIndex: 2 },
       { transform: "translate(0, 3px) rotate(-92deg)", zIndex: 3 }
+    ]
+  },
+  {
+    // Top-center: opposite the user, under the dealer.
+    wrapper: "left-1/2 top-[13%] z-[19] w-[22%] min-w-[96px] max-w-[128px] -translate-x-1/2",
+    avatarShell: "mx-auto h-[33px] w-[33px] rounded-full border-[2px] border-[#ffe3a2] bg-[linear-gradient(180deg,#f4be66_0%,#915d18_100%)] p-[2px] shadow-[0_8px_12px_rgba(0,0,0,0.24)] sm:h-[37px] sm:w-[37px]",
+    avatarInner: "rounded-full border border-white/55",
+    label: "mt-1 mx-auto w-fit min-w-[60px] rounded-[8px] border border-[#d8bd78] bg-[linear-gradient(180deg,#fee58d_0%,#d3a83b_100%)] px-1 py-0.5 text-center text-[#5b3500] shadow-[0_6px_10px_rgba(0,0,0,0.18)]",
+    cardsWrap: "left-1/2 top-[calc(100%+6px)] -translate-x-1/2",
+    cardsRow: "flex items-start justify-center",
+    overlap: "-ml-4 sm:-ml-5",
+    stateWrap: "bottom-[calc(100%+8px)]",
+    hiddenCardClass: "",
+    hiddenCardStyles: [
+      { transform: "rotate(-10deg) translate(4px, 2px)", zIndex: 1 },
+      { transform: "rotate(0deg) translate(0, 0)", zIndex: 2 },
+      { transform: "rotate(10deg) translate(-4px, 2px)", zIndex: 1 }
+    ],
+    visibleCardStyles: [
+      { transform: "rotate(-12deg) translate(8px, 4px)", zIndex: 1 },
+      { transform: "rotate(0deg) translate(0, 0)", zIndex: 2 },
+      { transform: "rotate(12deg) translate(-8px, 4px)", zIndex: 3 }
     ]
   }
 ];

@@ -1456,10 +1456,17 @@ body.app-body-portrait-blocked {
 }
 
 /* Dealer scales with the board instead of jumping at one breakpoint. */
+.casino-table-scene__dealer {
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -58%);
+}
+
 .casino-table-scene__dealer > div {
-  width: clamp(104px, 44%, 150px);
+  width: clamp(104px, 36%, 150px);
   height: auto;
   aspect-ratio: 1;
+  margin-inline: auto;
 }
 
 /* Portrait felt on phones/tablets, dedicated landscape art on desktop. */
@@ -1545,12 +1552,16 @@ body.app-body-portrait-blocked {
 
   .casino-table-scene__viewport .table-seat--index-2 {
     left: 2%;
-    top: 16%;
+    top: 42%;
+    bottom: auto;
+    transform: translateY(-50%);
   }
 
   .casino-table-scene__viewport .table-seat--index-3 {
     right: 2%;
-    top: 16%;
+    top: 42%;
+    bottom: auto;
+    transform: translateY(-50%);
   }
 
   .casino-table-scene__viewport .table-seat--index-4 {
@@ -1558,13 +1569,19 @@ body.app-body-portrait-blocked {
     bottom: 27%;
   }
 
+  .casino-table-scene__viewport .table-seat--index-5 {
+    left: 50%;
+    top: 4%;
+    transform: translateX(-50%);
+  }
+
   .casino-table-scene__viewport .casino-table-scene__dealer {
-    top: 8%;
-    transform: translate(-50%, -84%);
+    top: 0;
+    transform: translate(-50%, -48%);
   }
 
   .casino-table-scene__viewport .casino-table-scene__dealer > div {
-    width: clamp(120px, 15%, 176px);
+    width: clamp(120px, 12%, 168px);
   }
 
   .casino-table-scene__viewport .casino-table-scene__pot {
@@ -4252,9 +4269,9 @@ body.app-body-portrait-blocked {
   }
 
   .app-shell.is-mobile-landscape .casino-table-scene__dealer {
-    left: calc(50% + clamp(54px, 5.6vw, 72px));
-    top: 4.2%;
-    transform: translate(-50%, -34%);
+    left: 50%;
+    top: 0;
+    transform: translate(-50%, -42%);
   }
 
   .app-shell.is-mobile-landscape .casino-table-scene__dealer > div {
@@ -4323,17 +4340,27 @@ body.app-body-portrait-blocked {
 
   .app-shell.is-mobile-landscape .table-seat--index-2 {
     left: -24px;
-    top: -22px;
+    top: 42%;
+    bottom: auto;
+    transform: translateY(-50%);
   }
 
   .app-shell.is-mobile-landscape .table-seat--index-3 {
     right: -24px;
-    top: -22px;
+    top: 42%;
+    bottom: auto;
+    transform: translateY(-50%);
   }
 
   .app-shell.is-mobile-landscape .table-seat--index-4 {
     right: -24px;
     bottom: 36px;
+  }
+
+  .app-shell.is-mobile-landscape .table-seat--index-5 {
+    left: 50%;
+    top: -28px;
+    transform: translateX(-50%);
   }
 
   .app-shell.is-mobile-landscape .table-seat--user > div {
@@ -4553,17 +4580,27 @@ body.app-body-portrait-blocked {
 
   .app-shell.is-mobile-landscape .table-seat--index-2 {
     left: -30px;
-    top: -24px;
+    top: 42%;
+    bottom: auto;
+    transform: translateY(-50%);
   }
 
   .app-shell.is-mobile-landscape .table-seat--index-3 {
     right: -30px;
-    top: -24px;
+    top: 42%;
+    bottom: auto;
+    transform: translateY(-50%);
   }
 
   .app-shell.is-mobile-landscape .table-seat--index-4 {
     right: -30px;
     bottom: 30px;
+  }
+
+  .app-shell.is-mobile-landscape .table-seat--index-5 {
+    left: 50%;
+    top: -30px;
+    transform: translateX(-50%);
   }
 
   .app-shell.is-mobile-landscape .table-seat--user > div {

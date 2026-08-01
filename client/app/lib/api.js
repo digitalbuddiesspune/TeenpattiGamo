@@ -89,6 +89,10 @@ export function joinPublicTable(playerName, clientSeed, variant) {
   }, variant);
 }
 
+export function fetchPublicLobbyConfig() {
+  return request("/public/config", {}, null);
+}
+
 export function fetchPlatformProfile(token, gameId) {
   return request("/platform/profile", {
     method: "POST",

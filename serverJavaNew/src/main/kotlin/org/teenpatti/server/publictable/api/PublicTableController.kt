@@ -2,6 +2,7 @@ package org.teenpatti.server.publictable.api
 
 import org.teenpatti.server.common.ApiSupport
 import org.teenpatti.server.common.AppException
+import org.teenpatti.server.config.AppEnvironment
 import org.teenpatti.server.publictable.PublicTableManager
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
@@ -13,8 +14,19 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/public")
 internal class PublicTableController(
+    private val env: AppEnvironment,
     private val publicTableManagers: Map<String, PublicTableManager>,
 ) {
+    @GetMapping("/config")
+    fun getPublicConfig(): Map<String, Any?> =
+        ApiSupport.ok(
+            mapOf(
+                "initialBalance" to env.initialBalance,
+                "bootAmount" to env.bootAmount,
+                "platformEnabled" to env.platformEnabled,
+            ),
+        )
+
     @PostMapping("/join")
     fun joinPublicTable(
         @RequestParam(required = false) variant: String?,

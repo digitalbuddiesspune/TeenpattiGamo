@@ -1226,7 +1226,7 @@ internal class PublicTableManager(
         next.casinoBootCommissionPercent = config.casinoBootCommissionPercent
         next.casinoWinCommissionPercent = config.casinoWinCommissionPercent
         next.maxBalance = config.maxBalance
-        next.initialBalance = 100000
+        next.initialBalance = config.initialBalance
         next.turnDurationMs = config.turnDurationMs
         next.blindSeenMultiplier = config.blindSeenMultiplier
         next.blindRaiseMultiplier = config.blindRaiseMultiplier
