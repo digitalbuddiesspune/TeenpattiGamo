@@ -131,7 +131,15 @@ function ChipBalanceDisplay({ chipBalance }) {
     <div className="relative flex h-[40px] min-w-[118px] items-center pl-[14px] pr-[8px]">
       <div className="absolute inset-y-[4px] left-[14px] right-0 rounded-full border border-white/12 bg-[linear-gradient(180deg,rgba(60,60,60,0.96),rgba(38,38,38,0.98))] shadow-[0_12px_22px_rgba(0,0,0,0.28)]" />
       <div className="relative z-[1] mr-[-5px] flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-full bg-[radial-gradient(circle_at_35%_30%,rgba(255,255,255,0.18),rgba(255,255,255,0.02))] shadow-[0_8px_14px_rgba(0,0,0,0.28)]">
-        <Image src="/newAssets/chip.png" alt="" width={32} height={32} aria-hidden="true" className="object-contain" />
+        <Image
+          src="/newAssets/chip.png"
+          alt=""
+          width={32}
+          height={29}
+          aria-hidden="true"
+          className="object-contain"
+          style={{ width: 28, height: "auto" }}
+        />
       </div>
       <div className="relative z-[1] ml-1.5 flex min-w-0 flex-1 items-center justify-end pr-2">
         <strong className="truncate text-[12px] font-black tracking-[0.05em] text-white sm:text-[13px]">
@@ -565,6 +573,7 @@ export default function CasinoTable({
                 src="/newAssets/landscape-light.png"
                 alt=""
                 fill
+                priority
                 aria-hidden="true"
                 className="casino-table-scene__felt casino-table-scene__felt--landscape object-contain drop-shadow-[0_30px_50px_rgba(0,0,0,0.46)]"
               />
@@ -628,7 +637,15 @@ export default function CasinoTable({
 
               <div className="casino-table-scene__pot pointer-events-none absolute left-1/2 top-[48.6%] z-[29] -translate-x-1/2 -translate-y-1/2 text-center">
                 <div className="mx-auto flex h-[56px] w-[56px] items-center justify-center">
-                  <Image src="/newAssets/chip.png" alt="" width={38} height={38} aria-hidden="true" />
+                  <Image
+                    src="/newAssets/chip.png"
+                    alt=""
+                    width={38}
+                    height={34}
+                    aria-hidden="true"
+                    className="object-contain"
+                    style={{ width: 38, height: "auto" }}
+                  />
                 </div>
                 <span className="mt-0.5 block text-[8px] font-black uppercase tracking-[0.16em] text-white/54">
                   Table Pot

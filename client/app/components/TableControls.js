@@ -144,8 +144,9 @@ function StakeDisplay({ amount, compact = false }) {
         src="/newAssets/chip.png"
         alt=""
         width={22}
-        height={22}
-        className={compact ? "h-[13px] w-[13px]" : "h-[20px] w-[20px]"}
+        height={20}
+        className="object-contain"
+        style={compact ? { width: 13, height: "auto" } : { width: 20, height: "auto" }}
         aria-hidden="true"
       />
       <span className={compact ? "text-[10px] font-black tracking-[0.02em] text-[#ffefba] sm:text-[12px]" : "text-[17px] font-black tracking-[0.04em] text-[#ffefba] sm:text-[18px]"}>

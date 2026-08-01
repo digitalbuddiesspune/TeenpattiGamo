@@ -515,9 +515,11 @@ function VariantCard({ title, summary, onClick }) {
         <Image
           src="/newAssets/chip.png"
           alt=""
-          width={56}
-          height={56}
-          sizes="(min-width: 1024px) 56px, 40px"
+          width={40}
+          height={36}
+          sizes="40px"
+          className="object-contain"
+          style={{ width: "100%", height: "auto" }}
         />
       </span>
     </button>
@@ -975,7 +977,15 @@ export default function GameClient({
 
                       <div className="lobby-topbar__center">
                         <span className="lobby-topbar__wallet">
-                            <Image src="/newAssets/chip.png" alt="" width={24} height={24} aria-hidden="true" />
+                            <Image
+                              src="/newAssets/chip.png"
+                              alt=""
+                              width={24}
+                              height={22}
+                              aria-hidden="true"
+                              className="object-contain"
+                              style={{ width: 20, height: "auto" }}
+                            />
                           <b>{walletBalanceLabel}</b>
                         </span>
                       </div>
