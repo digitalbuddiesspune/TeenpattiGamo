@@ -190,25 +190,37 @@ export default function GameplaySoundController({
   useEffect(() => {
     if (!isUnlocked) {
       stopShuffle();
-      return;
+      return undefined;
     }
 
     const shuffleAudio = soundsRef.current.shuffle;
     const shouldShuffle = round?.status === "starting" && Boolean(round?.id);
 
     if (!shuffleAudio) {
-      return;
+      return undefined;
     }
 
-    if (shouldShuffle) {
+    if (!shouldShuffle) {
+      safelyStop(shuffleAudio);
+      return undefined;
+    }
+
+    // Retry briefly — join/start can race the first unlock frame.
+    const tryPlay = () => {
       if (shuffleAudio.paused) {
-        shuffleAudio.currentTime = 0;
+        try {
+          shuffleAudio.currentTime = 0;
+        } catch {}
         safelyPlay(shuffleAudio);
       }
-      return;
-    }
+    };
 
-    safelyStop(shuffleAudio);
+    tryPlay();
+    const retryTimer = window.setTimeout(tryPlay, 120);
+
+    return () => {
+      window.clearTimeout(retryTimer);
+    };
   }, [isUnlocked, round?.id, round?.status, stopShuffle]);
 
   useEffect(() => {

@@ -305,7 +305,7 @@ export default function TableControls({
   }
 
   return (
-    <section className="table-controls app-frame pointer-events-none fixed bottom-0 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center px-2 pb-[calc(env(safe-area-inset-bottom)+10px)] sm:px-4 sm:pb-4">
+    <section className="table-controls pointer-events-none fixed bottom-0 left-1/2 z-50 flex w-full max-w-none -translate-x-1/2 flex-col items-center px-2 pb-[calc(env(safe-area-inset-bottom)+10px)] sm:px-4 sm:pb-4">
       <div className="flex w-full flex-col items-center gap-1.5 sm:gap-2">
         <div className="pointer-events-auto flex w-full items-center justify-between gap-2">
           <StakeSelector

@@ -11,7 +11,8 @@ const avatarMap = {
 
 const seatLayouts = [
   {
-    wrapper: "left-1/2 bottom-[18%] z-[24] w-[34%] min-w-[176px] max-w-[246px] -translate-x-1/2 sm:bottom-[12.5%]",
+    // 0 — user, bottom center
+    wrapper: "left-1/2 bottom-[14%] z-[24] w-[34%] min-w-[176px] max-w-[246px] -translate-x-1/2 sm:bottom-[10%]",
     avatarShell: "relative z-[22] mx-auto h-[42px] w-[42px] rounded-full border-[3px] border-[#2dd6cf] bg-[radial-gradient(circle_at_50%_32%,#66f8e0_0%,#1aa8a1_42%,#0d5558_100%)] p-[3px] shadow-[0_0_18px_rgba(74,243,223,0.32)] sm:h-[48px] sm:w-[48px]",
     avatarInner: "rounded-full border-[2px] border-[#f4db9f]",
     label: "relative z-[22] mt-[-12px] mx-auto w-fit min-w-[96px] rounded-[12px] border border-[#e0c97f] bg-[linear-gradient(180deg,#f9df8a_0%,#d3a93e_100%)] px-2 pb-1.5 pt-3 text-center text-[#5b3500] shadow-[0_10px_18px_rgba(0,0,0,0.28)]",
@@ -32,7 +33,8 @@ const seatLayouts = [
     ]
   },
   {
-    wrapper: "left-[1.2%] bottom-[30%] z-[18] w-[20%] min-w-[92px] max-w-[122px]",
+    // 1 — left-lower (below the x-axis pair)
+    wrapper: "left-[2%] top-[62%] z-[18] w-[20%] min-w-[92px] max-w-[122px] -translate-y-1/2",
     avatarShell: "mx-auto h-[33px] w-[33px] rounded-full border-[2px] border-[#ffe3a2] bg-[linear-gradient(180deg,#f4be66_0%,#915d18_100%)] p-[2px] shadow-[0_8px_12px_rgba(0,0,0,0.24)] sm:h-[37px] sm:w-[37px]",
     avatarInner: "rounded-full border border-white/55",
     label: "mt-1 mx-auto w-fit min-w-[60px] rounded-[8px] border border-[#d8bd78] bg-[linear-gradient(180deg,#fee58d_0%,#d3a83b_100%)] px-1 py-0.5 text-center text-[#5b3500] shadow-[0_6px_10px_rgba(0,0,0,0.18)]",
@@ -53,7 +55,8 @@ const seatLayouts = [
     ]
   },
   {
-    wrapper: "left-[1.2%] top-[38%] z-[18] w-[20%] min-w-[92px] max-w-[122px] -translate-y-1/2",
+    // 2 — left-upper (x-axis pair)
+    wrapper: "left-[2%] top-[34%] z-[18] w-[20%] min-w-[92px] max-w-[122px] -translate-y-1/2",
     avatarShell: "mx-auto h-[33px] w-[33px] rounded-full border-[2px] border-[#ffe3a2] bg-[linear-gradient(180deg,#f4be66_0%,#915d18_100%)] p-[2px] shadow-[0_8px_12px_rgba(0,0,0,0.24)] sm:h-[37px] sm:w-[37px]",
     avatarInner: "rounded-full border border-white/55",
     label: "mt-1 mx-auto w-fit min-w-[60px] rounded-[8px] border border-[#d8bd78] bg-[linear-gradient(180deg,#fee58d_0%,#d3a83b_100%)] px-1 py-0.5 text-center text-[#5b3500] shadow-[0_6px_10px_rgba(0,0,0,0.18)]",
@@ -74,7 +77,8 @@ const seatLayouts = [
     ]
   },
   {
-    wrapper: "right-[1.2%] top-[38%] z-[18] w-[20%] min-w-[92px] max-w-[122px] -translate-y-1/2",
+    // 3 — right-upper (x-axis pair, opposite left-upper)
+    wrapper: "right-[2%] top-[34%] z-[18] w-[20%] min-w-[92px] max-w-[122px] -translate-y-1/2",
     avatarShell: "mx-auto h-[33px] w-[33px] rounded-full border-[2px] border-[#ffe3a2] bg-[linear-gradient(180deg,#f4be66_0%,#915d18_100%)] p-[2px] shadow-[0_8px_12px_rgba(0,0,0,0.24)] sm:h-[37px] sm:w-[37px]",
     avatarInner: "rounded-full border border-white/55",
     label: "mt-1 mx-auto w-fit min-w-[60px] rounded-[8px] border border-[#d8bd78] bg-[linear-gradient(180deg,#fee58d_0%,#d3a83b_100%)] px-1 py-0.5 text-center text-[#5b3500] shadow-[0_6px_10px_rgba(0,0,0,0.18)]",
@@ -95,7 +99,8 @@ const seatLayouts = [
     ]
   },
   {
-    wrapper: "right-[1.2%] bottom-[30%] z-[18] w-[20%] min-w-[92px] max-w-[122px]",
+    // 4 — right-lower (below the x-axis pair)
+    wrapper: "right-[2%] top-[62%] z-[18] w-[20%] min-w-[92px] max-w-[122px] -translate-y-1/2",
     avatarShell: "mx-auto h-[33px] w-[33px] rounded-full border-[2px] border-[#ffe3a2] bg-[linear-gradient(180deg,#f4be66_0%,#915d18_100%)] p-[2px] shadow-[0_8px_12px_rgba(0,0,0,0.24)] sm:h-[37px] sm:w-[37px]",
     avatarInner: "rounded-full border border-white/55",
     label: "mt-1 mx-auto w-fit min-w-[60px] rounded-[8px] border border-[#d8bd78] bg-[linear-gradient(180deg,#fee58d_0%,#d3a83b_100%)] px-1 py-0.5 text-center text-[#5b3500] shadow-[0_6px_10px_rgba(0,0,0,0.18)]",
@@ -113,28 +118,6 @@ const seatLayouts = [
       { transform: "translate(0, -3px) rotate(-88deg)", zIndex: 1 },
       { transform: "translate(0, 0) rotate(-90deg)", zIndex: 2 },
       { transform: "translate(0, 3px) rotate(-92deg)", zIndex: 3 }
-    ]
-  },
-  {
-    // Top-center: opposite the user, under the dealer.
-    wrapper: "left-1/2 top-[13%] z-[19] w-[22%] min-w-[96px] max-w-[128px] -translate-x-1/2",
-    avatarShell: "mx-auto h-[33px] w-[33px] rounded-full border-[2px] border-[#ffe3a2] bg-[linear-gradient(180deg,#f4be66_0%,#915d18_100%)] p-[2px] shadow-[0_8px_12px_rgba(0,0,0,0.24)] sm:h-[37px] sm:w-[37px]",
-    avatarInner: "rounded-full border border-white/55",
-    label: "mt-1 mx-auto w-fit min-w-[60px] rounded-[8px] border border-[#d8bd78] bg-[linear-gradient(180deg,#fee58d_0%,#d3a83b_100%)] px-1 py-0.5 text-center text-[#5b3500] shadow-[0_6px_10px_rgba(0,0,0,0.18)]",
-    cardsWrap: "left-1/2 top-[calc(100%+6px)] -translate-x-1/2",
-    cardsRow: "flex items-start justify-center",
-    overlap: "-ml-4 sm:-ml-5",
-    stateWrap: "bottom-[calc(100%+8px)]",
-    hiddenCardClass: "",
-    hiddenCardStyles: [
-      { transform: "rotate(-10deg) translate(4px, 2px)", zIndex: 1 },
-      { transform: "rotate(0deg) translate(0, 0)", zIndex: 2 },
-      { transform: "rotate(10deg) translate(-4px, 2px)", zIndex: 1 }
-    ],
-    visibleCardStyles: [
-      { transform: "rotate(-12deg) translate(8px, 4px)", zIndex: 1 },
-      { transform: "rotate(0deg) translate(0, 0)", zIndex: 2 },
-      { transform: "rotate(12deg) translate(-8px, 4px)", zIndex: 3 }
     ]
   }
 ];
@@ -211,7 +194,8 @@ export default function Seat({
   dealtCount = null,
   cardsPerSeat = 3,
   publicCardMode = "none",
-  registerCardAnchor
+  registerCardAnchor,
+  actionNotice = null,
 }) {
   const layout = seatLayouts[seat.seatIndex] || seatLayouts[0];
   const isWinner = Boolean(winnerId && winnerId === seat.id);
@@ -219,6 +203,31 @@ export default function Seat({
   const isDealing = roundStatus === "dealing";
   const shouldRevealCards = Boolean(isRoundComplete || seat.seen);
   const hasVisibleCards = Boolean(shouldRevealCards && seat.cards?.some((card) => !card.hidden));
+  const cardsRevealed = hasVisibleCards;
+  const isSideSeat = !isUser && seat.seatIndex >= 1 && seat.seatIndex <= 4;
+  const revealedCardStyles = isUser
+    ? [
+        { transform: "rotate(-6deg) translateY(2px)", zIndex: 1 },
+        { transform: "rotate(0deg) translateY(0)", zIndex: 2 },
+        { transform: "rotate(6deg) translateY(2px)", zIndex: 3 },
+        { transform: "rotate(10deg) translateY(4px)", zIndex: 4 },
+      ]
+    : [
+        { transform: "rotate(-2deg)", zIndex: 1 },
+        { transform: "rotate(0deg)", zIndex: 2 },
+        { transform: "rotate(2deg)", zIndex: 3 },
+        { transform: "rotate(4deg)", zIndex: 4 },
+      ];
+  const cardsRowClass = cardsRevealed
+    ? isUser
+      ? "flex items-end justify-center gap-1.5 sm:gap-2"
+      : "table-seat__cards-row table-seat__cards-row--opponent-revealed flex items-end justify-center"
+    : layout.cardsRow;
+  const cardsWrapClass = cardsRevealed && isSideSeat
+    ? seat.seatIndex <= 2
+      ? "left-[calc(100%-2px)] top-1/2 -translate-y-1/2"
+      : "right-[calc(100%-2px)] top-1/2 -translate-y-1/2"
+    : layout.cardsWrap;
   const publicCards = Array.isArray(seat.publicCards) ? seat.publicCards.filter(Boolean) : [];
   const showPublicCards = publicCardMode === "third_card_rank_joker" && publicCards.length > 0 && !isStarting && !isDealing;
   const shouldShowReservePlaceholder = publicCardMode === "third_card_rank_joker" && !isStarting && !isDealing && publicCards.length < 2;
@@ -275,10 +284,17 @@ export default function Seat({
         ? "LOSS"
         : null
     : null;
-  const displayName =
-    typeof seat.name === "string" && seat.name.trim()
-      ? seat.name.trim()
-      : `Player ${String(seat.seatIndex).padStart(2, "0")}`;
+  const displayName = (() => {
+    const raw =
+      typeof seat.name === "string" && seat.name.trim()
+        ? seat.name.trim()
+        : `Player ${String(seat.seatIndex).padStart(2, "0")}`;
+    const cleaned = raw
+      .replace(/\b[Bb][Oo][Tt]\b/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return cleaned || raw;
+  })();
 
   return (
     <div
@@ -293,14 +309,18 @@ export default function Seat({
               registerCardAnchor(seat.id, node);
             }
           }}
-          className={`table-seat__cards absolute z-[20] ${layout.cardsWrap} ${isDealing ? "is-dealing" : ""}`}
+          className={`table-seat__cards absolute z-[20] ${cardsWrapClass} ${isDealing ? "is-dealing" : ""} ${
+            cardsRevealed ? "is-revealed" : ""
+          }`}
           data-card-count={cardsToRender.length}
         >
-          <div className={layout.cardsRow}>
+          <div className={cardsRowClass}>
             {cardsToRender.map((card, index) => (
               <div
                 key={card.renderKey || `${seat.id}-${index}`}
-                className={`table-seat__dealt-card ${index === 0 ? "" : layout.overlap}`}
+                className={`table-seat__dealt-card ${
+                  cardsRevealed || index === 0 ? "" : layout.overlap
+                }`}
               >
                 <PlayingCard
                   card={card}
@@ -318,10 +338,12 @@ export default function Seat({
                   style={
                     card.hidden
                       ? layout.hiddenCardStyles?.[index] ?? layout.hiddenCardStyles?.[layout.hiddenCardStyles.length - 1]
+                      : cardsRevealed
+                        ? revealedCardStyles[Math.min(index, revealedCardStyles.length - 1)]
                       : hasVisibleCards
                         ? layout.visibleCardStyles?.[index] ?? layout.visibleCardStyles?.[layout.visibleCardStyles.length - 1]
                         : card.displayType === "public"
-                          ? layout.visibleCardStyles?.[index] ?? layout.visibleCardStyles?.[layout.visibleCardStyles.length - 1]
+                          ? revealedCardStyles[Math.min(index, revealedCardStyles.length - 1)]
                           : undefined
                   }
                 />
@@ -364,6 +386,18 @@ export default function Seat({
             {isUser ? seatState : getOpponentActionLabel(seat.lastAction)}
           </span>
         </div>
+
+        {actionNotice ? (
+          <div
+            className={`table-seat__action-notice absolute left-1/2 z-[30] -translate-x-1/2 ${
+              isUser ? "bottom-[calc(100%+8px)]" : "bottom-[calc(100%+6px)]"
+            }`}
+          >
+            <div className="whitespace-nowrap rounded-full border border-[#43d8cc]/35 bg-[linear-gradient(180deg,rgba(8,52,56,0.96),rgba(4,24,27,0.98))] px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-[#abfff5] shadow-[0_8px_16px_rgba(0,0,0,0.28)] sm:text-[9px]">
+              {actionNotice}
+            </div>
+          </div>
+        ) : null}
 
         {!seat.connected ? (
           <div className={`absolute left-1/2 z-[26] -translate-x-1/2 ${layout.stateWrap}`}>

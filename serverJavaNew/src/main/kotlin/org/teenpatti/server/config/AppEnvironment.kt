@@ -39,4 +39,19 @@ internal class AppEnvironment {
     var platformPubKey: String = ""
     var platformSecret: String = ""
     var platformGameId: Int = 0
+
+    /** Supports a single origin or a comma-separated list in CLIENT_ORIGIN. */
+    fun clientOrigins(): Array<String> {
+        val parsed =
+            clientOrigin
+                .split(",")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+        return if (parsed.isEmpty()) {
+            arrayOf("http://localhost:3000")
+        } else {
+            parsed.toTypedArray()
+        }
+    }
 }

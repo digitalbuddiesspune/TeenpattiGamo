@@ -98,20 +98,25 @@ body.app-body-portrait-blocked {
 /* ---------------------------------------------------------------------------
  * Public lobby — modern glass casino theme (responsive).
  * ------------------------------------------------------------------------- */
-.lobby {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-  isolation: isolate;
-  background:
+:root {
+  --lobby-bg:
     linear-gradient(165deg, rgba(18, 4, 8, 0.35) 0%, transparent 42%),
     radial-gradient(ellipse 90% 55% at 50% -8%, #9a1c28 0%, transparent 58%),
     radial-gradient(ellipse 70% 50% at 100% 100%, rgba(120, 28, 18, 0.45) 0%, transparent 55%),
     radial-gradient(ellipse 60% 40% at 0% 80%, rgba(80, 12, 20, 0.5) 0%, transparent 50%),
     linear-gradient(180deg, #3a0810 0%, #1c0408 48%, #0e0204 100%);
+}
+
+.lobby {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--lobby-bg);
 }
 
 .lobby__glow {
@@ -453,11 +458,45 @@ body.app-body-portrait-blocked {
   flex-direction: column;
   min-height: 0;
   width: 100%;
-  max-width: 1120px;
-  margin-inline: auto;
+  max-width: none;
+  margin: 0;
   padding-block: clamp(8px, 1.5vh, 16px) 0;
-  padding-inline: clamp(12px, 3.5vw, 36px);
+  padding-inline: clamp(16px, 4vw, 48px);
   padding-bottom: max(14px, env(safe-area-inset-bottom));
+}
+
+.lobby-exit {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  padding-top: clamp(10px, 1.8vh, 16px);
+  padding-bottom: 2px;
+}
+
+.lobby-exit__button {
+  min-width: min(100%, 220px);
+  border: 1px solid rgba(255, 180, 140, 0.34);
+  border-radius: 999px;
+  padding: 12px 22px;
+  background: linear-gradient(180deg, rgba(92, 24, 28, 0.94), rgba(42, 8, 12, 0.98));
+  color: #ffe6c8;
+  font-family: var(--font-body), sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.lobby-exit__button:hover {
+  border-color: rgba(255, 206, 150, 0.5);
+  background: linear-gradient(180deg, rgba(112, 30, 34, 0.96), rgba(52, 10, 14, 0.98));
+}
+
+.lobby-exit__button:active {
+  transform: translateY(1px);
 }
 
 .lobby-grid {
@@ -1037,6 +1076,39 @@ body.app-body-portrait-blocked {
   color: rgba(255, 230, 180, 0.5);
 }
 
+.joining-screen__exit {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: clamp(18px, 3.5vh, 28px);
+}
+
+.joining-screen__exit-button {
+  min-width: min(100%, 220px);
+  border: 1px solid rgba(255, 180, 140, 0.4);
+  border-radius: 999px;
+  padding: 12px 22px;
+  background: linear-gradient(180deg, rgba(92, 24, 28, 0.96), rgba(42, 8, 12, 0.98));
+  color: #ffe6c8;
+  font-family: var(--font-body), sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.32);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.joining-screen__exit-button:hover {
+  border-color: rgba(255, 206, 150, 0.55);
+  background: linear-gradient(180deg, rgba(112, 30, 34, 0.98), rgba(52, 10, 14, 0.98));
+}
+
+.joining-screen__exit-button:active {
+  transform: translateY(1px);
+}
+
 @keyframes joining-pulse {
   0%,
   100% {
@@ -1220,6 +1292,8 @@ body.app-body-portrait-blocked {
 
 .table-screen {
   position: relative;
+  width: 100%;
+  max-width: none;
   min-height: 100vh;
 }
 
@@ -1361,11 +1435,19 @@ body.app-body-portrait-blocked {
   min-height: 100dvh;
   height: 100dvh;
   overflow: hidden;
-  background: #120308;
+  background: var(--lobby-bg);
+}
+
+.casino-page-menu > .lobby {
+  width: 100%;
+  max-width: none;
+  margin: 0;
 }
 
 .casino-page-table {
   padding: 0;
+  width: 100%;
+  max-width: none;
 }
 
 /* ---------------------------------------------------------------------------
@@ -1374,33 +1456,47 @@ body.app-body-portrait-blocked {
  * The board is sized from available HEIGHT, not width. The table art is a tall
  * 1054x1492 portrait, so sizing it by width (the old `w-[84%] sm:w-full`) made
  * it overflow the viewport vertically the moment the frame stopped being a
- * fixed 430px phone column. Deriving width from the leftover height keeps the
- * whole surface, the dealer, and the user's card fan on screen at every size.
+ * fixed 430px phone column. Portrait mode stretches to fill leftover height
+ * on the Y axis (felt uses object-fit: fill).
  * ------------------------------------------------------------------------- */
 :root {
   --board-aspect: 0.7064; /* 1054 / 1492 */
-  --board-hud: 72px; /* sticky settings + balance row */
-  --board-controls: 120px; /* fixed action bar reserve */
-  --board-cards: 92px; /* user fan hanging below the surface */
-  --board-min: 280px;
-  --board-max: min(96vw, 420px);
+  --board-hud: 64px; /* sticky settings + balance row */
+  --board-controls: 108px; /* fixed action bar reserve */
+  --board-cards: 72px; /* user fan hanging below the surface */
+  --board-min: 240px;
+  --board-max: min(96vw, 430px);
   --board-column: 100%;
-  --board-lift: 36px;
+  --board-lift: 12px;
+  --board-avail-h: calc(
+    100dvh - var(--board-hud) - var(--board-controls) - var(--board-cards) -
+      env(safe-area-inset-bottom)
+  );
 }
 
 @media (min-width: 640px) {
   :root {
-    --board-controls: 148px;
-    --board-max: min(72vw, 480px);
-    --board-lift: 24px;
+    --board-controls: 140px;
+    --board-max: min(72vw, 460px);
+    --board-lift: 8px;
   }
 }
 
 @media (min-width: 1024px) and (min-height: 860px) {
   :root {
-    --board-max: min(52vw, 520px);
-    --board-column: 640px;
+    --board-max: min(48vw, 480px);
   }
+}
+
+.casino-table-scene__column {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding-inline: 0;
+  padding-bottom: calc(var(--board-controls) + env(safe-area-inset-bottom));
 }
 
 .casino-table-scene .app-frame-surface > div {
@@ -1408,8 +1504,8 @@ body.app-body-portrait-blocked {
   flex-direction: column;
   min-height: 100%;
   width: 100%;
-  max-width: var(--board-column);
-  margin-inline: auto;
+  max-width: none;
+  margin: 0;
   padding-inline: 0;
   padding-bottom: calc(var(--board-controls) + env(safe-area-inset-bottom));
 }
@@ -1421,16 +1517,16 @@ body.app-body-portrait-blocked {
 }
 
 /*
- * Portrait: stretch the board to fill leftover space so the felt uses the full
- * width and height. Landscape desktop keeps its own aspect-locked sizing.
+ * Portrait board: fill leftover viewport height on the Y axis, stretch felt.
+ * Landscape breakpoint below restores aspect-locked sizing.
  */
 .casino-table-scene__viewport {
-  width: 100%;
-  max-width: none;
-  height: calc(
-    100dvh - var(--board-hud) - var(--board-controls) - env(safe-area-inset-bottom)
-  );
-  min-height: 360px;
+  width: min(100%, var(--board-max));
+  max-width: 100%;
+  height: var(--board-avail-h);
+  max-height: var(--board-avail-h);
+  min-height: min(var(--board-avail-h), 280px);
+  aspect-ratio: auto;
   margin-inline: auto;
 }
 
@@ -1484,10 +1580,10 @@ body.app-body-portrait-blocked {
   height: clamp(40px, 14cqw, 84px);
 }
 
-/* Keep the fixed action bar aligned with the board column on wide screens. */
+/* Action bar spans the page; board sizing stays independent. */
 .table-controls {
   width: 100%;
-  max-width: var(--board-column);
+  max-width: none;
 }
 
 /* ---------------------------------------------------------------------------
@@ -1502,34 +1598,39 @@ body.app-body-portrait-blocked {
     --board-aspect: 1.5; /* 1536 / 1024 */
     --board-hud: 92px;
     --board-controls: 150px;
-    --board-cards: 112px;
-    --board-min: 520px;
-    --board-max: min(78vw, 1040px);
-    --board-column: min(1160px, 94vw);
-    --board-lift: 6px;
+    --board-cards: 96px;
+    --board-min: 420px;
+    --board-max: min(86vw, 960px);
+    --board-column: 100%;
+    --board-lift: 4px;
+    --board-avail-h: calc(
+      100dvh - var(--board-hud) - var(--board-controls) - var(--board-cards) -
+        env(safe-area-inset-bottom)
+    );
   }
 
   .casino-table-scene__viewport {
-    width: max(
-      var(--board-min),
-      min(
-        100%,
-        var(--board-max),
-        calc(
-          (100dvh - var(--board-hud) - var(--board-controls) - var(--board-cards)) *
-            var(--board-aspect)
-        )
-      )
+    width: min(
+      100%,
+      var(--board-max),
+      calc(var(--board-avail-h) * var(--board-aspect))
     );
+    max-width: 100%;
     height: auto;
+    max-height: var(--board-avail-h);
     min-height: 0;
+    aspect-ratio: 1536 / 1024;
+  }
+
+  .casino-table-scene__stage {
+    align-items: center;
   }
 
   .casino-table-scene .casino-table-scene__surface {
     container-type: size;
     width: 100%;
-    height: auto;
-    aspect-ratio: 1536 / 1024;
+    height: 100%;
+    aspect-ratio: auto;
   }
 
   .casino-table-scene__felt--portrait {
@@ -1538,50 +1639,43 @@ body.app-body-portrait-blocked {
 
   .casino-table-scene__felt--landscape {
     display: block;
-    object-fit: contain;
+    object-fit: fill !important;
   }
 
   .casino-table-scene__viewport .table-seat--index-0 {
-    bottom: 4%;
+    bottom: 6%;
   }
 
   .casino-table-scene__viewport .table-seat--index-1 {
-    left: 2%;
-    bottom: 27%;
+    left: 3%;
+    top: 62%;
+    bottom: auto;
+    transform: translateY(-50%);
   }
 
   .casino-table-scene__viewport .table-seat--index-2 {
-    left: 2%;
-    top: 42%;
+    left: 3%;
+    top: 32%;
     bottom: auto;
     transform: translateY(-50%);
   }
 
   .casino-table-scene__viewport .table-seat--index-3 {
-    right: 2%;
-    top: 42%;
+    right: 3%;
+    top: 32%;
     bottom: auto;
     transform: translateY(-50%);
   }
 
   .casino-table-scene__viewport .table-seat--index-4 {
-    right: 2%;
-    bottom: 27%;
-  }
-
-  .casino-table-scene__viewport .table-seat--index-5 {
-    left: 50%;
-    top: 4%;
-    transform: translateX(-50%);
+    right: 3%;
+    top: 62%;
+    bottom: auto;
+    transform: translateY(-50%);
   }
 
   .casino-table-scene__viewport .casino-table-scene__dealer {
-    top: 0;
-    transform: translate(-50%, -48%);
-  }
-
-  .casino-table-scene__viewport .casino-table-scene__dealer > div {
-    width: clamp(120px, 12%, 168px);
+    display: none;
   }
 
   .casino-table-scene__viewport .casino-table-scene__pot {
@@ -2799,6 +2893,193 @@ body.app-body-portrait-blocked {
   filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.22));
 }
 
+.casino-table-scene__pot-flight {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  will-change: transform, opacity;
+  opacity: 0;
+  animation-name: pot-flight;
+  animation-timing-function: cubic-bezier(0.33, 0.08, 0.18, 1);
+  animation-fill-mode: forwards;
+  transform: translate(-50%, -50%);
+}
+
+.casino-table-scene__pot-flight-amount {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 222, 131, 0.45);
+  background: linear-gradient(180deg, rgba(40, 24, 8, 0.92), rgba(18, 10, 4, 0.96));
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #ffde83;
+  white-space: nowrap;
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.28);
+}
+
+.casino-table-scene__celebration {
+  overflow: hidden;
+}
+
+.casino-table-scene__celebration-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 28%, rgba(255, 210, 90, 0.28) 0%, rgba(0, 0, 0, 0.18) 42%, rgba(0, 0, 0, 0.45) 100%);
+  animation: celebration-veil 4.8s ease-out forwards;
+}
+
+.casino-table-scene__celebration-burst {
+  position: absolute;
+  left: 50%;
+  top: 36%;
+  width: min(88vw, 560px);
+  height: min(88vw, 560px);
+  transform: translate(-50%, -50%) scale(0.4);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(255, 222, 120, 0.7) 0%, rgba(255, 170, 60, 0.28) 34%, transparent 68%);
+  animation: celebration-burst 1.6s ease-out forwards;
+}
+
+.casino-table-scene__celebration-banner {
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: min(78vw, 280px);
+  padding: 18px 28px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 222, 140, 0.65);
+  background: linear-gradient(180deg, rgba(110, 52, 10, 0.96), rgba(42, 16, 4, 0.98));
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.42), 0 0 40px rgba(255, 200, 80, 0.22);
+  transform: translate(-50%, -12px) scale(0.86);
+  opacity: 0;
+  animation: celebration-banner 4.6s cubic-bezier(0.22, 0.8, 0.2, 1) forwards;
+}
+
+.casino-table-scene__celebration-banner strong {
+  font-size: clamp(28px, 6vw, 44px);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ffe59a;
+  text-shadow: 0 0 28px rgba(255, 210, 90, 0.55);
+}
+
+.casino-table-scene__celebration-banner span {
+  font-size: clamp(15px, 3.2vw, 20px);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #fff4d0;
+}
+
+.casino-table-scene__confetti {
+  position: absolute;
+  top: -12px;
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: 0;
+  animation-name: confetti-fall;
+  animation-timing-function: cubic-bezier(0.22, 0.1, 0.35, 1);
+  animation-fill-mode: forwards;
+}
+
+@keyframes pot-flight {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.78);
+  }
+  8% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+  48% {
+    opacity: 1;
+    transform: translate(
+      calc(-50% + var(--pot-mid-x)),
+      calc(-50% + var(--pot-mid-y))
+    ) scale(1.02);
+  }
+  100% {
+    opacity: 0.2;
+    transform: translate(
+      calc(-50% + var(--pot-x)),
+      calc(-50% + var(--pot-y))
+    ) scale(0.62);
+  }
+}
+
+@keyframes celebration-veil {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  78% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes celebration-burst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  28% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.55);
+  }
+}
+
+@keyframes celebration-banner {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -22px) scale(0.78);
+  }
+  10% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1.06);
+  }
+  78% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(0.96);
+  }
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  8% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(22px, 105vh, 0) rotate(620deg);
+  }
+}
+
 .table-image {
   width: 100%;
   height: 100%;
@@ -3288,6 +3569,40 @@ body.app-body-portrait-blocked {
 .table-seat__dealt-card {
   transform-origin: center center;
   animation: seat-card-land 220ms cubic-bezier(0.22, 0.86, 0.3, 1);
+}
+
+.table-seat__cards.is-revealed {
+  overflow: visible;
+}
+
+.table-seat__cards.is-revealed .table-seat__dealt-card {
+  margin: 0 !important;
+  flex-shrink: 0;
+}
+
+/* Keep a tight but readable gap between revealed opponent cards. */
+.table-seat__cards-row--opponent-revealed {
+  gap: 3px;
+}
+
+.table-seat--opponent .table-seat__cards.is-revealed .playing-card.compact {
+  width: 38px;
+  height: 56px;
+  padding: 3px;
+  border-radius: 6px;
+}
+
+@media (min-width: 640px) {
+  .table-seat__cards-row--opponent-revealed {
+    gap: 4px;
+  }
+
+  .table-seat--opponent .table-seat__cards.is-revealed .playing-card.compact {
+    width: 46px;
+    height: 68px;
+    padding: 4px;
+    border-radius: 7px;
+  }
 }
 
 .table-seat__cards.is-dealing[data-card-count="1"] .table-seat__dealt-card {
@@ -4269,14 +4584,7 @@ body.app-body-portrait-blocked {
   }
 
   .app-shell.is-mobile-landscape .casino-table-scene__dealer {
-    left: 50%;
-    top: 0;
-    transform: translate(-50%, -42%);
-  }
-
-  .app-shell.is-mobile-landscape .casino-table-scene__dealer > div {
-    width: clamp(120px, 12.5vw, 152px);
-    height: clamp(120px, 12.5vw, 152px);
+    display: none;
   }
 
   .app-shell.is-mobile-landscape .casino-table-scene__message {
@@ -4335,32 +4643,34 @@ body.app-body-portrait-blocked {
 
   .app-shell.is-mobile-landscape .table-seat--index-1 {
     left: -24px;
-    bottom: 36px;
+    top: 62%;
+    bottom: auto;
+    transform: translateY(-50%);
   }
 
   .app-shell.is-mobile-landscape .table-seat--index-2 {
     left: -24px;
-    top: 42%;
+    top: 32%;
     bottom: auto;
     transform: translateY(-50%);
   }
 
   .app-shell.is-mobile-landscape .table-seat--index-3 {
     right: -24px;
-    top: 42%;
+    top: 32%;
     bottom: auto;
     transform: translateY(-50%);
   }
 
   .app-shell.is-mobile-landscape .table-seat--index-4 {
     right: -24px;
-    bottom: 36px;
+    top: 62%;
+    bottom: auto;
+    transform: translateY(-50%);
   }
 
   .app-shell.is-mobile-landscape .table-seat--index-5 {
-    left: 50%;
-    top: -28px;
-    transform: translateX(-50%);
+    display: none;
   }
 
   .app-shell.is-mobile-landscape .table-seat--user > div {
@@ -4575,32 +4885,34 @@ body.app-body-portrait-blocked {
 
   .app-shell.is-mobile-landscape .table-seat--index-1 {
     left: -30px;
-    bottom: 30px;
+    top: 62%;
+    bottom: auto;
+    transform: translateY(-50%);
   }
 
   .app-shell.is-mobile-landscape .table-seat--index-2 {
     left: -30px;
-    top: 42%;
+    top: 32%;
     bottom: auto;
     transform: translateY(-50%);
   }
 
   .app-shell.is-mobile-landscape .table-seat--index-3 {
     right: -30px;
-    top: 42%;
+    top: 32%;
     bottom: auto;
     transform: translateY(-50%);
   }
 
   .app-shell.is-mobile-landscape .table-seat--index-4 {
     right: -30px;
-    bottom: 30px;
+    top: 62%;
+    bottom: auto;
+    transform: translateY(-50%);
   }
 
   .app-shell.is-mobile-landscape .table-seat--index-5 {
-    left: 50%;
-    top: -30px;
-    transform: translateX(-50%);
+    display: none;
   }
 
   .app-shell.is-mobile-landscape .table-seat--user > div {

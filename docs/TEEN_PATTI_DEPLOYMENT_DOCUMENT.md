@@ -286,13 +286,34 @@ Reverse proxy requirements:
 Example Nginx WebSocket settings:
 
 ```nginx
+# Place in http {} context (e.g. /etc/nginx/nginx.conf), not inside server {}.
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+```
+
+```nginx
 proxy_http_version 1.1;
 proxy_set_header Upgrade $http_upgrade;
-proxy_set_header Connection "upgrade";
+proxy_set_header Connection $connection_upgrade;
 proxy_set_header Host $host;
 proxy_set_header X-Forwarded-Proto $scheme;
 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 ```
+
+If the browser shows `Unexpected response code: 400` and the API body is
+`Can "Upgrade" only to "WebSocket".`, Nginx is proxying `/ws/` to Spring but
+**not forwarding the Upgrade headers**. Fix the `/ws/` location, reload Nginx,
+then retest.
+
+Also set production `CLIENT_ORIGIN` to the exact frontend origin(s), for example:
+
+```env
+CLIENT_ORIGIN=https://doormart.shop,https://www.doormart.shop
+```
+
+A mismatched Origin returns `403` on the handshake.
 
 Example single-EC2 Nginx site for static frontend plus backend proxy:
 
@@ -326,9 +347,10 @@ server {
         proxy_pass http://127.0.0.1:4100/ws/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
+        proxy_set_header Connection $connection_upgrade;
         proxy_read_timeout 3600s;
         proxy_send_timeout 3600s;
+        proxy_buffering off;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;

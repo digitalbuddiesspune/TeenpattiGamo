@@ -861,6 +861,7 @@ internal class PublicTableManager(
         }
         val botCount = forcedBotCount ?: targetBotCount(participants.size)
         val botSlots = activeBotSlots(table, botCount)
+        refreshBotSlotNames(botSlots)
         for (botSlot in botSlots) {
             val participant = RoundParticipant()
             participant.id = botSlot.id
@@ -872,6 +873,14 @@ internal class PublicTableManager(
             participants.add(participant)
         }
         return participants
+    }
+
+    private fun refreshBotSlotNames(botSlots: List<PublicBotSlot>) {
+        val used = mutableListOf<String>()
+        for (slot in botSlots) {
+            slot.name = BotUsernames.resolve(slot.name, randomSource, used)
+            used.add(slot.name)
+        }
     }
 
     private fun targetBotCount(realPlayerCount: Int): Int =
@@ -894,7 +903,7 @@ internal class PublicTableManager(
         val usedNames = seating.botSlots.map { it.name }
         val slot = PublicBotSlot()
         slot.id = "${table.tableId}-bot-$botNumber"
-        slot.name = BotUsernames.pick(randomSource, usedNames)
+        slot.name = BotUsernames.resolve(null, randomSource, usedNames)
         slot.avatar = listOf("raj", "captain", "maya", "ace")[randomSource.nextInt(4)]
         return slot
     }
@@ -1186,9 +1195,22 @@ internal class PublicTableManager(
             }
             val slot = PublicBotSlot()
             slot.id = seat.id
-            slot.name = seat.name
+            slot.name = BotUsernames.resolve(seat.name, randomSource, seating.botSlots.map { it.name })
             slot.avatar = seat.avatar
             seating.botSlots.add(slot)
+            if (BotUsernames.isPlaceholder(seat.name) || seat.name != slot.name) {
+                seat.name = slot.name
+            }
+        }
+        refreshBotSlotNames(seating.botSlots)
+        for (seat in round.seats) {
+            if (!seat.isBot) {
+                continue
+            }
+            val slot = findBotSlot(seating, seat.id) ?: continue
+            if (seat.name != slot.name) {
+                seat.name = slot.name
+            }
         }
     }
 

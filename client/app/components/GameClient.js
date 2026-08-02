@@ -15,6 +15,8 @@ import {
   PLATFORM_PROFILE_STORAGE_KEY,
   withLaunchQuery,
 } from "../lib/platformLaunch";
+import { unlockAudioFromGesture } from "../lib/audioUnlock";
+import { rewritePlayerNamesInText, withDisplayNames } from "../lib/playerDisplayName";
 import { DEFAULT_VARIANT_ID, VARIANT_OPTIONS } from "../lib/variants";
 
 const menuActions = {
@@ -102,14 +104,14 @@ function getNextRoundDecision(round, nowMs) {
   };
 }
 
-// Visual slots around the oval (user always 0 at bottom).
-// Opponents are assigned in mirrored pairs so they sit opposite each other.
-// 1 = left-bottom, 2 = left-top, 3 = right-top, 4 = right-bottom, 5 = top-center.
+// Visual slots (user always 0 at bottom center):
+// 2 = left-upper, 3 = right-upper  → opposite on the x-axis
+// 1 = left-lower, 4 = right-lower  → two more seats below that pair
 const OPPONENT_DISPLAY_SLOTS = {
-  1: [5],
+  1: [2],
   2: [2, 3],
-  3: [2, 5, 3],
-  4: [1, 2, 3, 4],
+  3: [2, 3, 1],
+  4: [2, 3, 1, 4],
 };
 
 function rotateSeatsForViewer(seats = []) {
@@ -186,7 +188,7 @@ const LOBBY_MENU_OPTIONS = [
   {
     id: "history",
     label: "Transaction History",
-    hint: "View debit & credit rounds",
+    hint: "Rounds, debits & credits",
   },
   {
     id: "rules",
@@ -197,6 +199,11 @@ const LOBBY_MENU_OPTIONS = [
     id: "refresh",
     label: "Refresh Balance",
     hint: "Sync wallet from platform",
+  },
+  {
+    id: "exit",
+    label: "Exit Lobby",
+    hint: "Leave and return home",
   },
 ];
 
@@ -354,7 +361,7 @@ function useElapsedMatchmakingSeconds() {
   return elapsedSeconds;
 }
 
-function PublicTableJoiningScreen({ message, mode = "matchmaking" }) {
+function PublicTableJoiningScreen({ message, mode = "matchmaking", onExitLobby }) {
   const elapsedSeconds = useElapsedMatchmakingSeconds();
   const timerLabel = formatMatchmakingTimer(elapsedSeconds);
   const progressPercent = mode === "matchmaking"
@@ -459,6 +466,18 @@ function PublicTableJoiningScreen({ message, mode = "matchmaking" }) {
                 ? "Your table will reopen automatically."
                 : `Searching ${timerLabel} · opens when a seat is ready`}
             </p>
+
+            {typeof onExitLobby === "function" ? (
+              <div className="joining-screen__exit">
+                <button
+                  type="button"
+                  className="joining-screen__exit-button"
+                  onClick={onExitLobby}
+                >
+                  Exit Lobby
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -593,8 +612,31 @@ export default function GameClient({
   const isPublicLobbyWaiting =
     publicTableState?.playerStatus === "active_at_table" && !round;
   const canonicalSeats = round?.seats || [];
-  const displaySeats = rotateSeatsForViewer(canonicalSeats);
-  const tableRound = round;
+  const { seats: namedSeats, nameById } = withDisplayNames(canonicalSeats);
+  const displaySeats = rotateSeatsForViewer(namedSeats);
+  const resolveMappedName = (playerId, fallback) =>
+    (playerId && nameById.get(playerId)) || rewritePlayerNamesInText(fallback, canonicalSeats, nameById) || fallback;
+  const tableRound = round
+    ? {
+        ...round,
+        seats: namedSeats,
+        message: rewritePlayerNamesInText(round.message, canonicalSeats, nameById),
+        pendingSideShow: round.pendingSideShow
+          ? {
+              ...round.pendingSideShow,
+              requesterName: resolveMappedName(round.pendingSideShow.requesterId, round.pendingSideShow.requesterName),
+              targetName: resolveMappedName(round.pendingSideShow.targetId, round.pendingSideShow.targetName),
+            }
+          : round.pendingSideShow,
+        sideShowResult: round.sideShowResult
+          ? {
+              ...round.sideShowResult,
+              requesterName: resolveMappedName(round.sideShowResult.requesterId, round.sideShowResult.requesterName),
+              targetName: resolveMappedName(round.sideShowResult.targetId, round.sideShowResult.targetName),
+            }
+          : round.sideShowResult,
+      }
+    : round;
   const userSeat = displaySeats.find((seat) => seat.isUser);
   const viewerHasDealerTipPrompt = Boolean(round?.dealerTipPending && round?.dealerTipPrompt);
   const turnClock = getTurnClock(round, turnNow);
@@ -818,6 +860,11 @@ export default function GameClient({
 
     if (actionId === "refresh") {
       void syncPlatformProfile().catch(() => {});
+      return;
+    }
+
+    if (actionId === "exit") {
+      void handleExitLobby();
     }
   }
 
@@ -828,6 +875,31 @@ export default function GameClient({
   const closeLobbyRules = useCallback(() => {
     setLobbyRulesOpen(false);
   }, []);
+
+  const handleExitLobby = useCallback(() => {
+    setLobbyMenuOpen(false);
+    setLobbyRulesOpen(false);
+
+    VARIANT_OPTIONS.forEach((entry) => {
+      clearStoredPublicSession(entry.id);
+    });
+
+    try {
+      window.sessionStorage.removeItem(PLATFORM_PROFILE_STORAGE_KEY);
+      window.sessionStorage.removeItem(PLATFORM_LAUNCH_CONTEXT_STORAGE_KEY);
+    } catch {}
+
+    setPlatformProfile(null);
+    router.replace("/");
+  }, [router]);
+
+  const handleExitMatchmaking = useCallback(async () => {
+    try {
+      await leavePublicTable();
+    } catch {}
+    clearStoredPublicSession(variant);
+    router.replace(withLaunchQuery("/public"));
+  }, [leavePublicTable, router, variant]);
 
   const handleExitTable = useCallback(async () => {
     await leavePublicTable();
@@ -957,7 +1029,9 @@ export default function GameClient({
     try {
       clearStoredPublicSession(variantId);
     } catch {}
-    window.location.assign(withLaunchQuery(`/public?variant=${encodeURIComponent(variantId)}`));
+    // Keep the same document so the lobby click unlocks audio for shuffle/deal.
+    unlockAudioFromGesture();
+    router.push(withLaunchQuery(`/public?variant=${encodeURIComponent(variantId)}`));
   }
 
   useEffect(() => {
@@ -977,11 +1051,15 @@ export default function GameClient({
       pageContent = (
         <main className={`casino-page ${screen === "table" ? "casino-page-table" : "casino-page-menu"}`}>
           {screen === "table" ? (
-            <PublicTableJoiningScreen message={publicJoinMessage} />
+            <PublicTableJoiningScreen
+              message={publicJoinMessage}
+              onExitLobby={handleExitMatchmaking}
+            />
           ) : (
             <PublicTableJoiningScreen
               mode="sync"
               message={activeError || "Preparing the live table and syncing your player session."}
+              onExitLobby={handleExitMatchmaking}
             />
           )}
         </main>
@@ -990,83 +1068,79 @@ export default function GameClient({
       pageContent = (
         <main className={`casino-page ${screen === "table" ? "casino-page-table" : "casino-page-menu"}`}>
           {screen === "menu" ? (
-            <section className="menu-screen flex h-dvh overflow-hidden bg-[#120308]">
-              <div className="app-frame app-frame-surface app-frame-clip relative h-dvh w-full">
-                <div className="lobby relative z-[1] h-dvh overflow-hidden">
-                  <div className="lobby__glow lobby__glow--a" aria-hidden="true" />
-                  <div className="lobby__glow lobby__glow--b" aria-hidden="true" />
+            <section className="lobby relative z-[1] flex h-dvh w-full flex-col overflow-hidden">
+              <div className="lobby__glow lobby__glow--a" aria-hidden="true" />
+              <div className="lobby__glow lobby__glow--b" aria-hidden="true" />
 
-                  <header className="lobby-topbar">
-                    <span className="lobby-topbar__avatar">
-                      <Image
-                        src="/newAssets/avatars/avatar2.png"
-                        alt="Player avatar"
-                        width={52}
-                        height={52}
-                      />
-                    </span>
-
-                    <div className="lobby-topbar__plate">
-                      <div className="lobby-topbar__pod">
-                        <strong className="lobby-topbar__name">
-                          {platformProfile?.username || "Player"}
-                        </strong>
-                      </div>
-
-                      <div className="lobby-topbar__center">
-                        <span className="lobby-topbar__wallet">
-                            <Image
-                              src="/newAssets/chip.png"
-                              alt=""
-                              width={24}
-                              height={22}
-                              aria-hidden="true"
-                              className="object-contain"
-                              style={{ width: 20, height: "auto" }}
-                            />
-                          <b>{walletBalanceLabel}</b>
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="lobby-topbar__menu-wrap" ref={lobbyMenuAnchorRef}>
-                      <button
-                        type="button"
-                        className="lobby-topbar__menu"
-                        onClick={() => setLobbyMenuOpen((open) => !open)}
-                        aria-label="Open menu"
-                        aria-expanded={lobbyMenuOpen}
-                        aria-haspopup="menu"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-                          <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
-                        </svg>
-                      </button>
-                    </div>
-                  </header>
-
-                  <LobbyMenuDropdown
-                    open={lobbyMenuOpen}
-                    anchorRef={lobbyMenuAnchorRef}
-                    onSelect={handleMenuAction}
-                    onClose={closeLobbyMenu}
+              <header className="lobby-topbar">
+                <span className="lobby-topbar__avatar">
+                  <Image
+                    src="/newAssets/avatars/avatar2.png"
+                    alt="Player avatar"
+                    width={52}
+                    height={52}
                   />
+                </span>
 
-                  <LobbyRulesModal open={lobbyRulesOpen} onClose={closeLobbyRules} />
+                <div className="lobby-topbar__plate">
+                  <div className="lobby-topbar__pod">
+                    <strong className="lobby-topbar__name">
+                      {platformProfile?.username || "Player"}
+                    </strong>
+                  </div>
 
-                  <div className="lobby-main">
-                    <section className="lobby-grid" aria-label="Game variants">
-                      {VARIANT_OPTIONS.map((variant) => (
-                        <VariantCard
-                          key={variant.id}
-                          title={variant.label}
-                          summary={variant.summary}
-                          onClick={() => handleSelectVariant(variant.id)}
-                        />
-                      ))}
-                    </section>
+                  <div className="lobby-topbar__center">
+                    <span className="lobby-topbar__wallet">
+                      <Image
+                        src="/newAssets/chip.png"
+                        alt=""
+                        width={24}
+                        height={22}
+                        aria-hidden="true"
+                        className="object-contain"
+                        style={{ width: 20, height: "auto" }}
+                      />
+                      <b>{walletBalanceLabel}</b>
+                    </span>
                   </div>
                 </div>
+
+                <div className="lobby-topbar__menu-wrap" ref={lobbyMenuAnchorRef}>
+                  <button
+                    type="button"
+                    className="lobby-topbar__menu"
+                    onClick={() => setLobbyMenuOpen((open) => !open)}
+                    aria-label="Open menu"
+                    aria-expanded={lobbyMenuOpen}
+                    aria-haspopup="menu"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                      <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </div>
+              </header>
+
+              <LobbyMenuDropdown
+                open={lobbyMenuOpen}
+                anchorRef={lobbyMenuAnchorRef}
+                onSelect={handleMenuAction}
+                onClose={closeLobbyMenu}
+              />
+
+              <LobbyRulesModal open={lobbyRulesOpen} onClose={closeLobbyRules} />
+
+              <div className="lobby-main">
+                <section className="lobby-grid" aria-label="Game variants">
+                  {VARIANT_OPTIONS.map((variant) => (
+                    <VariantCard
+                      key={variant.id}
+                      title={variant.label}
+                      summary={variant.summary}
+                      onClick={() => handleSelectVariant(variant.id)}
+                    />
+                  ))}
+                </section>
               </div>
 
               <div className="sr-only" aria-live="polite">
@@ -1109,7 +1183,7 @@ export default function GameClient({
 
               {round?.status === "active" && !waitingForSeat && userSeat ? (
                 <TableControls
-                  round={round}
+                  round={tableRound}
                   seats={displaySeats}
                   userSeat={userSeat}
                   acting={activeActing}
@@ -1118,8 +1192,8 @@ export default function GameClient({
                   onAdjustStake={handleAdjustStake}
                 />
               ) : waitingForSeat ? null : (
-                <div className="table-screen__status pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:px-6 sm:pb-5">
-                  <div className="app-frame">
+                  <div className="table-screen__status pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:px-6 sm:pb-5">
+                  <div className="w-full max-w-xl">
                   {shouldKickForLowBalance ? (
                     <StatusBanner
                       title="Not enough balance"

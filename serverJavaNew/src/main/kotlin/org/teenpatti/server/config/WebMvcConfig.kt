@@ -11,15 +11,16 @@ internal class WebMvcConfig {
     fun webMvcConfigurer(env: AppEnvironment): WebMvcConfigurer =
         object : WebMvcConfigurer {
             override fun addCorsMappings(registry: CorsRegistry) {
+                val origins = env.clientOrigins()
                 registry.addMapping("/api/**")
-                    .allowedOrigins(env.clientOrigin)
+                    .allowedOrigins(*origins)
                     .allowedMethods("GET", "POST", "OPTIONS")
                     .allowedHeaders("*")
                     .allowCredentials(false)
                     .maxAge(3600)
 
                 registry.addMapping("/health")
-                    .allowedOrigins(env.clientOrigin)
+                    .allowedOrigins(*origins)
                     .allowedMethods("GET", "OPTIONS")
                     .allowedHeaders("*")
                     .allowCredentials(false)

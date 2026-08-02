@@ -14,7 +14,12 @@ internal class NewWebSocketConfig(
     private val privateRoomWebSocketHandler: PrivateRoomWebSocketHandler,
 ) : WebSocketConfigurer {
     override fun registerWebSocketHandlers(registry: WebSocketHandlerRegistry) {
-        registry.addHandler(publicTableWebSocketHandler, "/ws/public-tables").setAllowedOrigins(env.clientOrigin)
-        registry.addHandler(privateRoomWebSocketHandler, "/ws/private-rooms").setAllowedOrigins(env.clientOrigin)
+        val origins = env.clientOrigins()
+        registry
+            .addHandler(publicTableWebSocketHandler, "/ws/public-tables")
+            .setAllowedOrigins(*origins)
+        registry
+            .addHandler(privateRoomWebSocketHandler, "/ws/private-rooms")
+            .setAllowedOrigins(*origins)
     }
 }

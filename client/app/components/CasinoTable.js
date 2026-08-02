@@ -3,8 +3,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import PlayingCard from "./PlayingCard";
 import Seat from "./Seat";
 
-const DEAL_SEQUENCE_ORDER = [5, 3, 4, 0, 1, 2];
+const DEAL_SEQUENCE_ORDER = [2, 3, 4, 0, 1];
 const FALLBACK_DEALING_WINDOW_MS = 1800;
+const POT_PAYOUT_DURATION_MS = 2800;
+const POT_CHIP_COUNT = 8;
+const CELEBRATION_DURATION_MS = 5000;
 
 function HiddenDealCard({ className = "" }) {
   return (
@@ -113,13 +116,17 @@ function SharedJokersTray({ sharedJokers = [] }) {
   );
 }
 
-function InfoBadge({ label, value, align = "left" }) {
+function InfoBadge({ label, value, align = "left", tone = "default" }) {
+  const toneClass = tone === "red"
+    ? "border-[#e8b53c]/35 bg-[linear-gradient(180deg,rgba(140,22,28,0.94),rgba(72,8,14,0.98))]"
+    : "border-[#ffffff14] bg-[linear-gradient(180deg,rgba(6,44,48,0.84),rgba(4,22,26,0.94))]";
+
   return (
-    <div className={`rounded-[16px] border border-[#ffffff14] bg-[linear-gradient(180deg,rgba(6,44,48,0.84),rgba(4,22,26,0.94))] px-3 py-2 shadow-[0_16px_28px_rgba(0,0,0,0.3)] backdrop-blur-sm ${align === "right" ? "text-right" : ""}`}>
-      <span className="block text-[8px] font-black uppercase tracking-[0.18em] text-white/60">
+    <div className={`rounded-[16px] border px-3 py-2 shadow-[0_16px_28px_rgba(0,0,0,0.3)] backdrop-blur-sm ${toneClass} ${align === "right" ? "text-right" : ""}`}>
+      <span className={`block text-[8px] font-black uppercase tracking-[0.18em] ${tone === "red" ? "text-[#ffe6a0]/78" : "text-white/60"}`}>
         {label}
       </span>
-      <strong className="mt-1 block text-[13px] font-black text-white sm:text-[14px]">
+      <strong className={`mt-1 block text-[13px] font-black sm:text-[14px] ${tone === "red" ? "text-[#fff4d4]" : "text-white"}`}>
         {value}
       </strong>
     </div>
@@ -183,11 +190,20 @@ export default function CasinoTable({
   const [dealtCounts, setDealtCounts] = useState({});
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [revealedCompleteRoundId, setRevealedCompleteRoundId] = useState(null);
+  const [potPayoutFlights, setPotPayoutFlights] = useState([]);
+  const [potCollected, setPotCollected] = useState(false);
+  const [potTransferring, setPotTransferring] = useState(false);
+  const [celebrateWin, setCelebrateWin] = useState(false);
+  const [seatActionNotice, setSeatActionNotice] = useState(null);
   const surfaceRef = useRef(null);
+  const potRef = useRef(null);
   const deckAnchorRef = useRef(null);
   const seatAnchorRef = useRef(new Map());
   const dealTimersRef = useRef([]);
+  const potPayoutRoundIdRef = useRef("");
+  const celebrationRoundIdRef = useRef("");
   const activeDealAnimationKeyRef = useRef("");
+  const lastNotifiedActionRef = useRef("");
   const isStarting = round?.status === "starting";
   const isDealing = round?.status === "dealing";
   const isComplete = round?.status === "complete";
@@ -233,12 +249,6 @@ export default function CasinoTable({
         ),
       )
     : 0;
-  const centeredNotification =
-    round?.status === "active" &&
-    typeof round?.message === "string" &&
-    round.message.includes("has seen their cards")
-      ? round.message
-      : null;
   const roundStatusProgress = isStarting
     ? Math.min(1, Math.max(0, (roundStartClock?.progress ?? 0) / 100))
     : dealingProgress;
@@ -271,6 +281,192 @@ export default function CasinoTable({
   }, [clearDealTimers]);
 
   useEffect(() => {
+    if (round?.status !== "active") {
+      setSeatActionNotice(null);
+      lastNotifiedActionRef.current = "";
+      return undefined;
+    }
+
+    const lastAction = round?.lastAction;
+    const actionType = String(lastAction?.actionType || "").toLowerCase();
+    if (!lastAction?.playerId || actionType === "boot") {
+      return undefined;
+    }
+
+    const actionKey = `${round.id}:${lastAction.id || lastAction.timestamp || ""}:${lastAction.playerId}:${actionType}`;
+    if (lastNotifiedActionRef.current === actionKey) {
+      return undefined;
+    }
+
+    const shortLabelByType = {
+      see: "Seen",
+      blind: "Blind",
+      chaal: "Chaal",
+      raise: "Raised",
+      pack: "Packed",
+      timeout: "Timed out",
+      "sideshow-requested": "Side show",
+      "sideshow-denied": "Denied",
+      "sideshow-accepted": "Accepted",
+      "sideshow-loss": "Lost side",
+      show: "Show",
+    };
+
+    const label = shortLabelByType[actionType];
+    if (!label) {
+      return undefined;
+    }
+
+    lastNotifiedActionRef.current = actionKey;
+    setSeatActionNotice({
+      seatId: lastAction.playerId,
+      text: label,
+      key: actionKey,
+    });
+
+    const timer = window.setTimeout(() => {
+      setSeatActionNotice((current) => (current?.key === actionKey ? null : current));
+    }, 2400);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [round?.id, round?.lastAction, round?.status]);
+
+  useEffect(() => {
+    if (!isComplete) {
+      setPotPayoutFlights([]);
+      setPotCollected(false);
+      setPotTransferring(false);
+      setCelebrateWin(false);
+      potPayoutRoundIdRef.current = "";
+      celebrationRoundIdRef.current = "";
+      return undefined;
+    }
+
+    if (!result?.winnerId || !round?.id) {
+      return undefined;
+    }
+
+    if (potPayoutRoundIdRef.current === round.id) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let retryTimer = null;
+    let clearTimer = null;
+    let fadeTimer = null;
+
+    const startPayoutFlight = (attempt = 0) => {
+      if (cancelled) {
+        return;
+      }
+
+      const surface = surfaceRef.current;
+      const potNode = potRef.current;
+      const winnerNode = seatAnchorRef.current.get(result.winnerId);
+
+      if (!surface || !potNode || !winnerNode) {
+        if (attempt < 40) {
+          retryTimer = window.setTimeout(() => startPayoutFlight(attempt + 1), 100);
+        }
+        return;
+      }
+
+      potPayoutRoundIdRef.current = round.id;
+      const surfaceRect = surface.getBoundingClientRect();
+      const potCenter = getRelativeCenter(potNode.getBoundingClientRect(), surfaceRect);
+      const winnerCenter = getRelativeCenter(winnerNode.getBoundingClientRect(), surfaceRect);
+      const potAmount = typeof round.potAmount === "number"
+        ? round.potAmount
+        : (typeof result?.payout === "number" ? result.payout : 0);
+
+      const flights = Array.from({ length: POT_CHIP_COUNT }, (_, index) => {
+        const spread = (index - (POT_CHIP_COUNT - 1) / 2) * 14;
+        const deltaX = winnerCenter.x - potCenter.x + spread;
+        const deltaY = winnerCenter.y - potCenter.y + (index % 2 === 0 ? -8 : 8);
+        return {
+          id: `pot-chip-${round.id}-${index}`,
+          startX: potCenter.x,
+          startY: potCenter.y,
+          deltaX,
+          deltaY,
+          midX: deltaX * 0.45,
+          midY: deltaY * 0.35 - 56,
+          delayMs: index * 140,
+          durationMs: POT_PAYOUT_DURATION_MS,
+          showAmount: index === Math.floor(POT_CHIP_COUNT / 2),
+          amount: potAmount,
+        };
+      });
+
+      setPotPayoutFlights(flights);
+      setPotTransferring(true);
+      setPotCollected(false);
+
+      fadeTimer = window.setTimeout(() => {
+        if (!cancelled) {
+          setPotCollected(true);
+        }
+      }, Math.floor(POT_PAYOUT_DURATION_MS * 0.55));
+
+      clearTimer = window.setTimeout(() => {
+        if (cancelled) {
+          return;
+        }
+        setPotPayoutFlights([]);
+        setPotTransferring(false);
+      }, POT_PAYOUT_DURATION_MS + POT_CHIP_COUNT * 140 + 320);
+    };
+
+    startPayoutFlight();
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) {
+        window.clearTimeout(retryTimer);
+      }
+      if (clearTimer) {
+        window.clearTimeout(clearTimer);
+      }
+      if (fadeTimer) {
+        window.clearTimeout(fadeTimer);
+      }
+    };
+  }, [isComplete, result?.winnerId, result?.payout, round?.id, round?.potAmount]);
+
+  useEffect(() => {
+    if (!isComplete || !isWinningViewer || !round?.id) {
+      return undefined;
+    }
+
+    if (celebrationRoundIdRef.current === round.id) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const startTimer = window.setTimeout(() => {
+      if (cancelled) {
+        return;
+      }
+      celebrationRoundIdRef.current = round.id;
+      setCelebrateWin(true);
+    }, 280);
+    const endTimer = window.setTimeout(() => {
+      if (cancelled) {
+        return;
+      }
+      setCelebrateWin(false);
+    }, 280 + CELEBRATION_DURATION_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(startTimer);
+      window.clearTimeout(endTimer);
+    };
+  }, [isComplete, isWinningViewer, round?.id]);
+
+  useEffect(() => {
     if (!isComplete || !round?.id) {
       return undefined;
     }
@@ -279,10 +475,12 @@ export default function CasinoTable({
       return undefined;
     }
 
+    const ROUND_COMPLETE_OVERLAY_DELAY_MS = 5000;
     const decisionDeadlineMs = round?.nextRoundDecisionExpiresAt
       ? Math.max(0, new Date(round.nextRoundDecisionExpiresAt).getTime() - Date.now())
-      : 2500;
-    const delayMs = Math.min(2500, decisionDeadlineMs);
+      : ROUND_COMPLETE_OVERLAY_DELAY_MS;
+    // Show the next-round popup after 5s, but never later than the decision window.
+    const delayMs = Math.min(ROUND_COMPLETE_OVERLAY_DELAY_MS, Math.max(decisionDeadlineMs - 400, 0));
     const timer = window.setTimeout(() => {
       setRevealedCompleteRoundId(round.id);
     }, delayMs);
@@ -508,8 +706,37 @@ export default function CasinoTable({
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,15,16,0.06),rgba(0,6,8,0.18)_68%,rgba(0,0,0,0.62))]" />
       </div>
 
-      <div className="app-frame app-frame-surface relative z-[20] mx-auto h-dvh overflow-x-hidden overflow-y-auto overscroll-y-contain">
-        <div>
+      {celebrateWin ? (
+        <div className="casino-table-scene__celebration pointer-events-none fixed inset-0 z-[55]" aria-hidden="true">
+          <div className="casino-table-scene__celebration-veil" />
+          <div className="casino-table-scene__celebration-burst" />
+          <div className="casino-table-scene__celebration-banner">
+            <strong>You Win!</strong>
+          </div>
+          {Array.from({ length: 36 }, (_, index) => (
+            <span
+              key={`confetti-${index}`}
+              className="casino-table-scene__confetti"
+              style={{
+                left: `${4 + (index * 29) % 92}%`,
+                animationDelay: `${(index % 10) * 110}ms`,
+                animationDuration: `${2200 + (index % 6) * 280}ms`,
+                background: [
+                  "#ffd56a",
+                  "#ff7a59",
+                  "#7ef0e4",
+                  "#fff1b0",
+                  "#ff9f43",
+                  "#9bffb0",
+                ][index % 6],
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      <div className="casino-table-scene__page relative z-[20] mx-auto h-dvh w-full max-w-none overflow-x-hidden overflow-y-auto overscroll-y-contain">
+        <div className="casino-table-scene__column flex min-h-full w-full flex-col">
           <div className="sticky top-0 z-[40] -mx-3 px-3 pb-2 pt-[max(10px,env(safe-area-inset-top))] sm:mx-0 sm:px-0 sm:pb-3 sm:pt-[18px]">
             <div className="relative flex items-start justify-between">
               <div className="relative" onPointerDown={(event) => event.stopPropagation()}>
@@ -536,7 +763,7 @@ export default function CasinoTable({
             </div>
 
             <div className="pointer-events-none relative mt-1.5 flex items-start justify-between gap-2 sm:mt-2">
-              <InfoBadge label="Variant" value={variant?.label || "Teen Patti"} />
+              <InfoBadge label="Variant" value={variant?.label || "Teen Patti"} tone="red" />
               {isPrivateMode && (roomCode || roomName) ? (
                 <InfoBadge
                   label={roomCode ? "Room" : "Private"}
@@ -558,31 +785,15 @@ export default function CasinoTable({
                 priority
               />
               <Image
-                src="/newAssets/landscape-light.png"
+                src="/newAssets/landscapeProd.png"
                 alt=""
                 fill
                 priority
                 aria-hidden="true"
-                className="casino-table-scene__felt casino-table-scene__felt--landscape object-contain drop-shadow-[0_30px_50px_rgba(0,0,0,0.46)]"
+                className="casino-table-scene__felt casino-table-scene__felt--landscape object-fill drop-shadow-[0_30px_50px_rgba(0,0,0,0.46)]"
               />
 
-              <div className="casino-table-scene__dealer absolute left-1/2 top-0 z-[22] -translate-x-1/2 -translate-y-[58%]">
-                <div className="relative">
-                  <Image
-                    src="/newAssets/dealer.png"
-                    alt="Dealer"
-                    fill
-                    className="object-contain object-center drop-shadow-[0_22px_40px_rgba(0,0,0,0.42)]"
-                    priority
-                  />
-                </div>
-              </div>
-
-              {centeredNotification ? (
-                <div className="casino-table-scene__message absolute left-1/2 top-[16.5%] z-[36] w-[72%] -translate-x-1/2 rounded-[16px] border border-[#ffffff14] bg-[linear-gradient(180deg,rgba(7,44,48,0.95),rgba(5,24,27,0.98))] px-3 py-2 text-center text-[11px] font-semibold text-white/82 shadow-[0_18px_36px_rgba(0,0,0,0.32)] backdrop-blur-sm">
-                  {centeredNotification}
-                </div>
-              ) : null}
+              {showSharedJokersTray ? <SharedJokersTray sharedJokers={sharedJokers} /> : null}
 
               {(isStarting || isDealing) ? (
                 <div className="casino-table-scene__deck-layer pointer-events-none absolute inset-0 z-[25]">
@@ -632,10 +843,18 @@ export default function CasinoTable({
                   cardsPerSeat={cardsPerSeat}
                   publicCardMode={variant?.publicCardMode || "none"}
                   registerCardAnchor={registerCardAnchor}
+                  actionNotice={
+                    seatActionNotice?.seatId === seat.id ? seatActionNotice.text : null
+                  }
                 />
               ))}
 
-              <div className="casino-table-scene__pot pointer-events-none absolute left-1/2 top-[48.6%] z-[29] -translate-x-1/2 -translate-y-1/2 text-center">
+              <div
+                ref={potRef}
+                className={`casino-table-scene__pot pointer-events-none absolute left-1/2 top-[48.6%] z-[29] -translate-x-1/2 -translate-y-1/2 text-center transition-opacity duration-[1200ms] ease-out ${
+                  potCollected ? "opacity-0" : potTransferring ? "opacity-35" : "opacity-100"
+                }`}
+              >
                 <div className="mx-auto flex h-[56px] w-[56px] items-center justify-center">
                   <Image
                     src="/newAssets/chip.png"
@@ -654,6 +873,42 @@ export default function CasinoTable({
                   {round?.potAmount?.toLocaleString("en-IN") || "0"}
                 </strong>
               </div>
+
+              {potPayoutFlights.length > 0 ? (
+                <div className="casino-table-scene__pot-flight-layer pointer-events-none absolute inset-0 z-[35]">
+                  {potPayoutFlights.map((flight) => (
+                    <div
+                      key={flight.id}
+                      className="casino-table-scene__pot-flight"
+                      style={{
+                        left: `${flight.startX}px`,
+                        top: `${flight.startY}px`,
+                        animationDelay: `${flight.delayMs}ms`,
+                        animationDuration: `${flight.durationMs}ms`,
+                        "--pot-x": `${flight.deltaX}px`,
+                        "--pot-y": `${flight.deltaY}px`,
+                        "--pot-mid-x": `${flight.midX}px`,
+                        "--pot-mid-y": `${flight.midY}px`,
+                      }}
+                    >
+                      <Image
+                        src="/newAssets/chip.png"
+                        alt=""
+                        width={34}
+                        height={30}
+                        aria-hidden="true"
+                        className="object-contain drop-shadow-[0_10px_16px_rgba(0,0,0,0.35)]"
+                        style={{ width: 34, height: "auto" }}
+                      />
+                      {flight.showAmount && flight.amount > 0 ? (
+                        <strong className="casino-table-scene__pot-flight-amount">
+                          +{flight.amount.toLocaleString("en-IN")}
+                        </strong>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
 
               {showRoundCompleteOverlay ? (
                 <div className="casino-table-scene__complete-shell pointer-events-none fixed inset-x-0 bottom-0 z-[34] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:pb-5">
