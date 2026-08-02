@@ -2,6 +2,7 @@ package org.teenpatti.server.publictable
 
 import org.teenpatti.server.common.ClockProvider
 import org.teenpatti.server.common.IdGenerator
+import org.teenpatti.server.common.BotUsernames
 import org.teenpatti.server.common.RandomSource
 import org.teenpatti.server.common.ScheduledTask
 import org.teenpatti.server.common.Scheduler
@@ -890,9 +891,10 @@ internal class PublicTableManager(
 
     private fun createBotSlot(table: ManagedPublicTable, seating: PublicSeatingState): PublicBotSlot {
         val botNumber = seating.botSequence++
+        val usedNames = seating.botSlots.map { it.name }
         val slot = PublicBotSlot()
         slot.id = "${table.tableId}-bot-$botNumber"
-        slot.name = nextGuestName()
+        slot.name = BotUsernames.pick(randomSource, usedNames)
         slot.avatar = listOf("raj", "captain", "maya", "ace")[randomSource.nextInt(4)]
         return slot
     }
