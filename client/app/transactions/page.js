@@ -1,14 +1,19 @@
-import { redirect } from "next/navigation";
+"use client";
 
-export default async function TransactionsIndexPage({ searchParams }) {
-  const params = await searchParams;
-  const query = new URLSearchParams();
-  if (params?.id) {
-    query.set("id", String(params.id));
-  }
-  if (params?.game_id) {
-    query.set("game_id", String(params.game_id));
-  }
-  const suffix = query.toString();
-  redirect(suffix ? `/transactions/history?${suffix}` : "/transactions/history");
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+export default function TransactionsIndexPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const search = typeof window !== "undefined" ? window.location.search : "";
+    router.replace(`/transactions/history${search}`);
+  }, [router]);
+
+  return (
+    <main className="casino-page casino-page-menu flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,#041213,#010607_76%)] text-white/70">
+      <p className="text-sm font-semibold tracking-[0.08em]">Opening transaction history…</p>
+    </main>
+  );
 }
