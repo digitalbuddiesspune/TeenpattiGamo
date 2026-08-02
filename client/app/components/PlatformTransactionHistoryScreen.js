@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -78,14 +77,14 @@ function Metric({ label, value, tone = "default" }) {
   const toneClass = tone === "accent"
     ? "text-[#ffe6a0]"
     : tone === "win"
-      ? "text-[#abfff5]"
+      ? "text-[#9bffb0]"
       : tone === "loss"
         ? "text-[#ffc7b8]"
         : "text-white/84";
 
   return (
-    <div className="rounded-[14px] border border-white/8 bg-[rgba(255,255,255,0.03)] px-3 py-2">
-      <span className="block text-[9px] font-black uppercase tracking-[0.14em] text-white/42">{label}</span>
+    <div className="rounded-[14px] border border-[#e8b53c]/16 bg-[rgba(90,16,24,0.28)] px-3 py-2">
+      <span className="block text-[9px] font-black uppercase tracking-[0.14em] text-[#ffe6a0]/55">{label}</span>
       <span className={`mt-1 block break-all text-[11px] font-semibold ${toneClass}`}>{value}</span>
     </div>
   );
@@ -98,11 +97,11 @@ function TabButton({ tab, active, onClick }) {
       onClick={onClick}
       className={`min-w-0 flex-1 rounded-[16px] border px-3 py-2.5 text-left transition ${
         active
-          ? "border-[#43d8cc]/34 bg-[linear-gradient(180deg,rgba(14,78,82,0.95),rgba(7,36,39,0.98))] shadow-[0_12px_24px_rgba(0,0,0,0.28)]"
-          : "border-white/8 bg-[rgba(255,255,255,0.03)] hover:border-white/14"
+          ? "border-[#e8b53c]/40 bg-[linear-gradient(180deg,rgba(140,22,28,0.96),rgba(72,8,14,0.98))] shadow-[0_12px_24px_rgba(0,0,0,0.28)]"
+          : "border-[#ffffff14] bg-[rgba(90,16,24,0.28)] hover:border-[#e8b53c]/28"
       }`}
     >
-      <span className={`block text-[11px] font-black uppercase tracking-[0.12em] ${active ? "text-[#abfff5]" : "text-white/72"}`}>
+      <span className={`block text-[11px] font-black uppercase tracking-[0.12em] ${active ? "text-[#ffe6a0]" : "text-white/72"}`}>
         {tab.label}
       </span>
       <span className="mt-1 block text-[10px] leading-[1.35] text-white/48">{tab.hint}</span>
@@ -114,19 +113,19 @@ function RoundHistoryCard({ item }) {
   const playerWon = item.outcome === "win";
 
   return (
-    <article className="rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,34,37,0.92),rgba(4,18,21,0.96))] p-4 shadow-[0_18px_34px_rgba(0,0,0,0.24)]">
+    <article className="rounded-[22px] border border-[#e8b53c]/22 bg-[linear-gradient(180deg,rgba(90,16,24,0.92),rgba(36,6,12,0.96))] p-4 shadow-[0_18px_34px_rgba(0,0,0,0.24)]">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <span className="block text-[9px] font-black uppercase tracking-[0.14em] text-white/42">
+          <span className="block text-[9px] font-black uppercase tracking-[0.14em] text-[#ffe6a0]/55">
             {playerWon ? "You Won" : "You Lost"}
           </span>
-          <strong className={`mt-1 block text-[1.2rem] font-black ${playerWon ? "text-[#abfff5]" : "text-[#ffe6a0]"}`}>
+          <strong className={`mt-1 block text-[1.2rem] font-black ${playerWon ? "text-[#9bffb0]" : "text-[#ffe6a0]"}`}>
             {playerWon ? "+" : "−"}{formatAmount(item.resultAmount)}
           </strong>
         </div>
         <div className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
           playerWon
-            ? "border-[#43d8cc]/24 bg-[#0c3f41] text-[#abfff5]"
+            ? "border-[#9bffb0]/28 bg-[#1a3d24] text-[#9bffb0]"
             : "border-[#ffcf99]/24 bg-[#4b3112] text-[#ffe6a0]"
         }`}>
           {item.outcome}
@@ -159,19 +158,19 @@ function WalletTransactionCard({ item, txnType }) {
   const isCredit = txnType === "credit";
 
   return (
-    <article className="rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,34,37,0.92),rgba(4,18,21,0.96))] p-4 shadow-[0_18px_34px_rgba(0,0,0,0.24)]">
+    <article className="rounded-[22px] border border-[#e8b53c]/22 bg-[linear-gradient(180deg,rgba(90,16,24,0.92),rgba(36,6,12,0.96))] p-4 shadow-[0_18px_34px_rgba(0,0,0,0.24)]">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <span className="block text-[9px] font-black uppercase tracking-[0.14em] text-white/42">
+          <span className="block text-[9px] font-black uppercase tracking-[0.14em] text-[#ffe6a0]/55">
             {isCredit ? "Wallet Credit" : "Wallet Debit"}
           </span>
-          <strong className={`mt-1 block text-[1.2rem] font-black ${isCredit ? "text-[#abfff5]" : "text-[#ffe6a0]"}`}>
+          <strong className={`mt-1 block text-[1.2rem] font-black ${isCredit ? "text-[#9bffb0]" : "text-[#ffe6a0]"}`}>
             {isCredit ? "+" : "−"}{formatAmount(item.amount)}
           </strong>
         </div>
         <div className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
           statusTone(item.status) === "win"
-            ? "border-[#43d8cc]/24 bg-[#0c3f41] text-[#abfff5]"
+            ? "border-[#9bffb0]/28 bg-[#1a3d24] text-[#9bffb0]"
             : statusTone(item.status) === "loss"
               ? "border-[#ff9f8a]/28 bg-[#4a1d1a] text-[#ffc7b8]"
               : "border-[#ffcf99]/24 bg-[#4b3112] text-[#ffe6a0]"
@@ -356,52 +355,40 @@ export default function PlatformTransactionHistoryScreen({ initialTab = "rounds"
       : "No completed rounds have been recorded for this platform session yet.";
 
   return (
-    <main className="casino-page casino-page-menu min-h-screen overflow-hidden bg-[linear-gradient(180deg,#041213,#010607_76%)]">
+    <main className="casino-page casino-page-menu min-h-screen overflow-hidden bg-[linear-gradient(180deg,#2a070c,#140306_55%,#0a0204_100%)]">
       <div className="relative flex min-h-screen overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,15,16,0.08),rgba(0,6,8,0.26)_68%,rgba(0,0,0,0.88))]" aria-hidden="true" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_55%_at_50%_-10%,#8b1520_0%,transparent_58%),linear-gradient(180deg,rgba(42,7,12,0.2),rgba(10,2,4,0.72)_70%)]" aria-hidden="true" />
 
         <div ref={scrollContainerRef} className="app-frame app-frame-surface relative h-dvh overflow-y-auto">
-          <header className="sticky top-0 z-[5] h-[138px] pt-[max(16px,env(safe-area-inset-top))]">
-            <Image
-              src="/newAssets/homeTopBg.png"
-              alt=""
-              fill
-              priority
-              sizes="(max-width: 640px) 100vw, 500px"
-              className="object-cover object-top"
-              aria-hidden="true"
-            />
-            <div className="relative z-[1] flex items-start justify-between px-4 pt-2">
+          <section className="relative z-[1] px-[14px] pb-[max(24px,env(safe-area-inset-bottom))] pt-[max(16px,env(safe-area-inset-top))]">
+            <div className="mb-3 flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => router.push(withLaunchQuery("/public"))}
-                className="grid h-9 w-9 place-items-center rounded-full bg-[rgba(4,20,20,0.24)] text-[#f3dfab]"
+                className="grid h-9 w-9 place-items-center rounded-full border border-[#e8b53c]/35 bg-[rgba(90,16,24,0.55)] text-[#ffe6a0]"
                 aria-label="Back to lobby"
               >
                 <svg viewBox="0 0 20 20" aria-hidden="true" className="h-5 w-5">
                   <path d="M11.8 4.6 6.4 10l5.4 5.4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
-
-              <div className="rounded-full border border-[#43d8cc]/18 bg-[rgba(8,28,31,0.74)] px-3 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-[#abfff5]">
+              <div className="rounded-full border border-[#e8b53c]/35 bg-[rgba(90,16,24,0.82)] px-3 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-[#ffe6a0]">
                 Transaction History
               </div>
             </div>
-          </header>
 
-          <section className="relative z-[1] px-[14px] pb-[max(24px,env(safe-area-inset-bottom))] pt-4">
-            <div className="rounded-[28px] border border-[#ffffff14] bg-[linear-gradient(180deg,rgba(7,44,48,0.92),rgba(3,16,19,0.97))] p-5 shadow-[0_24px_44px_rgba(0,0,0,0.36)] backdrop-blur-[10px]">
+            <div className="rounded-[28px] border border-[#e8b53c]/28 bg-[linear-gradient(180deg,rgba(125,16,25,0.94),rgba(61,7,13,0.98))] p-5 shadow-[0_24px_44px_rgba(0,0,0,0.36)] backdrop-blur-[10px]">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h1 className="text-[1.85rem] font-black leading-[0.96] tracking-[-0.02em] text-white">
+                  <h1 className="text-[1.85rem] font-black leading-[0.96] tracking-[-0.02em] text-[#ffe9b0]">
                     History
                   </h1>
                   <p className="mt-3 max-w-[20rem] text-[0.82rem] leading-[1.5] text-white/66">
                     Track round outcomes, wallet debits for stakes, and credits for payouts or refunds.
                   </p>
                 </div>
-                <div className="rounded-[18px] border border-[#ffffff14] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-right">
-                  <span className="block text-[9px] font-black uppercase tracking-[0.14em] text-white/42">
+                <div className="rounded-[18px] border border-[#e8b53c]/28 bg-[rgba(12,2,5,0.35)] px-3 py-2 text-right">
+                  <span className="block text-[9px] font-black uppercase tracking-[0.14em] text-[#ffe6a0]/55">
                     {activeMeta.label}
                   </span>
                   <strong className="mt-1 block text-[1rem] font-black text-[#ffe6a0]">{state.items.length}</strong>
@@ -426,13 +413,13 @@ export default function PlatformTransactionHistoryScreen({ initialTab = "rounds"
               ) : null}
 
               {!authMissing && state.loading ? (
-                <div className="mt-5 rounded-[22px] border border-white/8 bg-[rgba(3,18,21,0.52)] p-4">
-                  <div className="flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.14em] text-white/54">
+                <div className="mt-5 rounded-[22px] border border-[#e8b53c]/18 bg-[rgba(12,2,5,0.45)] p-4">
+                  <div className="flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.14em] text-[#ffe6a0]/70">
                     <span>Syncing {activeMeta.label.toLowerCase()}</span>
-                    <span className="text-[#abfff5]">Loading</span>
+                    <span className="text-[#ffe6a0]">Loading</span>
                   </div>
                   <div className="mt-3 h-[3px] w-full overflow-hidden rounded-full bg-white/8">
-                    <div className="h-full w-[44%] rounded-full bg-[linear-gradient(90deg,#2ac7bf_0%,#78efe5_48%,#efc24e_100%)] shadow-[0_0_18px_rgba(67,216,204,0.3)]" style={{ animation: "pulse 1.8s ease-in-out infinite" }} />
+                    <div className="h-full w-[44%] rounded-full bg-[linear-gradient(90deg,#c61d1a_0%,#ff6b5a_48%,#efc24e_100%)] shadow-[0_0_18px_rgba(240,58,45,0.35)]" style={{ animation: "pulse 1.8s ease-in-out infinite" }} />
                   </div>
                 </div>
               ) : null}
@@ -444,7 +431,7 @@ export default function PlatformTransactionHistoryScreen({ initialTab = "rounds"
               ) : null}
 
               {!authMissing && !state.loading && !state.error && !state.items.length ? (
-                <div className="mt-5 rounded-[22px] border border-white/8 bg-[rgba(3,18,21,0.52)] px-4 py-5 text-[0.82rem] leading-[1.5] text-white/66">
+                <div className="mt-5 rounded-[22px] border border-[#e8b53c]/18 bg-[rgba(12,2,5,0.45)] px-4 py-5 text-[0.82rem] leading-[1.5] text-white/66">
                   {emptyCopy}
                 </div>
               ) : null}
@@ -466,13 +453,13 @@ export default function PlatformTransactionHistoryScreen({ initialTab = "rounds"
               ) : null}
 
               {state.loadingMore ? (
-                <div className="mt-5 rounded-[18px] border border-white/8 bg-[rgba(3,18,21,0.52)] px-4 py-3 text-center text-[0.78rem] font-semibold text-white/66">
+                <div className="mt-5 rounded-[18px] border border-[#e8b53c]/18 bg-[rgba(12,2,5,0.45)] px-4 py-3 text-center text-[0.78rem] font-semibold text-[#ffe6a0]/70">
                   Loading more {activeMeta.label.toLowerCase()}...
                 </div>
               ) : null}
 
               {!authMissing && !state.loading && !state.loadingMore && !state.hasMore && state.items.length ? (
-                <div className="mt-5 rounded-[18px] border border-white/8 bg-[rgba(3,18,21,0.52)] px-4 py-3 text-center text-[0.78rem] font-semibold text-white/50">
+                <div className="mt-5 rounded-[18px] border border-[#e8b53c]/16 bg-[rgba(12,2,5,0.4)] px-4 py-3 text-center text-[0.78rem] font-semibold text-white/50">
                   You have reached the end of this history.
                 </div>
               ) : null}

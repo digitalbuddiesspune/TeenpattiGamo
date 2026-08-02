@@ -104,7 +104,7 @@ function ActionButton({ label, onClick, disabled, busy = false, tone = "primary"
       type="button"
       aria-busy={busy}
       className={[
-        "table-controls__button relative inline-flex h-[46px] min-w-0 flex-1 items-center justify-center overflow-hidden rounded-[14px] border px-1.5 text-[9px] font-black uppercase tracking-[0.04em] whitespace-nowrap transition sm:h-[52px] sm:text-[10px] sm:tracking-[0.06em]",
+        "table-controls__button relative inline-flex h-[42px] min-w-0 flex-1 items-center justify-center overflow-hidden rounded-[12px] border px-1 text-[7px] font-black uppercase tracking-[0.03em] whitespace-nowrap transition sm:h-[52px] sm:rounded-[14px] sm:px-1.5 sm:text-[10px] sm:tracking-[0.06em]",
         toneClasses[tone] || toneClasses.primary,
         className,
         busy
@@ -120,7 +120,7 @@ function ActionButton({ label, onClick, disabled, busy = false, tone = "primary"
         {label}
       </span>
       {busy ? (
-        <span className="absolute inset-0 flex items-center justify-center gap-1 text-[10px] tracking-[0.08em] text-[#f7e39c]">
+        <span className="absolute inset-0 flex items-center justify-center gap-1 text-[8px] tracking-[0.06em] text-[#f7e39c] sm:text-[10px] sm:tracking-[0.08em]">
           <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
           <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse [animation-delay:120ms]" />
           <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse [animation-delay:240ms]" />

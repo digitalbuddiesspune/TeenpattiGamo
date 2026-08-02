@@ -59,7 +59,7 @@ function TopHudButton({ children, label, onClick, active }) {
       aria-label={label}
       aria-pressed={active}
       onClick={onClick}
-      className={`flex h-[48px] w-[48px] items-center justify-center rounded-[14px] transition active:translate-y-[1px] ${
+      className={`flex h-9 w-9 items-center justify-center rounded-[12px] transition active:translate-y-[1px] sm:h-[48px] sm:w-[48px] sm:rounded-[14px] ${
         active
           ? "opacity-100"
           : "opacity-90"
@@ -122,11 +122,11 @@ function InfoBadge({ label, value, align = "left", tone = "default" }) {
     : "border-[#ffffff14] bg-[linear-gradient(180deg,rgba(6,44,48,0.84),rgba(4,22,26,0.94))]";
 
   return (
-    <div className={`rounded-[16px] border px-3 py-2 shadow-[0_16px_28px_rgba(0,0,0,0.3)] backdrop-blur-sm ${toneClass} ${align === "right" ? "text-right" : ""}`}>
-      <span className={`block text-[8px] font-black uppercase tracking-[0.18em] ${tone === "red" ? "text-[#ffe6a0]/78" : "text-white/60"}`}>
+    <div className={`rounded-[12px] border px-2.5 py-1 shadow-[0_12px_22px_rgba(0,0,0,0.28)] backdrop-blur-sm sm:rounded-[16px] sm:px-3 sm:py-2 sm:shadow-[0_16px_28px_rgba(0,0,0,0.3)] ${toneClass} ${align === "right" ? "text-right" : ""}`}>
+      <span className={`block text-[7px] font-black uppercase tracking-[0.16em] sm:text-[8px] sm:tracking-[0.18em] ${tone === "red" ? "text-[#ffe6a0]/78" : "text-white/60"}`}>
         {label}
       </span>
-      <strong className={`mt-1 block text-[13px] font-black sm:text-[14px] ${tone === "red" ? "text-[#fff4d4]" : "text-white"}`}>
+      <strong className={`mt-0.5 block text-[11px] font-black sm:mt-1 sm:text-[14px] ${tone === "red" ? "text-[#fff4d4]" : "text-white"}`}>
         {value}
       </strong>
     </div>
@@ -135,9 +135,9 @@ function InfoBadge({ label, value, align = "left", tone = "default" }) {
 
 function ChipBalanceDisplay({ chipBalance }) {
   return (
-    <div className="relative flex h-[40px] min-w-[118px] items-center pl-[14px] pr-[8px]">
-      <div className="absolute inset-y-[4px] left-[14px] right-0 rounded-full border border-white/12 bg-[linear-gradient(180deg,rgba(60,60,60,0.96),rgba(38,38,38,0.98))] shadow-[0_12px_22px_rgba(0,0,0,0.28)]" />
-      <div className="relative z-[1] mr-[-5px] flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-full bg-[radial-gradient(circle_at_35%_30%,rgba(255,255,255,0.18),rgba(255,255,255,0.02))] shadow-[0_8px_14px_rgba(0,0,0,0.28)]">
+    <div className="relative flex h-[34px] min-w-[100px] items-center pl-[12px] pr-[6px] sm:h-[40px] sm:min-w-[118px] sm:pl-[14px] sm:pr-[8px]">
+      <div className="absolute inset-y-[3px] left-[12px] right-0 rounded-full border border-white/12 bg-[linear-gradient(180deg,rgba(60,60,60,0.96),rgba(38,38,38,0.98))] shadow-[0_10px_18px_rgba(0,0,0,0.26)] sm:inset-y-[4px] sm:left-[14px] sm:shadow-[0_12px_22px_rgba(0,0,0,0.28)]" />
+      <div className="relative z-[1] mr-[-4px] flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full bg-[radial-gradient(circle_at_35%_30%,rgba(255,255,255,0.18),rgba(255,255,255,0.02))] shadow-[0_8px_14px_rgba(0,0,0,0.28)] sm:mr-[-5px] sm:h-[32px] sm:w-[32px]">
         <Image
           src="/newAssets/chip.png"
           alt=""
@@ -145,11 +145,11 @@ function ChipBalanceDisplay({ chipBalance }) {
           height={29}
           aria-hidden="true"
           className="object-contain"
-          style={{ width: 28, height: "auto" }}
+          style={{ width: 24, height: "auto" }}
         />
       </div>
-      <div className="relative z-[1] ml-1.5 flex min-w-0 flex-1 items-center justify-end pr-2">
-        <strong className="truncate text-[12px] font-black tracking-[0.05em] text-white sm:text-[13px]">
+      <div className="relative z-[1] ml-1 flex min-w-0 flex-1 items-center justify-end pr-1.5 sm:ml-1.5 sm:pr-2">
+        <strong className="truncate text-[11px] font-black tracking-[0.05em] text-white sm:text-[13px]">
           {(chipBalance || 0).toLocaleString("en-IN")}
         </strong>
       </div>
@@ -737,8 +737,8 @@ export default function CasinoTable({
 
       <div className="casino-table-scene__page relative z-[20] mx-auto h-dvh w-full max-w-none overflow-x-hidden overflow-y-auto overscroll-y-contain">
         <div className="casino-table-scene__column flex min-h-full w-full flex-col">
-          <div className="sticky top-0 z-[40] -mx-3 px-3 pb-2 pt-[max(10px,env(safe-area-inset-top))] sm:mx-0 sm:px-0 sm:pb-3 sm:pt-[18px]">
-            <div className="relative flex items-start justify-between">
+          <div className="casino-table-scene__hud sticky top-0 z-[40] -mx-3 px-3 pb-1 pt-[max(4px,env(safe-area-inset-top))] sm:mx-0 sm:px-0 sm:pb-3 sm:pt-[18px]">
+            <div className="relative flex items-center justify-between">
               <div className="relative" onPointerDown={(event) => event.stopPropagation()}>
                 <TopHudButton
                   label="Open settings"
@@ -748,9 +748,10 @@ export default function CasinoTable({
                   <Image
                     src="/newAssets/settingsButton.png"
                     alt=""
-                    width={26}
-                    height={26}
+                    width={22}
+                    height={22}
                     aria-hidden="true"
+                    className="sm:h-[26px] sm:w-[26px]"
                   />
                 </TopHudButton>
                 <SettingsPanel
@@ -762,7 +763,7 @@ export default function CasinoTable({
               <ChipBalanceDisplay chipBalance={chipBalance} />
             </div>
 
-            <div className="pointer-events-none relative mt-1.5 flex items-start justify-between gap-2 sm:mt-2">
+            <div className="pointer-events-none relative mt-1 flex items-start justify-between gap-2 sm:mt-2">
               <InfoBadge label="Variant" value={variant?.label || "Teen Patti"} tone="red" />
               {isPrivateMode && (roomCode || roomName) ? (
                 <InfoBadge

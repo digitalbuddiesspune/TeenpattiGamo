@@ -200,11 +200,6 @@ const LOBBY_MENU_OPTIONS = [
     label: "Refresh Balance",
     hint: "Sync wallet from platform",
   },
-  {
-    id: "exit",
-    label: "Exit Lobby",
-    hint: "Leave and return home",
-  },
 ];
 
 function LobbyMenuDropdown({ open, anchorRef, onSelect, onClose }) {
@@ -860,11 +855,6 @@ export default function GameClient({
 
     if (actionId === "refresh") {
       void syncPlatformProfile().catch(() => {});
-      return;
-    }
-
-    if (actionId === "exit") {
-      void handleExitLobby();
     }
   }
 
@@ -875,23 +865,6 @@ export default function GameClient({
   const closeLobbyRules = useCallback(() => {
     setLobbyRulesOpen(false);
   }, []);
-
-  const handleExitLobby = useCallback(() => {
-    setLobbyMenuOpen(false);
-    setLobbyRulesOpen(false);
-
-    VARIANT_OPTIONS.forEach((entry) => {
-      clearStoredPublicSession(entry.id);
-    });
-
-    try {
-      window.sessionStorage.removeItem(PLATFORM_PROFILE_STORAGE_KEY);
-      window.sessionStorage.removeItem(PLATFORM_LAUNCH_CONTEXT_STORAGE_KEY);
-    } catch {}
-
-    setPlatformProfile(null);
-    router.replace("/");
-  }, [router]);
 
   const handleExitMatchmaking = useCallback(async () => {
     try {

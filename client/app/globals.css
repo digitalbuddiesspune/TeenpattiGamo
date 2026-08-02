@@ -1461,7 +1461,7 @@ body.app-body-portrait-blocked {
  * ------------------------------------------------------------------------- */
 :root {
   --board-aspect: 0.7064; /* 1054 / 1492 */
-  --board-hud: 64px; /* sticky settings + balance row */
+  --board-hud: 48px; /* sticky settings + balance + variant row */
   --board-controls: 108px; /* fixed action bar reserve */
   --board-cards: 72px; /* user fan hanging below the surface */
   --board-min: 240px;
