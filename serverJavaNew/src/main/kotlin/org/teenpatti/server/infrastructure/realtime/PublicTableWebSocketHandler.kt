@@ -245,7 +245,14 @@ internal class PublicTableWebSocketHandler(
                     )
                 sendSnapshot(session, event.eventType, result.data)
             } catch (error: Exception) {
-                sendSessionClosed(session, ApiSupport.errorCode(error), error.message ?: "Public table session is no longer valid.")
+                // Transient Redis/command timeouts during dealing must not kill the
+                // live session — the client will refresh on the next successful event.
+                GameEventLog.error(
+                    "public_websocket_snapshot_failed",
+                    error,
+                    "tableId" to tableId,
+                    "eventType" to event.eventType,
+                )
             }
         }
     }

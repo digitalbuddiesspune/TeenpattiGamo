@@ -6,12 +6,15 @@ import {
   createPlatformPublicSession,
   fetchPublicSession,
   leavePublicTable as apiLeavePublicTable,
+  performPublicAction,
   getPublicTableWebSocketUrl
 } from "../lib/api";
 import { createClientSeed } from "../lib/clientSeed";
 
 const INITIAL_PUBLIC_LOADING_DELAY_MS = 0;
-const SOCKET_HEARTBEAT_INTERVAL_MS = 25000;
+const SOCKET_HEARTBEAT_INTERVAL_MS = 15000;
+const SOCKET_ACK_TIMEOUT_MS = 10000;
+const SOCKET_RECONNECT_MAX_ATTEMPTS = 12;
 const pendingPublicSessionRequests = new Map();
 
 function createWindowId() {
@@ -192,6 +195,8 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
   const reconnectAttemptRef = useRef(0);
   const heartbeatIntervalRef = useRef(null);
   const manualCloseRef = useRef(false);
+  const socketReadyRef = useRef(false);
+  const connectingSocketRef = useRef(false);
   const pendingRequestsRef = useRef(new Map());
   const requestSequenceRef = useRef(1);
   const packableActionsRef = useRef(new Set(["blind", "chaal", "raise", "show"]));
@@ -218,7 +223,10 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
   }, [variant]);
 
   function rejectPendingRequests(message) {
-    pendingRequestsRef.current.forEach(({ reject }) => {
+    pendingRequestsRef.current.forEach(({ reject, timeoutId }) => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
       reject(new Error(message));
     });
     pendingRequestsRef.current.clear();
@@ -238,6 +246,12 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
     }
   }
 
+  function isConnectionError(message = "") {
+    return /connection is not ready|connection closed|connection interrupted|websocket|timed out|authenticate/i.test(
+      String(message)
+    );
+  }
+
   // Proxies and load balancers drop websockets that sit idle for ~60s, so keep a
   // client-originated frame flowing even when the table has no activity.
   function startHeartbeat(socket) {
@@ -255,23 +269,73 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
   async function emitWithAck(type, payload = {}) {
     const socket = socketRef.current;
 
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
+    if (!socket || socket.readyState !== WebSocket.OPEN || !socketReadyRef.current) {
       throw new Error("Public table connection is not ready.");
     }
 
     const requestId = nextRequestId();
 
     return new Promise((resolve, reject) => {
-      pendingRequestsRef.current.set(requestId, { resolve, reject });
+      const timeoutId = window.setTimeout(() => {
+        const pending = pendingRequestsRef.current.get(requestId);
+        if (!pending) {
+          return;
+        }
+        pendingRequestsRef.current.delete(requestId);
+        reject(new Error("Public table request timed out."));
+      }, SOCKET_ACK_TIMEOUT_MS);
 
-      socket.send(
-        JSON.stringify({
-          type,
-          requestId,
-          payload
-        })
-      );
+      pendingRequestsRef.current.set(requestId, {
+        resolve: (data) => {
+          window.clearTimeout(timeoutId);
+          resolve(data);
+        },
+        reject: (error) => {
+          window.clearTimeout(timeoutId);
+          reject(error);
+        },
+        timeoutId
+      });
+
+      try {
+        socket.send(
+          JSON.stringify({
+            type,
+            requestId,
+            payload
+          })
+        );
+      } catch (error) {
+        pendingRequestsRef.current.delete(requestId);
+        window.clearTimeout(timeoutId);
+        reject(error instanceof Error ? error : new Error("Public table connection is not ready."));
+      }
     });
+  }
+
+  async function runTransportAction(actionType, payload = {}) {
+    const session = sessionRef.current;
+    if (!session) {
+      throw new Error("Public table session is not ready.");
+    }
+
+    try {
+      if (socketRef.current?.readyState === WebSocket.OPEN && socketReadyRef.current) {
+        return await emitWithAck("public_table:action", { actionType, payload });
+      }
+    } catch (error) {
+      if (!isConnectionError(error?.message)) {
+        throw error;
+      }
+    }
+
+    return performPublicAction(
+      session.playerId,
+      session.playerToken,
+      actionType,
+      payload,
+      variant
+    );
   }
 
   useEffect(() => {
@@ -301,135 +365,217 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
         return;
       }
 
-      const socket = new WebSocket(getPublicTableWebSocketUrl());
-      socketRef.current = socket;
+      socketReadyRef.current = false;
+      connectingSocketRef.current = true;
 
-      socket.addEventListener("open", () => {
-        reconnectAttemptRef.current = 0;
-        startHeartbeat(socket);
-        const requestId = nextRequestId();
-        pendingRequestsRef.current.set(requestId, {
-          resolve: () => {
-            if (!cancelled) {
-              setError("");
-            }
-          },
-          reject: (nextError) => {
-            if (!cancelled) {
-              setError(nextError.message || "Unable to authenticate the public table session.");
-            }
-          }
-        });
-
-        socket.send(
-          JSON.stringify({
-            type: "public_table:authenticate",
-            requestId,
-            payload: {
-              variant,
-              playerId: data.playerId,
-              playerToken: data.playerToken
-            }
-          })
-        );
-      });
-
-      socket.addEventListener("message", (event) => {
+      const previousSocket = socketRef.current;
+      socketRef.current = null;
+      if (previousSocket && previousSocket.readyState < WebSocket.CLOSING) {
         try {
-          const message = JSON.parse(event.data);
-          const pending = message.requestId ? pendingRequestsRef.current.get(message.requestId) : null;
+          previousSocket.close();
+        } catch {}
+      }
 
-          if (pending) {
-            pendingRequestsRef.current.delete(message.requestId);
-            if (message.status === "ok") {
-              pending.resolve(message.data);
-            } else {
-              pending.reject(new Error(message.message || "Request failed."));
-            }
-            return;
-          }
+      try {
+        await new Promise((resolve, reject) => {
+          const socket = new WebSocket(getPublicTableWebSocketUrl());
+          socketRef.current = socket;
+          let settled = false;
 
-          if (message.type === "public_table:snapshot" && message.payload) {
-            applyState(message.payload);
-            setError("");
-            return;
-          }
-
-          if (message.type === "public_table:session_closed") {
-            manualCloseRef.current = true;
-            clearReconnectTimer();
-            writeStoredSession(variant, null);
-            sessionRef.current = null;
-            setError(message.message || "Public table session expired.");
-            startTransition(() => {
-              setTableState(null);
-            });
-            socket.close();
-            return;
-          }
-
-          if (message.type === "public_table:error") {
-            setError(message.message || "Public table action failed.");
-          }
-        } catch {
-          if (!cancelled) {
-            setError("Unable to process live table updates.");
-          }
-        }
-      });
-
-      socket.addEventListener("close", () => {
-        if (socketRef.current === socket) {
-          socketRef.current = null;
-        }
-
-        clearHeartbeat();
-        rejectPendingRequests("Public table connection closed.");
-
-        if (cancelled || manualCloseRef.current || !sessionRef.current) {
-          return;
-        }
-
-        reconnectAttemptRef.current += 1;
-        const delay = getReconnectDelay(reconnectAttemptRef.current);
-        setError("Live connection interrupted. Reconnecting...");
-        clearReconnectTimer();
-        reconnectTimeoutRef.current = window.setTimeout(async () => {
-          try {
-            const latest = await fetchPublicSession(
-              sessionRef.current.playerId,
-              sessionRef.current.playerToken,
-              variant
-            );
-            if (cancelled || manualCloseRef.current) {
+          const settle = (fn, value) => {
+            if (settled) {
               return;
             }
-            applyState({
-              ...latest,
-              clientSeed: sessionRef.current.clientSeed
-            });
-            await connectSocket({
-              playerId: latest.playerId,
-              playerToken: latest.playerToken
-            });
-          } catch (nextError) {
-            if (!cancelled && !manualCloseRef.current) {
-              writeStoredSession(variant, null);
-              sessionRef.current = null;
-              setError(nextError.message || "Public table session expired.");
-              startTransition(() => {
-                setTableState(null);
-              });
-            }
-          }
-        }, delay);
-      });
+            settled = true;
+            fn(value);
+          };
 
-      socket.addEventListener("error", () => {
-        if (!cancelled && !manualCloseRef.current) {
-          setError("Public table websocket connection failed.");
-        }
-      });
+          socket.addEventListener("open", () => {
+            reconnectAttemptRef.current = 0;
+            startHeartbeat(socket);
+            const requestId = nextRequestId();
+            const timeoutId = window.setTimeout(() => {
+              const pending = pendingRequestsRef.current.get(requestId);
+              if (!pending) {
+                return;
+              }
+              pendingRequestsRef.current.delete(requestId);
+              socketReadyRef.current = false;
+              settle(reject, new Error("Public table authentication timed out."));
+            }, SOCKET_ACK_TIMEOUT_MS);
+
+            pendingRequestsRef.current.set(requestId, {
+              resolve: (snapshot) => {
+                window.clearTimeout(timeoutId);
+                if (cancelled || socketRef.current !== socket) {
+                  settle(reject, new Error("Public table connection closed."));
+                  return;
+                }
+                socketReadyRef.current = true;
+                if (snapshot) {
+                  applyState({
+                    ...snapshot,
+                    clientSeed: sessionRef.current?.clientSeed || data.clientSeed
+                  });
+                }
+                if (!cancelled) {
+                  setError("");
+                }
+                settle(resolve);
+              },
+              reject: (nextError) => {
+                window.clearTimeout(timeoutId);
+                socketReadyRef.current = false;
+                settle(reject, nextError instanceof Error ? nextError : new Error(String(nextError)));
+              },
+              timeoutId
+            });
+
+            try {
+              socket.send(
+                JSON.stringify({
+                  type: "public_table:authenticate",
+                  requestId,
+                  payload: {
+                    variant,
+                    playerId: data.playerId,
+                    playerToken: data.playerToken
+                  }
+                })
+              );
+            } catch (error) {
+              window.clearTimeout(timeoutId);
+              pendingRequestsRef.current.delete(requestId);
+              settle(reject, error instanceof Error ? error : new Error("Public table connection failed."));
+            }
+          });
+
+          socket.addEventListener("message", (event) => {
+            try {
+              const message = JSON.parse(event.data);
+              const pending = message.requestId ? pendingRequestsRef.current.get(message.requestId) : null;
+
+              if (pending) {
+                pendingRequestsRef.current.delete(message.requestId);
+                if (message.status === "ok") {
+                  pending.resolve(message.data);
+                } else {
+                  pending.reject(new Error(message.message || "Request failed."));
+                }
+                return;
+              }
+
+              if (message.type === "public_table:snapshot" && message.payload) {
+                applyState(message.payload);
+                setError("");
+                return;
+              }
+
+              if (message.type === "public_table:session_closed") {
+                manualCloseRef.current = true;
+                socketReadyRef.current = false;
+                clearReconnectTimer();
+                writeStoredSession(variant, null);
+                sessionRef.current = null;
+                setError(message.message || "Public table session expired.");
+                startTransition(() => {
+                  setTableState(null);
+                });
+                setActing(false);
+                socket.close();
+                return;
+              }
+
+              if (message.type === "public_table:error") {
+                setError(message.message || "Public table action failed.");
+              }
+            } catch {
+              if (!cancelled) {
+                setError("Unable to process live table updates.");
+              }
+            }
+          });
+
+          socket.addEventListener("close", () => {
+            if (socketRef.current !== socket) {
+              return;
+            }
+
+            socketRef.current = null;
+            socketReadyRef.current = false;
+            clearHeartbeat();
+            rejectPendingRequests("Public table connection closed.");
+            setActing(false);
+
+            if (cancelled || manualCloseRef.current || !sessionRef.current) {
+              settle(reject, new Error("Public table connection closed."));
+              return;
+            }
+
+            if (!settled) {
+              settle(reject, new Error("Public table connection closed."));
+            }
+
+            reconnectAttemptRef.current += 1;
+            if (reconnectAttemptRef.current > SOCKET_RECONNECT_MAX_ATTEMPTS) {
+              setError("Live connection lost. Refresh the page to rejoin the table.");
+              return;
+            }
+
+            const delay = getReconnectDelay(reconnectAttemptRef.current);
+            setError("Live connection interrupted. Reconnecting...");
+            clearReconnectTimer();
+            reconnectTimeoutRef.current = window.setTimeout(async () => {
+              try {
+                const latest = await fetchPublicSession(
+                  sessionRef.current.playerId,
+                  sessionRef.current.playerToken,
+                  variant
+                );
+                if (cancelled || manualCloseRef.current || !sessionRef.current) {
+                  return;
+                }
+                applyState({
+                  ...latest,
+                  clientSeed: sessionRef.current.clientSeed
+                });
+                await connectSocket({
+                  playerId: latest.playerId,
+                  playerToken: latest.playerToken,
+                  clientSeed: sessionRef.current.clientSeed
+                });
+              } catch (nextError) {
+                if (cancelled || manualCloseRef.current) {
+                  return;
+                }
+                // Keep the session and keep retrying so controls can still use HTTP.
+                setError(nextError.message || "Live connection interrupted. Reconnecting...");
+                reconnectAttemptRef.current += 1;
+                if (reconnectAttemptRef.current <= SOCKET_RECONNECT_MAX_ATTEMPTS && sessionRef.current) {
+                  clearReconnectTimer();
+                  reconnectTimeoutRef.current = window.setTimeout(() => {
+                    if (!cancelled && !manualCloseRef.current && sessionRef.current) {
+                      connectSocket({
+                        playerId: sessionRef.current.playerId,
+                        playerToken: sessionRef.current.playerToken,
+                        clientSeed: sessionRef.current.clientSeed
+                      }).catch(() => {});
+                    }
+                  }, getReconnectDelay(reconnectAttemptRef.current));
+                }
+              }
+            }, delay);
+          });
+
+          socket.addEventListener("error", () => {
+            if (!cancelled && !manualCloseRef.current && socketRef.current === socket) {
+              setError("Public table websocket connection failed.");
+            }
+          });
+        });
+      } finally {
+        connectingSocketRef.current = false;
+      }
     }
 
     async function bootstrap() {
@@ -482,7 +628,13 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
 
         applyState(data);
         setError("");
-        await connectSocket(data);
+        try {
+          await connectSocket(data);
+        } catch (socketError) {
+          if (!cancelled) {
+            setError(socketError.message || "Live connection interrupted. Reconnecting...");
+          }
+        }
       } catch (nextError) {
         if (!cancelled) {
           await waitForInitialLoadingDelay(loadingStartedAt);
@@ -502,6 +654,8 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
     return () => {
       cancelled = true;
       manualCloseRef.current = true;
+      socketReadyRef.current = false;
+      connectingSocketRef.current = false;
       clearReconnectTimer();
       clearHeartbeat();
       rejectPendingRequests("Public table connection closed.");
@@ -519,26 +673,14 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
     setError("");
 
     try {
-      const data = await emitWithAck(
-        "public_table:action",
-        {
-          actionType,
-          payload
-        }
-      );
+      const data = await runTransportAction(actionType, payload || {});
       applyState(data);
     } catch (nextError) {
       const message = nextError.message || "Request failed";
 
       if (message.includes("Insufficient balance") && packableActionsRef.current.has(actionType)) {
         try {
-          const packed = await emitWithAck(
-            "public_table:action",
-            {
-              actionType: "pack",
-              payload: {}
-            }
-          );
+          const packed = await runTransportAction("pack", {});
           applyState(packed);
           setError("You don't have enough chips to place that bet. Your cards were packed.");
         } catch {
@@ -583,13 +725,7 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
     setError("");
 
     try {
-      const data = await emitWithAck(
-        "public_table:action",
-        {
-          actionType: "ready_next_round",
-          payload: {}
-        }
-      );
+      const data = await runTransportAction("ready_next_round", {});
       applyState(data);
     } catch (nextError) {
       setError(nextError.message);
@@ -606,8 +742,11 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
     manualCloseRef.current = true;
     clearReconnectTimer();
 
+    const canLeaveOverSocket =
+      socketRef.current?.readyState === WebSocket.OPEN && socketReadyRef.current;
+
     try {
-      if (socketRef.current?.readyState === WebSocket.OPEN) {
+      if (canLeaveOverSocket) {
         await emitWithAck("public_table:leave");
       } else {
         await apiLeavePublicTable(
@@ -616,7 +755,17 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
           variant
         );
       }
-    } catch {}
+    } catch {
+      try {
+        await apiLeavePublicTable(
+          sessionRef.current.playerId,
+          sessionRef.current.playerToken,
+          variant
+        );
+      } catch {}
+    }
+
+    socketReadyRef.current = false;
 
     writeStoredSession(variant, null);
     sessionRef.current = null;
