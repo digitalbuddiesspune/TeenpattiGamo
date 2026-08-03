@@ -302,16 +302,20 @@ internal class PlatformWalletService(
     ): PlatformCreditQueueMessage {
         val request = PlatformCreditQueueMessage()
         request.txn_id = txnId
-        request.amount = amount
+        request.txn_ref_id = txnRefId
+        request.txn_type = 1
+        request.amount = amount.toExternalAmount()
+        request.user_id = platformUserId
+        request.game_id = platformGameId.toString()
         request.description = description
         request.ip = ip?.takeIf { it.isNotBlank() } ?: "0.0.0.0"
-        request.game_id = platformGameId
-        request.user_id = platformUserId
-        request.txn_ref_id = txnRefId
         request.operatorId = operatorId
         request.token = token
         return request
     }
+
+    private fun Int.toExternalAmount(): String =
+        java.math.BigDecimal.valueOf(toLong()).setScale(2).toPlainString()
 
     private fun requestToPayload(request: PlatformBalanceRequest): MutableMap<String, Any?> =
         linkedMapOf(
@@ -328,15 +332,16 @@ internal class PlatformWalletService(
 
     private fun creditRequestToPayload(request: PlatformCreditQueueMessage): MutableMap<String, Any?> =
         linkedMapOf(
-            "amount" to request.amount,
             "txn_id" to request.txn_id,
             "txn_ref_id" to request.txn_ref_id,
-            "ip" to request.ip,
-            "game_id" to request.game_id,
+            "txn_type" to request.txn_type,
+            "amount" to request.amount,
             "user_id" to request.user_id,
+            "game_id" to request.game_id,
+            "description" to request.description,
+            "ip" to request.ip,
             "operatorId" to request.operatorId,
             "token" to request.token,
-            "description" to request.description,
         )
 
     private fun postDebit(request: PlatformBalanceRequest, token: String) {

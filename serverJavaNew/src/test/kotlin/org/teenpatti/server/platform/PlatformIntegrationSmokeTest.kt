@@ -327,7 +327,9 @@ internal class PlatformIntegrationSmokeTest {
             assertEquals(1, publisher.messages.size)
             assertEquals("round-1:player-1:payout", publisher.messages[0].txn_id)
             assertEquals("round-1:player-1:boot", publisher.messages[0].txn_ref_id)
-            assertEquals(789, publisher.messages[0].game_id)
+            assertEquals(1, publisher.messages[0].txn_type)
+            assertEquals("2000.00", publisher.messages[0].amount)
+            assertEquals("789", publisher.messages[0].game_id)
             assertEquals("platform-user", publisher.messages[0].user_id)
             assertEquals("operator-1", publisher.messages[0].operatorId)
             assertEquals("platform-token", publisher.messages[0].token)
@@ -509,12 +511,13 @@ private class FailingPlatformWalletPublisher : PlatformWalletPublisher {
 private fun PlatformCreditQueueMessage.copy(): PlatformCreditQueueMessage =
     PlatformCreditQueueMessage().also {
         it.txn_id = txn_id
+        it.txn_ref_id = txn_ref_id
+        it.txn_type = txn_type
         it.amount = amount
+        it.user_id = user_id
+        it.game_id = game_id
         it.description = description
         it.ip = ip
-        it.game_id = game_id
-        it.user_id = user_id
-        it.txn_ref_id = txn_ref_id
         it.operatorId = operatorId
         it.token = token
     }
