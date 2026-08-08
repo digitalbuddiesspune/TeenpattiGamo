@@ -335,13 +335,12 @@ internal class PrivateRoomSmokeTest {
         room.round!!.activePlayerIndex = 1
 
         manager.performAction(roomCode, guestId, guestToken, "pack", emptyMap())
-        manager.performAction(roomCode, hostId, hostToken, "dealer_tip", mapOf("amount" to 100))
 
         assertEquals(1, roundHistoryRepository.entries.size)
         val entry = roundHistoryRepository.entries[0]
         assertEquals("private_room", entry.aggregateType)
         assertEquals(roomCode, entry.aggregateId)
-        assertEquals(100, entry.dealerTip)
+        assertEquals(0, entry.dealerTip)
         assertNotNull(entry.settledAt)
         assertFalse(entry.actionLog.isEmpty())
         assertTrue(entry.participants.all { it.cards.isNotEmpty() })

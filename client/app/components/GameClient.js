@@ -640,7 +640,6 @@ export default function GameClient({
       }
     : round;
   const userSeat = displaySeats.find((seat) => seat.isUser);
-  const viewerHasDealerTipPrompt = Boolean(round?.dealerTipPending && round?.dealerTipPrompt);
   const turnClock = getTurnClock(round, turnNow);
   const roundStartClock = getRoundStartClock(round, turnNow);
   const nextRoundDecision = getNextRoundDecision(round, turnNow);
@@ -666,7 +665,6 @@ export default function GameClient({
       acceptedPlayerIds: [],
       pendingPlayerIds: [],
     } : null);
-  const dealerTipPending = viewerHasDealerTipPrompt;
   const platformLaunchToken = platformLaunchContext?.token || "";
   const platformLaunchGameId = platformLaunchContext?.gameId || 0;
   const isPlatformLaunch = Boolean(platformLaunchToken && platformLaunchGameId > 0);
@@ -914,7 +912,7 @@ export default function GameClient({
       return undefined;
     }
 
-    if (nextRoundState?.viewerAccepted || dealerTipPending) {
+    if (nextRoundState?.viewerAccepted) {
       publicDecisionHandledRef.current = false;
       publicDecisionPendingExitRef.current = false;
       return undefined;
@@ -947,7 +945,6 @@ export default function GameClient({
     };
   }, [
     handleExitTable,
-    dealerTipPending,
     nextRoundDecision.expired,
     nextRoundState?.viewerAccepted,
     publicTableState?.playerStatus,

@@ -35,6 +35,14 @@ const SOUND_LIBRARY = {
     src: "/sounds/Chaal.mp3",
     volume: 0.8,
   },
+  blind: {
+    src: "/sounds/Blind.mp3",
+    volume: 0.8,
+  },
+  seen: {
+    src: "/sounds/Seen.mp3",
+    volume: 0.8,
+  },
   pack: {
     src: "/sounds/Pack.mp3",
     volume: 0.8,
@@ -46,6 +54,8 @@ const SOUND_LIBRARY = {
 };
 
 const ACTION_SOUND_BY_TYPE = {
+  blind: "blind",
+  see: "seen",
   chaal: "chaal",
   pack: "pack",
   show: "show",

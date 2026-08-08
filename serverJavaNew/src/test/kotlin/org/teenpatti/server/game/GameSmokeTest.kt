@@ -272,7 +272,7 @@ internal class GameSmokeTest {
     }
 
     @Test
-    fun humanWinnerMustResolveDealerTipBeforeSettlementFinalizes() {
+    fun humanWinnerSettlesImmediatelyWithoutDealerTipPrompt() {
         val service = roundService(tableType = "private_room")
         service.startRound(listOf(participant("player-1", "Alpha"), participant("player-2", "Bravo")))
         service.state.round!!.status = "active"
@@ -281,57 +281,23 @@ internal class GameSmokeTest {
         service.performAction("player-1", "pack", emptyMap())
 
         assertEquals("player-2", service.state.round!!.result!!.winnerId)
-        assertEquals(0, service.state.round!!.result!!.payout)
-        assertEquals(true, service.state.round!!.dealerTipState!!.pending)
-        assertEquals(1_709, service.state.round!!.dealerTipState!!.maxAmount)
-        assertEquals(1_710, service.state.round!!.dealerTipState!!.winnerReceivableBeforeTip)
-        assertNotNull(service.state.round!!.nextRoundDecisionExpiresAt)
-        assertEquals(service.state.round!!.nextRoundDecisionExpiresAt, service.state.round!!.dealerTipState!!.expiresAt)
-
-        val error = assertThrows(IllegalStateException::class.java) {
-            service.performAction("player-1", "dealer_tip", mapOf("amount" to 100))
-        }
-        assertEquals("Only the winner can submit the dealer tip.", error.message)
-
-        service.performAction("player-2", "dealer_tip", mapOf("amount" to 100))
-
-        assertEquals(100, service.state.round!!.result!!.dealerTip)
-        assertEquals(1_610, service.state.round!!.result!!.payout)
-        assertEquals(390, service.state.round!!.result!!.casinoCommissionTotal)
-        assertEquals(false, service.state.round!!.dealerTipState!!.pending)
+        assertEquals(1_710, service.state.round!!.result!!.payout)
+        assertEquals(0, service.state.round!!.result!!.dealerTip)
+        assertNull(service.state.round!!.dealerTipState)
+        assertNotNull(service.state.round!!.settledAt)
     }
 
     @Test
-    fun dealerTipMustBeLessThanWinnerReceivableAmount() {
+    fun midGameDealerTipDeductsFromPlayerBalance() {
         val service = roundService(tableType = "private_room")
         service.startRound(listOf(participant("player-1", "Alpha"), participant("player-2", "Bravo")))
         service.state.round!!.status = "active"
         service.state.round!!.activePlayerIndex = 0
-        service.performAction("player-1", "pack", emptyMap())
 
-        val error = assertThrows(IllegalStateException::class.java) {
-            service.performAction("player-2", "dealer_tip", mapOf("amount" to 1_710))
-        }
-        assertEquals("Dealer tip must be less than the winning amount.", error.message)
-    }
+        val balanceBefore = service.state.round!!.seats[0].balance
+        service.performAction("player-1", "dealer_tip", mapOf("amount" to 100))
 
-    @Test
-    fun dealerTipAutoSkipsAfterTimeout() {
-        val scheduler = CapturingScheduler()
-        val service = roundService(tableType = "private_room", scheduler = scheduler)
-        service.startRound(listOf(participant("player-1", "Alpha"), participant("player-2", "Bravo")))
-        service.state.round!!.status = "active"
-        service.state.round!!.activePlayerIndex = 0
-        service.performAction("player-1", "pack", emptyMap())
-
-        assertEquals(true, service.state.round!!.dealerTipState!!.pending)
-        assertNotNull(service.state.round!!.dealerTipState!!.expiresAt)
-
-        scheduler.runLast()
-
-        assertEquals(false, service.state.round!!.dealerTipState!!.pending)
-        assertEquals(0, service.state.round!!.result!!.dealerTip)
-        assertEquals(1_710, service.state.round!!.result!!.payout)
+        assertEquals(balanceBefore - 100, service.state.round!!.seats[0].balance)
     }
 
     @Test

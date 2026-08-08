@@ -449,7 +449,13 @@ internal fun invokeDecideBotPendingSideShowDecision(service: RoundTableService, 
 }
 
 internal fun invokeFinishRound(service: RoundTableService, winner: SeatState, reason: String) {
-    val method: Method = RoundTableService::class.java.getDeclaredMethod("finishRound", SeatState::class.java, String::class.java)
+    val method =
+        RoundTableService::class.java.getDeclaredMethod(
+            "finishRound",
+            SeatState::class.java,
+            String::class.java,
+            Boolean::class.javaPrimitiveType,
+        )
     method.isAccessible = true
-    method.invoke(service, winner, reason)
+    method.invoke(service, winner, reason, false)
 }

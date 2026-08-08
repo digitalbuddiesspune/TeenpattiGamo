@@ -570,7 +570,7 @@ internal class PublicTableSmokeTest {
 
         val bravo = sessionRepository.loadSession(bravoId)!!
         assertTrue(bravo.nextRoundReady)
-        assertFalse(table.service.state.round!!.dealerTipState!!.pending)
+        assertTrue(table.service.state.round!!.dealerTipState?.pending != true)
         assertNotNull(table.service.state.round!!.nextRoundDecisionExpiresAt)
     }
 

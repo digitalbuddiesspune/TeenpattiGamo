@@ -15,7 +15,7 @@ const seatLayouts = [
     wrapper: "left-1/2 bottom-[14%] z-[24] w-[34%] min-w-[176px] max-w-[246px] -translate-x-1/2 sm:bottom-[10%]",
     avatarShell: "relative z-[22] mx-auto h-[42px] w-[42px] rounded-full border-[3px] border-[#2dd6cf] bg-[radial-gradient(circle_at_50%_32%,#66f8e0_0%,#1aa8a1_42%,#0d5558_100%)] p-[3px] shadow-[0_0_18px_rgba(74,243,223,0.32)] sm:h-[48px] sm:w-[48px]",
     avatarInner: "rounded-full border-[2px] border-[#f4db9f]",
-    label: "relative z-[22] mt-[-12px] mx-auto w-fit min-w-[96px] rounded-[12px] border border-[#e0c97f] bg-[linear-gradient(180deg,#f9df8a_0%,#d3a93e_100%)] px-2 pb-1.5 pt-3 text-center text-[#5b3500] shadow-[0_10px_18px_rgba(0,0,0,0.28)]",
+    label: "relative z-[22] mt-[-10px] mx-auto w-fit min-w-[88px] rounded-[10px] border border-[#e0c97f] bg-[linear-gradient(180deg,#f9df8a_0%,#d3a93e_100%)] px-1.5 pt-0.5 pb-0 text-center text-[#5b3500] shadow-[0_10px_18px_rgba(0,0,0,0.28)]",
     cardsWrap: "left-1/2 bottom-[-86px] -translate-x-1/2 sm:bottom-[-112px]",
     cardsRow: "flex items-end justify-center",
     overlap: "-ml-4 sm:-ml-5",
@@ -37,7 +37,7 @@ const seatLayouts = [
     wrapper: "left-[2%] top-[62%] z-[18] w-[20%] min-w-[92px] max-w-[122px] -translate-y-1/2",
     avatarShell: "mx-auto h-[33px] w-[33px] rounded-full border-[2px] border-[#ffe3a2] bg-[linear-gradient(180deg,#f4be66_0%,#915d18_100%)] p-[2px] shadow-[0_8px_12px_rgba(0,0,0,0.24)] sm:h-[37px] sm:w-[37px]",
     avatarInner: "rounded-full border border-white/55",
-    label: "mt-1 mx-auto w-fit min-w-[60px] rounded-[8px] border border-[#d8bd78] bg-[linear-gradient(180deg,#fee58d_0%,#d3a83b_100%)] px-1 py-0.5 text-center text-[#5b3500] shadow-[0_6px_10px_rgba(0,0,0,0.18)]",
+    label: "mt-1 mx-auto w-fit min-w-[56px] rounded-[8px] border border-[#d8bd78] bg-[linear-gradient(180deg,#fee58d_0%,#d3a83b_100%)] px-1 py-0 text-center text-[#5b3500] shadow-[0_6px_10px_rgba(0,0,0,0.18)]",
     cardsWrap: "left-[calc(100%+1px)] top-[50%] -translate-y-1/2",
     cardsRow: "flex flex-col items-center",
     overlap: "-mt-7 sm:-mt-8",
@@ -59,7 +59,7 @@ const seatLayouts = [
     wrapper: "left-[2%] top-[34%] z-[18] w-[20%] min-w-[92px] max-w-[122px] -translate-y-1/2",
     avatarShell: "mx-auto h-[33px] w-[33px] rounded-full border-[2px] border-[#ffe3a2] bg-[linear-gradient(180deg,#f4be66_0%,#915d18_100%)] p-[2px] shadow-[0_8px_12px_rgba(0,0,0,0.24)] sm:h-[37px] sm:w-[37px]",
     avatarInner: "rounded-full border border-white/55",
-    label: "mt-1 mx-auto w-fit min-w-[60px] rounded-[8px] border border-[#d8bd78] bg-[linear-gradient(180deg,#fee58d_0%,#d3a83b_100%)] px-1 py-0.5 text-center text-[#5b3500] shadow-[0_6px_10px_rgba(0,0,0,0.18)]",
+    label: "mt-1 mx-auto w-fit min-w-[56px] rounded-[8px] border border-[#d8bd78] bg-[linear-gradient(180deg,#fee58d_0%,#d3a83b_100%)] px-1 py-0 text-center text-[#5b3500] shadow-[0_6px_10px_rgba(0,0,0,0.18)]",
     cardsWrap: "left-[calc(100%+1px)] top-[50%] -translate-y-1/2",
     cardsRow: "flex flex-col items-center",
     overlap: "-mt-7 sm:-mt-8",
@@ -81,7 +81,7 @@ const seatLayouts = [
     wrapper: "right-[2%] top-[34%] z-[18] w-[20%] min-w-[92px] max-w-[122px] -translate-y-1/2",
     avatarShell: "mx-auto h-[33px] w-[33px] rounded-full border-[2px] border-[#ffe3a2] bg-[linear-gradient(180deg,#f4be66_0%,#915d18_100%)] p-[2px] shadow-[0_8px_12px_rgba(0,0,0,0.24)] sm:h-[37px] sm:w-[37px]",
     avatarInner: "rounded-full border border-white/55",
-    label: "mt-1 mx-auto w-fit min-w-[60px] rounded-[8px] border border-[#d8bd78] bg-[linear-gradient(180deg,#fee58d_0%,#d3a83b_100%)] px-1 py-0.5 text-center text-[#5b3500] shadow-[0_6px_10px_rgba(0,0,0,0.18)]",
+    label: "mt-1 mx-auto w-fit min-w-[56px] rounded-[8px] border border-[#d8bd78] bg-[linear-gradient(180deg,#fee58d_0%,#d3a83b_100%)] px-1 py-0 text-center text-[#5b3500] shadow-[0_6px_10px_rgba(0,0,0,0.18)]",
     cardsWrap: "right-[calc(100%+1px)] top-[50%] -translate-y-1/2",
     cardsRow: "flex flex-col items-center",
     overlap: "-mt-7 sm:-mt-8",
@@ -103,7 +103,7 @@ const seatLayouts = [
     wrapper: "right-[2%] top-[62%] z-[18] w-[20%] min-w-[92px] max-w-[122px] -translate-y-1/2",
     avatarShell: "mx-auto h-[33px] w-[33px] rounded-full border-[2px] border-[#ffe3a2] bg-[linear-gradient(180deg,#f4be66_0%,#915d18_100%)] p-[2px] shadow-[0_8px_12px_rgba(0,0,0,0.24)] sm:h-[37px] sm:w-[37px]",
     avatarInner: "rounded-full border border-white/55",
-    label: "mt-1 mx-auto w-fit min-w-[60px] rounded-[8px] border border-[#d8bd78] bg-[linear-gradient(180deg,#fee58d_0%,#d3a83b_100%)] px-1 py-0.5 text-center text-[#5b3500] shadow-[0_6px_10px_rgba(0,0,0,0.18)]",
+    label: "mt-1 mx-auto w-fit min-w-[56px] rounded-[8px] border border-[#d8bd78] bg-[linear-gradient(180deg,#fee58d_0%,#d3a83b_100%)] px-1 py-0 text-center text-[#5b3500] shadow-[0_6px_10px_rgba(0,0,0,0.18)]",
     cardsWrap: "right-[calc(100%+1px)] top-[50%] -translate-y-1/2",
     cardsRow: "flex flex-col items-center",
     overlap: "-mt-7 sm:-mt-8",
@@ -415,9 +415,17 @@ export default function Seat({
           <strong className={`block truncate font-black leading-[1] ${isUser ? "text-[12px] sm:text-[13px]" : "text-[9px] sm:text-[10px]"}`}>
             {displayName}
           </strong>
-          <span className={`mt-[1px] block font-black uppercase leading-[1] tracking-[0.08em] ${isUser ? "text-[9px]" : "text-[7px] sm:text-[8px]"}`}>
-            {isUser ? seatState : getOpponentActionLabel(seat.lastAction)}
-          </span>
+          {showHandLabel ? (
+            <span
+              className={`mx-auto mt-1 inline-block max-w-full truncate rounded-full border px-2 py-0.5 text-[7px] font-black uppercase leading-[1] tracking-[0.1em] sm:text-[8px] ${handLabelTone.className}`}
+            >
+              {handLabel}
+            </span>
+          ) : (
+            <span className={`mt-[1px] block font-black uppercase leading-[1] tracking-[0.08em] ${isUser ? "text-[9px]" : "text-[7px] sm:text-[8px]"}`}>
+              {isUser ? seatState : getOpponentActionLabel(seat.lastAction)}
+            </span>
+          )}
         </div>
 
         {actionNotice ? (
@@ -438,7 +446,7 @@ export default function Seat({
           </div>
         ) : null}
 
-        {isWinner || showHandLabel || sideShowStatus || !seat.connected ? (
+        {isWinner || sideShowStatus || !seat.connected ? (
           <div
             className={`pointer-events-none absolute left-1/2 z-[27] flex -translate-x-1/2 flex-col items-center gap-1 ${
               isUser ? "top-[calc(100%+4px)]" : "top-[calc(100%+8px)]"
@@ -447,14 +455,6 @@ export default function Seat({
             {isWinner ? (
               <div className="whitespace-nowrap rounded-full border border-[#ffe888]/40 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#5c3900] shadow-[0_10px_20px_rgba(0,0,0,0.28)]">
                 Winner
-              </div>
-            ) : null}
-
-            {showHandLabel ? (
-              <div
-                className={`whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[8px] font-black uppercase tracking-[0.14em] shadow-[0_8px_16px_rgba(0,0,0,0.24)] sm:text-[9px] ${handLabelTone.className}`}
-              >
-                {handLabel}
               </div>
             ) : null}
 

@@ -903,19 +903,9 @@ internal class RoundTableService(
         Engine.validateSettlementConsistency(round, settlement)
         round.result = buildRoundResult(winner, hand, reason, settlement, false)
         round.result!!.potLimitReached = potLimitReached
-        if (winner.isBot) {
-            finalizeRoundSettlement(winner, hand, settlement)
-        } else {
-            val dealerTipState = DealerTipState()
-            dealerTipState.winnerId = winner.id
-            dealerTipState.winnerName = winner.name
-            dealerTipState.winnerReceivableBeforeTip = settlement.winnerReceivableBeforeTip
-            dealerTipState.maxAmount = maxOf(0, settlement.winnerReceivableBeforeTip - 1)
-            dealerTipState.pending = true
-            dealerTipState.expiresAt = round.nextRoundDecisionExpiresAt
-            round.dealerTipState = dealerTipState
-            round.message = "${winner.name} won with ${hand.label}. Add an optional dealer's tip to settle the round."
-            scheduleDealerTipTimeout()
+        finalizeRoundSettlement(winner, hand, settlement)
+        if (round.message.isNullOrBlank()) {
+            round.message = "${winner.name} won with ${hand.label}."
         }
         persistState()
         emitState("round_complete")

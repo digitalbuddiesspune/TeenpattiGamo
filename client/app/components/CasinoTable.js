@@ -184,9 +184,6 @@ export default function CasinoTable({
   isPublicTable = false,
 }) {
   const [dismissedSideShowResultAt, setDismissedSideShowResultAt] = useState(null);
-  const [dealerTipRoundId, setDealerTipRoundId] = useState("");
-  const [dealerTipAmount, setDealerTipAmount] = useState("10");
-  const [dealerTipError, setDealerTipError] = useState("");
   const [midGameTipAmount, setMidGameTipAmount] = useState(10);
   const [tipModalOpen, setTipModalOpen] = useState(false);
   const [midGameTipSending, setMidGameTipSending] = useState(false);
@@ -200,7 +197,6 @@ export default function CasinoTable({
   const [potTransferring, setPotTransferring] = useState(false);
   const [celebrateWin, setCelebrateWin] = useState(false);
   const [seatActionNotice, setSeatActionNotice] = useState(null);
-  const [handIntroNotice, setHandIntroNotice] = useState(null);
   const surfaceRef = useRef(null);
   const potRef = useRef(null);
   const deckAnchorRef = useRef(null);
@@ -210,14 +206,11 @@ export default function CasinoTable({
   const celebrationRoundIdRef = useRef("");
   const activeDealAnimationKeyRef = useRef("");
   const lastNotifiedActionRef = useRef("");
-  const lastHandIntroRoundIdRef = useRef("");
   const isStarting = round?.status === "starting";
   const isDealing = round?.status === "dealing";
   const isComplete = round?.status === "complete";
   const tableSeats = seats ?? round?.seats;
   const result = round?.result || null;
-  const dealerTipPrompt = round?.dealerTipPrompt || null;
-  const dealerTipPending = Boolean(round?.dealerTipPending && dealerTipPrompt);
   const viewerSeat = tableSeats?.find((seat) => seat.isUser) || null;
   const isWinningViewer = Boolean(result?.winnerId && viewerSeat?.id === result.winnerId);
   const pendingSideShow = round?.pendingSideShow || null;
@@ -241,8 +234,6 @@ export default function CasinoTable({
     !isHoldingRoundCompleteOverlay &&
     !(viewerReady && nextRoundDecision?.expired);
   const finalPayout = typeof result?.payout === "number" ? result.payout : 0;
-  const activeDealerTipAmount = dealerTipPending && dealerTipRoundId === round?.id ? dealerTipAmount : "";
-  const activeDealerTipError = dealerTipPending && dealerTipRoundId === round?.id ? dealerTipError : "";
   const pendingSideShowSeconds = pendingSideShow?.expiresAt
     ? Math.max(0, Math.ceil((new Date(pendingSideShow.expiresAt).getTime() - nowMs) / 1000))
     : 0;
@@ -320,9 +311,6 @@ export default function CasinoTable({
     };
 
     let label = shortLabelByType[actionType];
-    if (actionType === "see" && lastAction.playerId === viewerSeat?.id && viewerSeat?.handLabel) {
-      label = viewerSeat.handLabel;
-    }
     if (!label) {
       return undefined;
     }
@@ -341,29 +329,7 @@ export default function CasinoTable({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [round?.id, round?.lastAction, round?.status, viewerSeat?.handLabel, viewerSeat?.id]);
-
-  useEffect(() => {
-    if (isPublicTable || !round?.id || isDealing || isStarting || round?.status !== "active") {
-      setHandIntroNotice(null);
-      return undefined;
-    }
-
-    const handLabel = typeof viewerSeat?.handLabel === "string" ? viewerSeat.handLabel.trim() : "";
-    if (!handLabel || lastHandIntroRoundIdRef.current === round.id) {
-      return undefined;
-    }
-
-    lastHandIntroRoundIdRef.current = round.id;
-    setHandIntroNotice(`Your hand: ${handLabel}`);
-    const timer = window.setTimeout(() => {
-      setHandIntroNotice(null);
-    }, 3200);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [isDealing, isPublicTable, isStarting, round?.id, round?.status, viewerSeat?.handLabel]);
+  }, [round?.id, round?.lastAction, round?.status, viewerSeat?.id]);
 
   useEffect(() => {
     if (!isComplete) {
@@ -523,18 +489,34 @@ export default function CasinoTable({
   }, [isComplete, revealedCompleteRoundId, round?.id, round?.nextRoundDecisionExpiresAt]);
 
   useEffect(() => {
+    clearDealTimers();
+    activeDealAnimationKeyRef.current = "";
+    setDealFlightCards([]);
+    setDealtCounts({});
+  }, [clearDealTimers, round?.id]);
+
+  useEffect(() => {
     if (isDealing) {
       return undefined;
     }
 
     clearDealTimers();
     activeDealAnimationKeyRef.current = "";
+    setDealFlightCards([]);
+    setDealtCounts({});
     return undefined;
   }, [clearDealTimers, isDealing]);
 
   useEffect(() => {
     if (!isDealing || !round?.id || !round?.dealingStartedAt || !round?.dealingEndsAt) {
       return undefined;
+    }
+
+    if (round.startCountdownEndsAt) {
+      const countdownEndsMs = new Date(round.startCountdownEndsAt).getTime();
+      if (nowMs < countdownEndsMs) {
+        return undefined;
+      }
     }
 
     const animationKey = `${round.id}:${round.dealingStartedAt}`;
@@ -669,6 +651,7 @@ export default function CasinoTable({
     round?.dealingEndsAt,
     round?.dealingStartedAt,
     round?.id,
+    round?.startCountdownEndsAt,
     tableSeats,
   ]);
 
@@ -685,50 +668,11 @@ export default function CasinoTable({
     };
   }, [settingsOpen]);
 
-  async function resolveDealerTipForDecision() {
-    const parsed = Number.parseInt(activeDealerTipAmount, 10);
-
-    if (!dealerTipPending) {
-      return true;
-    }
-
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      setDealerTipRoundId(round?.id || "");
-      setDealerTipAmount("");
-      setDealerTipError("");
-      await onAction("dealer_tip", { amount: 0 });
-      return true;
-    }
-
-    if (parsed > dealerTipPrompt.maxAmount) {
-      setDealerTipRoundId(round?.id || "");
-      setDealerTipError(`Tip must be less than ${dealerTipPrompt.winnerReceivableBeforeTip.toLocaleString("en-IN")}.`);
-      return false;
-    }
-
-    setDealerTipRoundId(round?.id || "");
-    setDealerTipError("");
-    await onAction("dealer_tip", { amount: parsed });
-    return true;
-  }
-
   async function handleNextRoundAccept() {
-    if (isWinningViewer && dealerTipPending) {
-      const resolved = await resolveDealerTipForDecision();
-      if (!resolved) {
-        return;
-      }
-    }
     await onStartNextRound();
   }
 
   async function handleNextRoundDecline() {
-    if (isWinningViewer && dealerTipPending) {
-      const resolved = await resolveDealerTipForDecision();
-      if (!resolved) {
-        return;
-      }
-    }
     await onDeclineNextRound();
   }
 
@@ -770,49 +714,65 @@ export default function CasinoTable({
       <div className="casino-table-scene__page relative z-[20] mx-auto h-dvh w-full max-w-none overflow-x-hidden overflow-y-auto overscroll-y-contain">
         <div className="casino-table-scene__column flex min-h-full w-full flex-col">
           <div className="casino-table-scene__hud sticky top-0 z-[40] -mx-3 px-3 pb-1 pt-[max(4px,env(safe-area-inset-top))] sm:mx-0 sm:px-0 sm:pb-3 sm:pt-[18px]">
-            <div className="relative flex items-center justify-between">
-              <div className="relative" onPointerDown={(event) => event.stopPropagation()}>
-                <TopHudButton
-                  label="Open settings"
-                  onClick={() => setSettingsOpen((current) => !current)}
-                  active={settingsOpen}
-                >
-                  <Image
-                    src="/newAssets/settingsButton.png"
-                    alt=""
-                    width={22}
-                    height={22}
-                    aria-hidden="true"
-                    className="sm:h-[26px] sm:w-[26px]"
+            <div className="relative flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+                <div className="relative shrink-0" onPointerDown={(event) => event.stopPropagation()}>
+                  <TopHudButton
+                    label="Open settings"
+                    onClick={() => setSettingsOpen((current) => !current)}
+                    active={settingsOpen}
+                  >
+                    <Image
+                      src="/newAssets/settingsButton.png"
+                      alt=""
+                      width={22}
+                      height={22}
+                      aria-hidden="true"
+                      className="sm:h-[26px] sm:w-[26px]"
+                    />
+                  </TopHudButton>
+                  <SettingsPanel
+                    open={settingsOpen}
+                    onExitTable={onExitTable}
                   />
-                </TopHudButton>
-                <SettingsPanel
-                  open={settingsOpen}
-                  onExitTable={onExitTable}
-                />
-              </div>
-
-              <ChipBalanceDisplay chipBalance={chipBalance} />
-            </div>
-
-            <div className="pointer-events-none relative mt-1 flex items-start justify-between gap-2 sm:mt-2">
-              <InfoBadge label="Variant" value={variant?.label || "Teen Patti"} tone="red" />
-              {isPrivateMode && (roomCode || roomName) ? (
-                <InfoBadge
-                  label={roomCode ? "Room" : "Private"}
-                  value={roomCode || roomName}
-                  align="right"
-                />
-              ) : null}
-            </div>
-
-            {handIntroNotice ? (
-              <div className="pointer-events-none mt-2 flex justify-center">
-                <div className="rounded-full border border-[#ffe888]/35 bg-[linear-gradient(180deg,rgba(18,52,56,0.96),rgba(4,24,27,0.98))] px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#fff1c1] shadow-[0_10px_20px_rgba(0,0,0,0.28)] sm:text-[11px]">
-                  {handIntroNotice}
                 </div>
+
+                <InfoBadge label="Variant" value={variant?.label || "Teen Patti"} tone="red" />
               </div>
-            ) : null}
+
+              <div className="pointer-events-auto absolute left-1/2 top-1/2 z-[2] -translate-x-1/2 -translate-y-1/2">
+                <button
+                  type="button"
+                  onClick={() => setTipModalOpen(true)}
+                  className="group relative flex items-center gap-1.5 rounded-full border border-[#ffe888]/60 bg-[linear-gradient(135deg,rgba(40,25,5,0.94)_0%,rgba(15,10,2,0.98)_100%)] px-2.5 py-1 text-white shadow-[0_4px_14px_rgba(0,0,0,0.5),0_0_12px_rgba(255,232,136,0.3)] transition-all duration-200 hover:scale-105 hover:border-[#ffe888] active:scale-95 sm:px-3 sm:py-1.5"
+                  title="Tip Dealer"
+                >
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full border border-[#ffe888]/80 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] text-[10px] shadow-sm sm:h-6 sm:w-6 sm:text-[11px]">
+                    🪙
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <span className="text-[7.5px] font-black uppercase tracking-[0.14em] text-[#ffe888] sm:text-[8px]">
+                      TIP DEALER
+                    </span>
+                    <span className="text-[9px] font-extrabold text-[#fff7d6] sm:text-[10px]">
+                      ₹{midGameTipAmount}
+                    </span>
+                  </div>
+                </button>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                {isPrivateMode && (roomCode || roomName) ? (
+                  <InfoBadge
+                    label={roomCode ? "Room" : "Private"}
+                    value={roomCode || roomName}
+                    align="right"
+                  />
+                ) : null}
+                <ChipBalanceDisplay chipBalance={chipBalance} />
+              </div>
+            </div>
+
           </div>
 
           <div className="casino-table-scene__stage relative mx-auto flex w-full flex-none items-start justify-center sm:flex-1">
@@ -836,30 +796,21 @@ export default function CasinoTable({
 
               {showSharedJokersTray ? <SharedJokersTray sharedJokers={sharedJokers} /> : null}
 
-              <div className="casino-table-scene__dealer-tip-anchor pointer-events-auto absolute left-[calc(50%+54px)] top-[18.5%] z-[28] -translate-y-1/2 sm:left-[calc(50%+68px)]">
-                <button
-                  type="button"
-                  onClick={() => setTipModalOpen(true)}
-                  className="group relative flex items-center gap-1.5 rounded-full border border-[#ffe888]/60 bg-[linear-gradient(135deg,rgba(40,25,5,0.94)_0%,rgba(15,10,2,0.98)_100%)] px-2.5 py-1 text-white shadow-[0_4px_14px_rgba(0,0,0,0.5),0_0_12px_rgba(255,232,136,0.3)] transition-all duration-200 hover:scale-105 hover:border-[#ffe888] active:scale-95"
-                  title="Tip Dealer"
-                >
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full border border-[#ffe888]/80 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] text-[10px] shadow-sm">
-                    🪙
-                  </div>
-                  <div className="flex flex-col text-left">
-                    <span className="text-[7.5px] font-black uppercase tracking-[0.14em] text-[#ffe888] sm:text-[8px]">
-                      TIP DEALER
-                    </span>
-                    <span className="text-[9px] font-extrabold text-[#fff7d6] sm:text-[10px]">
-                      ₹{midGameTipAmount}
-                    </span>
-                  </div>
-                </button>
-              </div>
-
-              {(isStarting || isDealing) ? (
+              {isStarting ? (
                 <div className="casino-table-scene__deck-layer pointer-events-none absolute inset-0 z-[25]">
-                  <div className={`casino-table-scene__deck ${isStarting ? "is-shuffling" : "is-dealing"}`}>
+                  <div className="casino-table-scene__deck is-shuffling">
+                    <div ref={deckAnchorRef} className="casino-table-scene__deck-anchor">
+                      <HiddenDealCard className="casino-table-scene__deck-card casino-table-scene__deck-card--base" />
+                      <HiddenDealCard className="casino-table-scene__deck-card casino-table-scene__deck-card--mid" />
+                      <HiddenDealCard className="casino-table-scene__deck-card casino-table-scene__deck-card--top" />
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {isDealing ? (
+                <div className="casino-table-scene__deck-layer pointer-events-none absolute inset-0 z-[25]">
+                  <div className="casino-table-scene__deck is-dealing">
                     <div ref={deckAnchorRef} className="casino-table-scene__deck-anchor">
                       <HiddenDealCard className="casino-table-scene__deck-card casino-table-scene__deck-card--base" />
                       <HiddenDealCard className="casino-table-scene__deck-card casino-table-scene__deck-card--mid" />
@@ -981,12 +932,6 @@ export default function CasinoTable({
                       </div>
                     ) : null}
 
-                    {!isQueuedSpectator && isWinningViewer ? (
-                      <div className="rounded-full bg-[linear-gradient(180deg,#fff0a7_0%,#d1a22c_100%)] px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#4d2600]">
-                        You won this round
-                      </div>
-                    ) : null}
-
                     <div>
                       <strong className="block text-lg font-black text-white sm:text-xl">
                         {isQueuedSpectator
@@ -1005,13 +950,11 @@ export default function CasinoTable({
                               ? (isPrivateMode
                                   ? (isHost
                                       ? (canStartNextRound
-                                          ? "You won this round. Everyone is ready. Start the next round when you want."
-                                          : "You won this round. Wait for another player to join or get ready before starting the next round.")
-                                      : "You won this round. You are ready for the host to start the next round.")
-                                  : "You won this round. You are in for the next round.")
-                              : dealerTipPending
-                                ? "You won this round. Add an optional dealer tip, then decide whether you want to continue."
-                                : `You won this round. ${round?.message || ""}`.trim()
+                                          ? "Everyone is ready. Start the next round when you want."
+                                          : "Wait for another player to join or get ready before starting the next round.")
+                                      : "You are ready for the host to start the next round.")
+                                  : "You are in for the next round.")
+                              : (round?.message || "").trim()
                             : viewerReady
                               ? (isPrivateMode
                                   ? (isHost
@@ -1020,95 +963,13 @@ export default function CasinoTable({
                                           : "Wait for another player to join or get ready before starting the next round.")
                                       : "You are ready. Waiting for the host to start the next round.")
                                   : "You are in for the next round.")
-                              : round?.dealerTipPending
-                                ? `${result.winnerName} won with ${result.winningHand}.`
-                                : round?.message}
+                              : round?.message || `${result.winnerName} won with ${result.winningHand}.`}
                       </span>
                     </div>
 
                     {!isQueuedSpectator && isWinningViewer && finalPayout > 0 ? (
                       <div className="rounded-full border border-[#3be7de]/24 bg-black/22 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[#a6fff2]">
                         Final payout {finalPayout.toLocaleString("en-IN")}
-                      </div>
-                    ) : null}
-
-                    {!isQueuedSpectator && dealerTipPending && dealerTipPrompt ? (
-                      <div className="w-full rounded-[18px] border border-white/10 bg-black/24 p-3 text-left">
-                        <label className="mb-2 block text-[12px] font-black uppercase tracking-[0.18em] text-white/82" htmlFor="dealer-tip-input">
-                          Dealer&apos;s tip
-                        </label>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDealerTipRoundId(round?.id || "");
-                              setDealerTipError("");
-                              const current = Number.parseInt(activeDealerTipAmount || "10", 10) || 10;
-                              setDealerTipAmount(String(Math.max(10, current - 10)));
-                            }}
-                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-lg font-black text-white hover:bg-white/20 active:scale-95 disabled:opacity-40"
-                            disabled={(Number.parseInt(activeDealerTipAmount || "10", 10) || 10) <= 10}
-                          >
-                            −
-                          </button>
-
-                          <input
-                            id="dealer-tip-input"
-                            className="w-full rounded-xl border border-white/12 bg-white/8 px-4 py-2 text-center text-lg font-black text-[#ffe888] outline-none placeholder:text-white/50"
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            placeholder="10"
-                            value={activeDealerTipAmount || "10"}
-                            onChange={(event) => {
-                              setDealerTipRoundId(round?.id || "");
-                              setDealerTipError("");
-                              setDealerTipAmount(event.target.value.replace(/[^\d]/g, ""));
-                            }}
-                          />
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDealerTipRoundId(round?.id || "");
-                              setDealerTipError("");
-                              const current = Number.parseInt(activeDealerTipAmount || "10", 10) || 10;
-                              setDealerTipAmount(String(current + 10));
-                            }}
-                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#ffe888]/40 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] text-lg font-black text-[#4a2e00] shadow-sm hover:brightness-110 active:scale-95"
-                          >
-                            +
-                          </button>
-                        </div>
-
-                        <div className="mt-2.5 flex justify-center gap-1.5">
-                          {[10, 20, 50, 100].map((amt) => (
-                            <button
-                              key={amt}
-                              type="button"
-                              onClick={() => {
-                                setDealerTipRoundId(round?.id || "");
-                                setDealerTipError("");
-                                setDealerTipAmount(String(amt));
-                              }}
-                              className={`rounded-lg border px-2.5 py-1 text-[11px] font-black transition-all ${
-                                (activeDealerTipAmount || "10") === String(amt)
-                                  ? "border-[#ffe888] bg-[#ffe888] text-[#3a2200]"
-                                  : "border-white/12 bg-white/5 text-white/80 hover:border-white/25"
-                              }`}
-                            >
-                              ₹{amt}
-                            </button>
-                          ))}
-                        </div>
-
-                        <span className="mt-2 block text-center text-[11px] text-white/60">
-                          Increments in multiples of ₹10.
-                        </span>
-                        {activeDealerTipError ? (
-                          <p className="mt-2 text-sm font-semibold text-[#ff9c9c]">{activeDealerTipError}</p>
-                        ) : null}
                       </div>
                     ) : null}
 
