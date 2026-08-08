@@ -166,6 +166,32 @@ function getOpponentActionLabel(lastAction) {
   }
 }
 
+function getHandLabelTone(handLabel) {
+  const normalized = String(handLabel || "").trim().toLowerCase();
+  if (normalized === "trail" || normalized === "pure sequence") {
+    return {
+      className:
+        "border-[#ffe888]/45 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] text-[#5c3900]",
+    };
+  }
+  if (normalized === "sequence" || normalized === "color") {
+    return {
+      className:
+        "border-[#9ff5c8]/35 bg-[linear-gradient(180deg,rgba(18,88,62,0.96),rgba(8,42,32,0.98))] text-[#d6ffe8]",
+    };
+  }
+  if (normalized === "pair") {
+    return {
+      className:
+        "border-[#9fd4ff]/35 bg-[linear-gradient(180deg,rgba(18,52,88,0.96),rgba(8,28,42,0.98))] text-[#d8f0ff]",
+    };
+  }
+  return {
+    className:
+      "border-[#d8bd78]/35 bg-[linear-gradient(180deg,rgba(36,28,18,0.96),rgba(18,12,8,0.98))] text-[#f2dfae]",
+  };
+}
+
 function TurnClock({ turnClock, isUser, className }) {
   const progress = Math.max(0, Math.min(100, turnClock?.progress ?? 0));
   const ringBackground = `conic-gradient(${turnClock?.isCritical ? "#ff7c70" : "#ffdf86"} ${progress}%, rgba(255,255,255,0.14) ${progress}% 100%)`;
@@ -295,6 +321,13 @@ export default function Seat({
       .trim();
     return cleaned || raw;
   })();
+  const handLabel = typeof seat.handLabel === "string" ? seat.handLabel.trim() : "";
+  const showHandLabel =
+    Boolean(handLabel) &&
+    !isStarting &&
+    !isDealing &&
+    (isUser || cardsRevealed || isRoundComplete);
+  const handLabelTone = getHandLabelTone(handLabel);
 
   return (
     <div
@@ -396,6 +429,16 @@ export default function Seat({
             <div className="whitespace-nowrap rounded-full border border-[#43d8cc]/35 bg-[linear-gradient(180deg,rgba(8,52,56,0.96),rgba(4,24,27,0.98))] px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-[#abfff5] shadow-[0_8px_16px_rgba(0,0,0,0.28)] sm:text-[9px]">
               {actionNotice}
             </div>
+          </div>
+        ) : null}
+
+        {showHandLabel ? (
+          <div
+            className={`absolute left-1/2 z-[27] -translate-x-1/2 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[8px] font-black uppercase tracking-[0.14em] shadow-[0_8px_16px_rgba(0,0,0,0.24)] sm:text-[9px] ${
+              isUser ? "top-[calc(100%+4px)]" : "top-[calc(100%+12px)]"
+            } ${handLabelTone.className}`}
+          >
+            {handLabel}
           </div>
         ) : null}
 

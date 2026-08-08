@@ -464,6 +464,14 @@ internal class RoundTableService(
             item["packed"] = seat.packed
             item["seen"] = seat.seen
             item["cards"] = cards
+            if (seat.cards.isNotEmpty()) {
+                val includeHandLabel =
+                    canReveal ||
+                        (isViewer && round.status in setOf("active", "complete"))
+                if (includeHandLabel) {
+                    item["handLabel"] = Engine.evaluateSeatHand(seat, round, config).label
+                }
+            }
             item["publicCards"] = seat.publicCards
             item["totalContributed"] = seat.totalContributed
             item["lastAction"] = seat.lastAction

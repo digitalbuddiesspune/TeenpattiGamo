@@ -195,6 +195,7 @@ export default function CasinoTable({
   const [potTransferring, setPotTransferring] = useState(false);
   const [celebrateWin, setCelebrateWin] = useState(false);
   const [seatActionNotice, setSeatActionNotice] = useState(null);
+  const [handIntroNotice, setHandIntroNotice] = useState(null);
   const surfaceRef = useRef(null);
   const potRef = useRef(null);
   const deckAnchorRef = useRef(null);
@@ -204,6 +205,7 @@ export default function CasinoTable({
   const celebrationRoundIdRef = useRef("");
   const activeDealAnimationKeyRef = useRef("");
   const lastNotifiedActionRef = useRef("");
+  const lastHandIntroRoundIdRef = useRef("");
   const isStarting = round?.status === "starting";
   const isDealing = round?.status === "dealing";
   const isComplete = round?.status === "complete";
@@ -312,7 +314,10 @@ export default function CasinoTable({
       show: "Show",
     };
 
-    const label = shortLabelByType[actionType];
+    let label = shortLabelByType[actionType];
+    if (actionType === "see" && lastAction.playerId === viewerSeat?.id && viewerSeat?.handLabel) {
+      label = viewerSeat.handLabel;
+    }
     if (!label) {
       return undefined;
     }
@@ -331,7 +336,28 @@ export default function CasinoTable({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [round?.id, round?.lastAction, round?.status]);
+  }, [round?.id, round?.lastAction, round?.status, viewerSeat?.handLabel, viewerSeat?.id]);
+
+  useEffect(() => {
+    if (!round?.id || isDealing || isStarting || round?.status !== "active") {
+      return undefined;
+    }
+
+    const handLabel = typeof viewerSeat?.handLabel === "string" ? viewerSeat.handLabel.trim() : "";
+    if (!handLabel || lastHandIntroRoundIdRef.current === round.id) {
+      return undefined;
+    }
+
+    lastHandIntroRoundIdRef.current = round.id;
+    setHandIntroNotice(`Your hand: ${handLabel}`);
+    const timer = window.setTimeout(() => {
+      setHandIntroNotice(null);
+    }, 3200);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [isDealing, isStarting, round?.id, round?.status, viewerSeat?.handLabel]);
 
   useEffect(() => {
     if (!isComplete) {
@@ -773,6 +799,14 @@ export default function CasinoTable({
                 />
               ) : null}
             </div>
+
+            {handIntroNotice ? (
+              <div className="pointer-events-none mt-2 flex justify-center">
+                <div className="rounded-full border border-[#ffe888]/35 bg-[linear-gradient(180deg,rgba(18,52,56,0.96),rgba(4,24,27,0.98))] px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#fff1c1] shadow-[0_10px_20px_rgba(0,0,0,0.28)] sm:text-[11px]">
+                  {handIntroNotice}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="casino-table-scene__stage relative mx-auto flex w-full flex-none items-start justify-center sm:flex-1">
