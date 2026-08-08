@@ -77,9 +77,33 @@ internal class RoundTableService(
     fun currentActionLogSize(): Int = state.round?.actionLog?.size ?: 0
 
     @Synchronized
-    fun quoteDebitForAction(playerId: String, type: String): Int {
+    fun quoteDebitForAction(playerId: String, type: String, payload: Map<String, Any?> = emptyMap()): Int {
         if (type == "dealer_tip") {
-            return 0
+            val round = state.round ?: throw IllegalStateException("Dealer tip is not available right now.")
+            val actorIndex = indexOfSeat(round, playerId)
+            val actor = round.seats[actorIndex]
+            val rawAmount = payload["amount"] ?: throw IllegalStateException("Dealer tip amount is required.")
+            if (rawAmount !is Number) {
+                throw IllegalStateException("Dealer tip amount is required.")
+            }
+            val amount = rawAmount.toInt()
+            if (amount < 0) {
+                throw IllegalStateException("Dealer tip cannot be negative.")
+            }
+            if (amount == 0) {
+                return 0
+            }
+            if (actor.balance < amount) {
+                throw IllegalStateException("Insufficient balance to tip dealer.")
+            }
+            if (round.status == "complete" &&
+                round.dealerTipState?.pending == true &&
+                playerId == round.dealerTipState!!.winnerId &&
+                amount >= round.dealerTipState!!.winnerReceivableBeforeTip
+            ) {
+                throw IllegalStateException("Dealer tip must be less than the winning amount.")
+            }
+            return amount
         }
         val round = requireActiveRound()
         val actorIndex = indexOfSeat(round, playerId)

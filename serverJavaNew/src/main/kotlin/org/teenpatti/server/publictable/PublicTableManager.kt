@@ -219,7 +219,7 @@ internal class PublicTableManager(
             throw IllegalStateException("Player is not seated at this table.")
         }
         markConnected(session)
-        debitActionIfNeeded(table, session, actionType)
+        debitActionIfNeeded(table, session, actionType, payload)
         table.service.performAction(sessionId, actionType, payload)
         creditWinnerIfNeeded(table)
         return serializeForPlayer(sessionId, playerToken)
@@ -780,17 +780,28 @@ internal class PublicTableManager(
         GameEventLog.info("matchmaking_table_discarded", "variantId" to config.variant.id, "lobbyId" to table.tableId)
     }
 
-    private fun debitActionIfNeeded(table: ManagedPublicTable, session: PublicPlayerSessionState, actionType: String) {
-        val amount = table.service.quoteDebitForAction(session.id, actionType)
+    private fun debitActionIfNeeded(
+        table: ManagedPublicTable,
+        session: PublicPlayerSessionState,
+        actionType: String,
+        payload: Map<String, Any?> = emptyMap(),
+    ) {
+        val amount = table.service.quoteDebitForAction(session.id, actionType, payload)
         if (amount <= 0) {
             return
         }
         val roundId = table.service.currentRoundId() ?: throw IllegalStateException("No active round is available.")
         val actionIndex = table.service.currentActionLogSize()
+        val operationKey =
+            if (actionType == "dealer_tip") {
+                "tp:$roundId:${session.id}:dealer_tip:$amount:${clockProvider.now().toEpochMilli()}"
+            } else {
+                "tp:$roundId:${session.id}:$actionIndex:$actionType"
+            }
         platformWalletService?.debit(
             platformRef(session),
             roundId,
-            "tp:$roundId:${session.id}:$actionIndex:$actionType",
+            operationKey,
             amount,
             TeenPattiWalletStatement.description(amount, "debited", actionType, roundId, table.tableId),
         )

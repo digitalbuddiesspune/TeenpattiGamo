@@ -335,7 +335,7 @@ internal class PrivateRoom(
 
     @Synchronized
     fun performAction(playerId: String, type: String, payload: Map<String, Any?>): Map<String, Any?> {
-        debitActionIfNeeded(playerId, type)
+        debitActionIfNeeded(playerId, type, payload)
         runtime.performAction(playerId, type, payload)
         syncRuntimeToRoom()
         creditWinnerIfNeeded()
@@ -358,18 +358,24 @@ internal class PrivateRoom(
         }
     }
 
-    private fun debitActionIfNeeded(playerId: String, type: String) {
-        val amount = runtime.quoteDebitForAction(playerId, type)
+    private fun debitActionIfNeeded(playerId: String, type: String, payload: Map<String, Any?> = emptyMap()) {
+        val amount = runtime.quoteDebitForAction(playerId, type, payload)
         if (amount <= 0) {
             return
         }
         val roundId = runtime.currentRoundId() ?: throw IllegalStateException("No active round is available.")
         val actionIndex = runtime.currentActionLogSize()
         val player = requirePlayer(playerId)
+        val operationKey =
+            if (type == "dealer_tip") {
+                "tp:$roundId:${player.id}:dealer_tip:$amount:${clockProvider.now().toEpochMilli()}"
+            } else {
+                "tp:$roundId:${player.id}:$actionIndex:$type"
+            }
         platformWalletService?.debit(
             platformRef(player),
             roundId,
-            "tp:$roundId:${player.id}:$actionIndex:$type",
+            operationKey,
             amount,
             TeenPattiWalletStatement.description(amount, "debited", type, roundId, state.roomCode),
         )

@@ -295,9 +295,18 @@ internal class GameSmokeTest {
         service.state.round!!.activePlayerIndex = 0
 
         val balanceBefore = service.state.round!!.seats[0].balance
+        assertEquals(100, service.quoteDebitForAction("player-1", "dealer_tip", mapOf("amount" to 100)))
         service.performAction("player-1", "dealer_tip", mapOf("amount" to 100))
 
         assertEquals(balanceBefore - 100, service.state.round!!.seats[0].balance)
+    }
+
+    @Test
+    fun dealerTipQuoteReturnsZeroForSkippedTip() {
+        val service = roundService(tableType = "private_room")
+        service.startRound(listOf(participant("player-1", "Alpha"), participant("player-2", "Bravo")))
+
+        assertEquals(0, service.quoteDebitForAction("player-1", "dealer_tip", mapOf("amount" to 0)))
     }
 
     @Test
