@@ -161,7 +161,7 @@ internal class PlatformIntegrationSmokeTest {
     fun platformSessionRejectsMissingGameIdBeforeUserDetailCall() {
         withPlatformServer { server ->
             val controller =
-                platformController(server.baseUrl())
+                platformController(server.baseUrl(), platformGameId = 0)
 
             val error =
                 assertThrows(AppException::class.java) {
@@ -233,7 +233,7 @@ internal class PlatformIntegrationSmokeTest {
     @Test
     fun transactionHistoryRejectsMissingGameIdBeforeLookup() {
         withPlatformServer { server ->
-            val controller = platformController(server.baseUrl())
+            val controller = platformController(server.baseUrl(), platformGameId = 0)
 
             val error =
                 assertThrows(AppException::class.java) {
@@ -458,9 +458,10 @@ internal class PlatformIntegrationSmokeTest {
         assertEquals("failed", repository.loadByOperationKey("round-1:player-1:payout")!!.status)
     }
 
-    private fun platformEnv(baseUrl: String): AppEnvironment =
+    private fun platformEnv(baseUrl: String, platformGameId: Int = 2): AppEnvironment =
         AppEnvironment().also {
             it.platformEnabled = true
+            it.platformGameId = platformGameId
             it.appOperatorBaseUrl = baseUrl
             it.appOperatorUserDetailPath = "/service/user/detail"
             it.appOperatorBalancePath = "/service/operator/user/balance/v2"
@@ -475,14 +476,18 @@ internal class PlatformIntegrationSmokeTest {
         publicManagers: Map<String, org.teenpatti.server.publictable.PublicTableManager> = emptyMap(),
         walletTransactionRepository: WalletTransactionRepository = InMemoryWalletTransactionRepository(),
         roundHistoryRepository: InMemoryRoundHistoryRepository = InMemoryRoundHistoryRepository(),
-    ): PlatformController =
-        PlatformController(
-            PlatformGatewayClient(platformEnv(baseUrl)),
+        platformGameId: Int = 2,
+    ): PlatformController {
+        val env = platformEnv(baseUrl, platformGameId)
+        return PlatformController(
+            PlatformGatewayClient(env),
             FixedClock(),
+            env,
             publicManagers,
             privateRoomManager(InMemoryPrivateRoomRepository(), roundHistoryRepository, FixedClock(), ManualScheduler()),
-            PlatformWalletService(platformEnv(baseUrl), RecordingPlatformWalletPublisher(), walletTransactionRepository, roundHistoryRepository, FixedClock()),
+            PlatformWalletService(env, RecordingPlatformWalletPublisher(), walletTransactionRepository, roundHistoryRepository, FixedClock()),
         )
+    }
 
     private fun withPlatformServer(block: (RecordingHttpServer) -> Unit) {
         val server = RecordingHttpServer()

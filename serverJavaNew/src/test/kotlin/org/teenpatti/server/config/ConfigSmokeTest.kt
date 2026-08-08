@@ -109,6 +109,7 @@ internal class ConfigSmokeTest {
             it.setProperty("PLATFORM_AMQP_URL", "amqp://guest:guest@localhost:5672/")
             it.setProperty("PLATFORM_AMQP_EXCHANGE", "/games/admin")
             it.setProperty("PLATFORM_AMQP_ROUTING_KEY", "games_cashout")
+            it.setProperty("PLATFORM_GAME_ID", "2")
         }
 
     private fun platformEnvWithout(property: String): MockEnvironment =

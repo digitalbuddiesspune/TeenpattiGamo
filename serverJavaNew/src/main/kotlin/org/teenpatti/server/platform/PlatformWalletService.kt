@@ -375,6 +375,7 @@ internal class PlatformWalletService(
 
     private fun requirePlatformGameId(player: PlatformPlayerRef): Int =
         player.platformGameId?.takeIf { it > 0 }
+            ?: env.platformGameId.takeIf { it > 0 }
             ?: throw AppException.badRequest("platform_game_id_required", "Platform game_id is required for wallet play.")
 
     private fun requirePlatformOperatorId(player: PlatformPlayerRef): String =

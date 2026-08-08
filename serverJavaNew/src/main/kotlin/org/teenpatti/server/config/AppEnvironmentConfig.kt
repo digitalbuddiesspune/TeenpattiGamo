@@ -87,6 +87,7 @@ internal class AppEnvironmentConfig {
         check(env.platformAmqpRoutingKey.isNotBlank()) {
             "PLATFORM_AMQP_ROUTING_KEY or PLATFORM_AMQP_QUEUE_NAME is required when PLATFORM_ENABLED=true."
         }
+        check(env.platformGameId > 0) { "PLATFORM_GAME_ID is required when PLATFORM_ENABLED=true." }
     }
 
     private fun joinUrl(baseUrl: String, path: String): String {

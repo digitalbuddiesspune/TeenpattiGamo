@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RestController
 import org.teenpatti.server.common.ApiSupport
 import org.teenpatti.server.common.AppException
 import org.teenpatti.server.common.ClockProvider
+import org.teenpatti.server.config.AppEnvironment
 import org.teenpatti.server.platform.PlatformGatewayClient
 import org.teenpatti.server.platform.PlatformSession
 import org.teenpatti.server.platform.PlatformWalletService
@@ -19,6 +20,7 @@ import org.teenpatti.server.publictable.PublicTableManager
 internal class PlatformController(
     private val gatewayClient: PlatformGatewayClient,
     private val clockProvider: ClockProvider,
+    private val env: AppEnvironment,
     private val publicTableManagers: Map<String, PublicTableManager>,
     private val privateRoomManager: PrivateRoomManager,
     private val platformWalletService: PlatformWalletService,
@@ -102,6 +104,7 @@ internal class PlatformController(
         }
         val normalizedGameId =
             gameId?.takeIf { it > 0 }
+                ?: env.platformGameId.takeIf { it > 0 }
                 ?: throw AppException.badRequest("platform_game_id_required", "Platform game_id is required.")
         val user = gatewayClient.getUserDetail(normalizedToken)
         if (user.userId.isBlank()) {
