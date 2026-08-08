@@ -9,6 +9,7 @@ import {
   performPublicAction,
   getPublicTableWebSocketUrl
 } from "../lib/api";
+import { getPlatformLaunchContext } from "../lib/platformLaunch";
 import { createClientSeed } from "../lib/clientSeed";
 
 const INITIAL_PUBLIC_LOADING_DELAY_MS = 0;
@@ -42,20 +43,6 @@ function getWindowId() {
 
 function getSessionStorageKey(variant) {
   return `teen-patti-public-session:${variant}:${getWindowId()}`;
-}
-
-function getPlatformLaunchContext() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get("id")?.trim() || "";
-  if (!token) {
-    return null;
-  }
-  const rawGameId = params.get("game_id")?.trim() || "";
-  const gameId = Number(rawGameId);
-  return { token, gameId };
 }
 
 function readStoredSession(variant) {

@@ -577,6 +577,13 @@ export default function GameClient({
       return null;
     }
   });
+  const [platformProfileLoading, setPlatformProfileLoading] = useState(false);
+  const [platformLaunchContext, setPlatformLaunchContext] = useState(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+    return getPlatformLaunchContext();
+  });
   const [lobbyInitialBalance, setLobbyInitialBalance] = useState(null);
   const publicDecisionHandledRef = useRef(false);
   const publicDecisionPendingExitRef = useRef(false);
@@ -660,9 +667,13 @@ export default function GameClient({
       pendingPlayerIds: [],
     } : null);
   const dealerTipPending = viewerHasDealerTipPrompt;
-  const platformLaunchContext = getPlatformLaunchContext();
   const platformLaunchToken = platformLaunchContext?.token || "";
   const platformLaunchGameId = platformLaunchContext?.gameId || 0;
+  const isPlatformLaunch = Boolean(platformLaunchToken && platformLaunchGameId > 0);
+
+  useEffect(() => {
+    setPlatformLaunchContext(getPlatformLaunchContext());
+  }, [view, variant]);
 
   const commitPlatformProfile = useCallback((profile) => {
     setPlatformProfile(profile);
@@ -713,23 +724,31 @@ export default function GameClient({
       return null;
     }
 
+    setPlatformProfileLoading(true);
     const requestId = platformProfileRequestIdRef.current + 1;
     platformProfileRequestIdRef.current = requestId;
-    const profile = await fetchPlatformProfile(platformLaunchToken, platformLaunchGameId);
-    if (requestId !== platformProfileRequestIdRef.current) {
+    try {
+      const profile = await fetchPlatformProfile(platformLaunchToken, platformLaunchGameId);
+      if (requestId !== platformProfileRequestIdRef.current) {
+        return profile;
+      }
+      commitPlatformProfile(profile);
       return profile;
+    } finally {
+      if (requestId === platformProfileRequestIdRef.current) {
+        setPlatformProfileLoading(false);
+      }
     }
-
-    commitPlatformProfile(profile);
-    return profile;
   }, [commitPlatformProfile, platformLaunchGameId, platformLaunchToken]);
 
   useEffect(() => {
     if (!platformLaunchToken || !platformLaunchGameId) {
+      setPlatformProfileLoading(false);
       return undefined;
     }
 
     let cancelled = false;
+    setPlatformProfileLoading(true);
     const requestId = platformProfileRequestIdRef.current + 1;
     platformProfileRequestIdRef.current = requestId;
 
@@ -744,6 +763,11 @@ export default function GameClient({
       .catch(() => {
         if (!cancelled && requestId === platformProfileRequestIdRef.current && isPublicMenuView) {
           setPlatformProfile(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled && requestId === platformProfileRequestIdRef.current) {
+          setPlatformProfileLoading(false);
         }
       });
 
@@ -935,6 +959,7 @@ export default function GameClient({
   const activeActing = publicActing;
   const activeError = publicError;
   const platformBalanceFallback = publicTableState?.viewerPlatformBalance;
+  const platformNameFallback = publicTableState?.playerName;
   const visibleChipBalance = userSeat?.balance ?? publicTableState?.table?.balance;
   const displayedChipBalance = typeof platformProfile?.balance === "number"
     ? platformProfile.balance
@@ -942,10 +967,15 @@ export default function GameClient({
       ? platformBalanceFallback
     : typeof visibleChipBalance === "number"
       ? visibleChipBalance
+    : isPlatformLaunch
+      ? null
     : lobbyInitialBalance;
-  const headerChipBalanceLabel = (
-    typeof displayedChipBalance === "number" ? displayedChipBalance : 0
-  ).toLocaleString("en-IN");
+  const displayedUsername = platformProfile?.username
+    || platformNameFallback
+    || (isPlatformLaunch && platformProfileLoading ? "Loading..." : "Player");
+  const headerChipBalanceLabel = platformProfileLoading && isPlatformLaunch && displayedChipBalance == null
+    ? "..."
+    : (typeof displayedChipBalance === "number" ? displayedChipBalance : 0).toLocaleString("en-IN");
   const walletBalanceLabel = `₹ ${headerChipBalanceLabel}`;
   const minimumBootAmount = publicTableState?.config?.bootAmount || round?.bootAmount || 0;
   const roundAllowsLowBalanceView = round?.status === "active" || round?.status === "starting" || round?.status === "dealing";
@@ -1058,7 +1088,7 @@ export default function GameClient({
                 <div className="lobby-topbar__plate">
                   <div className="lobby-topbar__pod">
                     <strong className="lobby-topbar__name">
-                      {platformProfile?.username || "Player"}
+                      {displayedUsername}
                     </strong>
                   </div>
 
