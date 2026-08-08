@@ -432,47 +432,49 @@ export default function Seat({
           </div>
         ) : null}
 
-        {showHandLabel ? (
-          <div
-            className={`absolute left-1/2 z-[27] -translate-x-1/2 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[8px] font-black uppercase tracking-[0.14em] shadow-[0_8px_16px_rgba(0,0,0,0.24)] sm:text-[9px] ${
-              isUser ? "top-[calc(100%+4px)]" : "top-[calc(100%+12px)]"
-            } ${handLabelTone.className}`}
-          >
-            {handLabel}
-          </div>
-        ) : null}
-
-        {!seat.connected ? (
-          <div className={`absolute left-1/2 z-[26] -translate-x-1/2 ${layout.stateWrap}`}>
-            <div className="rounded-full border border-[#ffad9f]/30 bg-[rgba(87,20,20,0.88)] px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.18em] text-[#ffe0d6]">
-              OFFLINE
-            </div>
-          </div>
-        ) : null}
-
         {seat.seen && !seat.packed && !isUser ? (
           <div className="absolute left-1/2 top-[-10px] z-[26] -translate-x-1/2 rounded-full border border-[#fff0bc]/22 bg-[rgba(9,35,39,0.86)] px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.14em] text-[#fff2be]">
             Seen
           </div>
         ) : null}
 
-        {isWinner ? (
-          <div className={`absolute left-1/2 z-[26] -translate-x-1/2 rounded-full border border-[#ffe888]/40 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#5c3900] shadow-[0_10px_20px_rgba(0,0,0,0.28)] ${
-            isUser ? "top-[calc(100%+2px)]" : "top-[calc(100%+10px)]"
-          }`}>
-            Winner
-          </div>
-        ) : null}
-
-        {sideShowStatus ? (
+        {isWinner || showHandLabel || sideShowStatus || !seat.connected ? (
           <div
-            className={`absolute left-1/2 top-[calc(100%+10px)] z-[26] -translate-x-1/2 rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] ${
-              sideShowStatus === "WIN"
-                ? "bg-[#d9ff87] text-[#294400]"
-                : "bg-[#ff9e9e] text-[#651010]"
+            className={`pointer-events-none absolute left-1/2 z-[27] flex -translate-x-1/2 flex-col items-center gap-1 ${
+              isUser ? "top-[calc(100%+4px)]" : "top-[calc(100%+8px)]"
             }`}
           >
-            Side {sideShowStatus}
+            {isWinner ? (
+              <div className="whitespace-nowrap rounded-full border border-[#ffe888]/40 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#5c3900] shadow-[0_10px_20px_rgba(0,0,0,0.28)]">
+                Winner
+              </div>
+            ) : null}
+
+            {showHandLabel ? (
+              <div
+                className={`whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[8px] font-black uppercase tracking-[0.14em] shadow-[0_8px_16px_rgba(0,0,0,0.24)] sm:text-[9px] ${handLabelTone.className}`}
+              >
+                {handLabel}
+              </div>
+            ) : null}
+
+            {sideShowStatus ? (
+              <div
+                className={`whitespace-nowrap rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] ${
+                  sideShowStatus === "WIN"
+                    ? "bg-[#d9ff87] text-[#294400]"
+                    : "bg-[#ff9e9e] text-[#651010]"
+                }`}
+              >
+                Side {sideShowStatus}
+              </div>
+            ) : null}
+
+            {!seat.connected ? (
+              <div className="whitespace-nowrap rounded-full border border-[#ffad9f]/30 bg-[rgba(87,20,20,0.88)] px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.18em] text-[#ffe0d6]">
+                OFFLINE
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

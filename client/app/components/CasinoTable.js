@@ -181,11 +181,16 @@ export default function CasinoTable({
   isPrivateMode = false,
   isHost = false,
   canStartNextRound = true,
+  isPublicTable = false,
 }) {
   const [dismissedSideShowResultAt, setDismissedSideShowResultAt] = useState(null);
   const [dealerTipRoundId, setDealerTipRoundId] = useState("");
-  const [dealerTipAmount, setDealerTipAmount] = useState("");
+  const [dealerTipAmount, setDealerTipAmount] = useState("10");
   const [dealerTipError, setDealerTipError] = useState("");
+  const [midGameTipAmount, setMidGameTipAmount] = useState(10);
+  const [tipModalOpen, setTipModalOpen] = useState(false);
+  const [midGameTipSending, setMidGameTipSending] = useState(false);
+  const [midGameTipSuccess, setMidGameTipSuccess] = useState(null);
   const [dealFlightCards, setDealFlightCards] = useState([]);
   const [dealtCounts, setDealtCounts] = useState({});
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -339,7 +344,8 @@ export default function CasinoTable({
   }, [round?.id, round?.lastAction, round?.status, viewerSeat?.handLabel, viewerSeat?.id]);
 
   useEffect(() => {
-    if (!round?.id || isDealing || isStarting || round?.status !== "active") {
+    if (isPublicTable || !round?.id || isDealing || isStarting || round?.status !== "active") {
+      setHandIntroNotice(null);
       return undefined;
     }
 
@@ -357,7 +363,7 @@ export default function CasinoTable({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [isDealing, isStarting, round?.id, round?.status, viewerSeat?.handLabel]);
+  }, [isDealing, isPublicTable, isStarting, round?.id, round?.status, viewerSeat?.handLabel]);
 
   useEffect(() => {
     if (!isComplete) {
@@ -830,6 +836,27 @@ export default function CasinoTable({
 
               {showSharedJokersTray ? <SharedJokersTray sharedJokers={sharedJokers} /> : null}
 
+              <div className="casino-table-scene__dealer-tip-anchor pointer-events-auto absolute left-[calc(50%+54px)] top-[18.5%] z-[28] -translate-y-1/2 sm:left-[calc(50%+68px)]">
+                <button
+                  type="button"
+                  onClick={() => setTipModalOpen(true)}
+                  className="group relative flex items-center gap-1.5 rounded-full border border-[#ffe888]/60 bg-[linear-gradient(135deg,rgba(40,25,5,0.94)_0%,rgba(15,10,2,0.98)_100%)] px-2.5 py-1 text-white shadow-[0_4px_14px_rgba(0,0,0,0.5),0_0_12px_rgba(255,232,136,0.3)] transition-all duration-200 hover:scale-105 hover:border-[#ffe888] active:scale-95"
+                  title="Tip Dealer"
+                >
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full border border-[#ffe888]/80 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] text-[10px] shadow-sm">
+                    🪙
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <span className="text-[7.5px] font-black uppercase tracking-[0.14em] text-[#ffe888] sm:text-[8px]">
+                      TIP DEALER
+                    </span>
+                    <span className="text-[9px] font-extrabold text-[#fff7d6] sm:text-[10px]">
+                      ₹{midGameTipAmount}
+                    </span>
+                  </div>
+                </button>
+              </div>
+
               {(isStarting || isDealing) ? (
                 <div className="casino-table-scene__deck-layer pointer-events-none absolute inset-0 z-[25]">
                   <div className={`casino-table-scene__deck ${isStarting ? "is-shuffling" : "is-dealing"}`}>
@@ -1004,22 +1031,74 @@ export default function CasinoTable({
                         <label className="mb-2 block text-[12px] font-black uppercase tracking-[0.18em] text-white/82" htmlFor="dealer-tip-input">
                           Dealer&apos;s tip
                         </label>
-                        <input
-                          id="dealer-tip-input"
-                          className="w-full rounded-2xl border border-white/12 bg-white/8 px-4 py-2.5 text-base font-semibold text-white outline-none placeholder:text-white/50"
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          placeholder="Enter amount"
-                          value={activeDealerTipAmount}
-                          onChange={(event) => {
-                            setDealerTipRoundId(round?.id || "");
-                            setDealerTipError("");
-                            setDealerTipAmount(event.target.value.replace(/[^\d]/g, ""));
-                          }}
-                        />
-                        <span className="mt-2 block text-[13px] text-white/78">
-                          Leave blank to skip the tip automatically.
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDealerTipRoundId(round?.id || "");
+                              setDealerTipError("");
+                              const current = Number.parseInt(activeDealerTipAmount || "10", 10) || 10;
+                              setDealerTipAmount(String(Math.max(10, current - 10)));
+                            }}
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-lg font-black text-white hover:bg-white/20 active:scale-95 disabled:opacity-40"
+                            disabled={(Number.parseInt(activeDealerTipAmount || "10", 10) || 10) <= 10}
+                          >
+                            −
+                          </button>
+
+                          <input
+                            id="dealer-tip-input"
+                            className="w-full rounded-xl border border-white/12 bg-white/8 px-4 py-2 text-center text-lg font-black text-[#ffe888] outline-none placeholder:text-white/50"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            placeholder="10"
+                            value={activeDealerTipAmount || "10"}
+                            onChange={(event) => {
+                              setDealerTipRoundId(round?.id || "");
+                              setDealerTipError("");
+                              setDealerTipAmount(event.target.value.replace(/[^\d]/g, ""));
+                            }}
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDealerTipRoundId(round?.id || "");
+                              setDealerTipError("");
+                              const current = Number.parseInt(activeDealerTipAmount || "10", 10) || 10;
+                              setDealerTipAmount(String(current + 10));
+                            }}
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#ffe888]/40 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] text-lg font-black text-[#4a2e00] shadow-sm hover:brightness-110 active:scale-95"
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        <div className="mt-2.5 flex justify-center gap-1.5">
+                          {[10, 20, 50, 100].map((amt) => (
+                            <button
+                              key={amt}
+                              type="button"
+                              onClick={() => {
+                                setDealerTipRoundId(round?.id || "");
+                                setDealerTipError("");
+                                setDealerTipAmount(String(amt));
+                              }}
+                              className={`rounded-lg border px-2.5 py-1 text-[11px] font-black transition-all ${
+                                (activeDealerTipAmount || "10") === String(amt)
+                                  ? "border-[#ffe888] bg-[#ffe888] text-[#3a2200]"
+                                  : "border-white/12 bg-white/5 text-white/80 hover:border-white/25"
+                              }`}
+                            >
+                              ₹{amt}
+                            </button>
+                          ))}
+                        </div>
+
+                        <span className="mt-2 block text-center text-[11px] text-white/60">
+                          Increments in multiples of ₹10.
                         </span>
                         {activeDealerTipError ? (
                           <p className="mt-2 text-sm font-semibold text-[#ff9c9c]">{activeDealerTipError}</p>
@@ -1168,6 +1247,115 @@ export default function CasinoTable({
               <span className="mt-1 block text-[12px] text-white/74">
                 {waitingMessage}
               </span>
+            </div>
+          </div>
+        ) : null}
+
+        {midGameTipSuccess ? (
+          <div className="pointer-events-none fixed inset-x-0 top-16 z-[55] flex justify-center px-4">
+            <div className="rounded-full border border-[#ffe888]/40 bg-[linear-gradient(180deg,rgba(35,25,5,0.96),rgba(15,10,2,0.98))] px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-[#ffe888] shadow-lg">
+              {midGameTipSuccess}
+            </div>
+          </div>
+        ) : null}
+
+        {tipModalOpen ? (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+            <div className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-[#ffe888]/40 bg-[linear-gradient(180deg,rgba(20,28,32,0.98),rgba(8,12,15,0.99))] p-5 text-center shadow-[0_25px_60px_rgba(0,0,0,0.6)]">
+              <button
+                type="button"
+                onClick={() => setTipModalOpen(false)}
+                className="absolute right-3.5 top-3.5 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xs text-white/60 transition-colors hover:bg-white/15 hover:text-white"
+              >
+                ✕
+              </button>
+
+              <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full border-2 border-[#ffe888]/80 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] text-2xl shadow-[0_0_20px_rgba(255,232,136,0.4)]">
+                🪙
+              </div>
+
+              <h3 className="text-base font-black uppercase tracking-[0.16em] text-[#ffe888]">
+                Tip The Dealer
+              </h3>
+              <p className="mt-1 text-xs text-white/60">
+                Show appreciation to the dealer anytime
+              </p>
+
+              <div className="my-5 flex items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => setMidGameTipAmount((prev) => Math.max(10, prev - 10))}
+                  className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/15 bg-white/8 text-xl font-black text-white transition-transform active:scale-90 disabled:opacity-40"
+                  disabled={midGameTipAmount <= 10}
+                >
+                  −
+                </button>
+
+                <div className="min-w-[110px] rounded-2xl border border-[#ffe888]/30 bg-black/40 px-4 py-2">
+                  <span className="block text-[10px] font-black uppercase tracking-[0.16em] text-white/50">
+                    Tip Amount
+                  </span>
+                  <span className="text-2xl font-black text-[#ffe888]">
+                    ₹{midGameTipAmount}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setMidGameTipAmount((prev) => prev + 10)}
+                  className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#ffe888]/40 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] text-xl font-black text-[#4a2e00] shadow-md transition-transform active:scale-90"
+                >
+                  +
+                </button>
+              </div>
+
+              <div className="mb-5 flex justify-center gap-2">
+                {[10, 20, 50, 100].map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setMidGameTipAmount(amt)}
+                    className={`rounded-xl border px-3 py-1.5 text-xs font-black transition-all ${
+                      midGameTipAmount === amt
+                        ? "border-[#ffe888] bg-[#ffe888] text-[#3a2200]"
+                        : "border-white/12 bg-white/5 text-white/80 hover:border-white/30"
+                    }`}
+                  >
+                    ₹{amt}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTipModalOpen(false)}
+                  className="flex-1 rounded-2xl border border-white/12 bg-white/6 py-2.5 text-xs font-black uppercase tracking-[0.14em] text-white/80 transition-colors hover:bg-white/12"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  disabled={midGameTipSending}
+                  onClick={async () => {
+                    setMidGameTipSending(true);
+                    try {
+                      await onAction("dealer_tip", { amount: midGameTipAmount });
+                      setMidGameTipSuccess(`You tipped the dealer ₹${midGameTipAmount}!`);
+                      setTipModalOpen(false);
+                      setTimeout(() => setMidGameTipSuccess(null), 3000);
+                    } catch (err) {
+                      console.error(err);
+                    } finally {
+                      setMidGameTipSending(false);
+                    }
+                  }}
+                  className="flex-1 rounded-2xl border border-[#ffe888]/60 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] py-2.5 text-xs font-black uppercase tracking-[0.14em] text-[#4a2e00] shadow-[0_8px_20px_rgba(208,162,46,0.35)] transition-transform active:scale-95 disabled:opacity-60"
+                >
+                  {midGameTipSending ? "Sending..." : `Send Tip ₹${midGameTipAmount}`}
+                </button>
+              </div>
             </div>
           </div>
         ) : null}

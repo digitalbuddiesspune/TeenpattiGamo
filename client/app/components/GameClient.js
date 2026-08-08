@@ -1152,6 +1152,7 @@ export default function GameClient({
                 variant={publicTableState?.config?.variant || null}
                 variantState={round?.variantState || null}
                 chipBalance={displayedChipBalance || 0}
+                isPublicTable={isPublicTableView}
               />
 
               {round?.status === "active" && !waitingForSeat && userSeat ? (

@@ -889,12 +889,7 @@ internal class RoundTableService(
 
     private fun handleDealerTipAction(playerId: String, payload: Map<String, Any?>): Map<String, Any?> {
         val round = state.round
-        if (round == null || round.status != "complete" || round.dealerTipState?.pending != true) {
-            throw IllegalStateException("Dealer tip is not available right now.")
-        }
-        if (playerId != round.dealerTipState!!.winnerId) {
-            throw IllegalStateException("Only the winner can submit the dealer tip.")
-        }
+            ?: throw IllegalStateException("Dealer tip is not available right now.")
         val rawAmount = payload["amount"]
         if (rawAmount !is Number) {
             throw IllegalStateException("Dealer tip amount is required.")
@@ -903,15 +898,31 @@ internal class RoundTableService(
         if (dealerTip < 0) {
             throw IllegalStateException("Dealer tip cannot be negative.")
         }
-        if (dealerTip >= round.dealerTipState!!.winnerReceivableBeforeTip) {
-            throw IllegalStateException("Dealer tip must be less than the winning amount.")
+
+        if (round.status == "complete" && round.dealerTipState?.pending == true && playerId == round.dealerTipState!!.winnerId) {
+            if (dealerTip >= round.dealerTipState!!.winnerReceivableBeforeTip) {
+                throw IllegalStateException("Dealer tip must be less than the winning amount.")
+            }
+            val winnerIndex = indexOfSeat(round, playerId)
+            val winner = round.seats[winnerIndex]
+            val hand = Engine.evaluateSeatHand(winner, round, config)
+            val settlement = calculateSettlement(round, winner, dealerTip)
+            Engine.validateSettlementConsistency(round, settlement)
+            finalizeRoundSettlement(winner, hand, settlement)
+            persistState()
+            emitState("dealer_tip")
+            return getClientState(playerId)
         }
-        val winnerIndex = indexOfSeat(round, playerId)
-        val winner = round.seats[winnerIndex]
-        val hand = Engine.evaluateSeatHand(winner, round, config)
-        val settlement = calculateSettlement(round, winner, dealerTip)
-        Engine.validateSettlementConsistency(round, settlement)
-        finalizeRoundSettlement(winner, hand, settlement)
+
+        val actorIndex = indexOfSeat(round, playerId)
+        val actor = round.seats[actorIndex]
+        if (dealerTip > 0) {
+            if (actor.chips < dealerTip) {
+                throw IllegalStateException("Insufficient balance to tip dealer.")
+            }
+            actor.chips -= dealerTip
+            round.message = "${actor.name} tipped the dealer ₹${dealerTip}!"
+        }
         persistState()
         emitState("dealer_tip")
         return getClientState(playerId)
