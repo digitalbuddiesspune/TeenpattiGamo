@@ -975,6 +975,12 @@ export default function CasinoTable({
               {showRoundCompleteOverlay ? (
                 <div className="casino-table-scene__complete-shell pointer-events-none fixed inset-x-0 bottom-0 z-[34] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:pb-5">
                   <div className="casino-table-scene__complete-card pointer-events-auto flex w-full max-w-[22rem] flex-col items-center gap-3 rounded-[22px] border border-[#ffffff18] bg-[linear-gradient(180deg,rgba(7,44,48,0.48),rgba(3,16,19,0.58))] px-5 py-4 text-center shadow-[0_22px_40px_rgba(0,0,0,0.22)] backdrop-blur-[10px]">
+                    {!isQueuedSpectator && result?.potLimitReached ? (
+                      <div className="rounded-full border border-[#ffd08a]/35 bg-[rgba(88,52,18,0.88)] px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-[#ffe8bf]">
+                        Maximum pot amount reached
+                      </div>
+                    ) : null}
+
                     {!isQueuedSpectator && isWinningViewer ? (
                       <div className="rounded-full bg-[linear-gradient(180deg,#fff0a7_0%,#d1a22c_100%)] px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#4d2600]">
                         You won this round

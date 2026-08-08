@@ -378,7 +378,8 @@ internal class PublicBotDecisionEngine(
         if (seat.balance < amount) {
             return false
         }
-        return round.potAmount + amount <= config.maxPotAmount
+        val potRoom = maxOf(0, config.maxPotAmount - round.potAmount)
+        return potRoom > 0 && minOf(amount, potRoom) <= seat.balance
     }
 
     private fun hasAggressiveSignal(round: RoundState, botId: String): Boolean {

@@ -207,6 +207,10 @@ internal class RoundTableService(
         }
 
         val round = requireActiveRound()
+        if (isPotLimitReached(round)) {
+            finishRoundByPotLimit()
+            return getClientState(playerId)
+        }
         val actorIndex = indexOfSeat(round, playerId)
         val seat = round.seats[actorIndex]
         if (seat.packed) {
@@ -587,23 +591,47 @@ internal class RoundTableService(
         if (amount < minStakeFloor() || amount > config.maxStake * config.blindSeenMultiplier) {
             return false
         }
-        if (seat.balance < amount) {
-            return false
-        }
-        return round.potAmount + amount <= config.maxPotAmount
+        val payable = capContributionAmount(round, seat, amount)
+        return payable > 0
     }
 
     private fun quotePayableAmount(round: RoundState, seat: SeatState, amount: Int): Int {
         if (amount < minStakeFloor() || amount > config.maxStake * config.blindSeenMultiplier) {
             throw IllegalStateException("Stake is outside the table limits.")
         }
-        if (seat.balance < amount) {
-            throw IllegalStateException("Insufficient balance.")
-        }
-        if (round.potAmount + amount > config.maxPotAmount) {
+        val payable = capContributionAmount(round, seat, amount)
+        if (payable <= 0) {
             throw IllegalStateException("Maximum pot amount reached.")
         }
-        return amount
+        return payable
+    }
+
+    private fun remainingPotRoom(round: RoundState): Int = maxOf(0, config.maxPotAmount - round.potAmount)
+
+    private fun isPotLimitReached(round: RoundState): Boolean = round.potAmount >= config.maxPotAmount
+
+    private fun capContributionAmount(round: RoundState, seat: SeatState, requestedAmount: Int): Int {
+        val potRoom = remainingPotRoom(round)
+        if (potRoom <= 0) {
+            return 0
+        }
+        return minOf(requestedAmount, potRoom, seat.balance)
+    }
+
+    private fun finishRoundByPotLimit() {
+        val round = state.round ?: return
+        if (round.status != "active") {
+            return
+        }
+        val activeSeats = Engine.getActiveSeats(round)
+        when {
+            activeSeats.isEmpty() -> throw IllegalStateException("No active players remain.")
+            activeSeats.size == 1 -> finishRound(activeSeats.first(), "Maximum pot amount reached.", potLimitReached = true)
+            else -> {
+                val winner = Engine.resolveWinner(activeSeats, round, config)
+                finishRound(winner, "Maximum pot amount reached.", potLimitReached = true)
+            }
+        }
     }
 
     private fun canSee(round: RoundState): Boolean = !(round.variantState?.forceBlindActive == true)
@@ -738,15 +766,14 @@ internal class RoundTableService(
 
     private fun handleBet(seat: SeatState, actorIndex: Int, raise: Boolean) {
         val round = state.round!!
-        val amount = if (raise) Engine.getPlayerRaiseStake(round, seat, config) else Engine.getPlayerMinimumStake(round, seat, config)
-        if (amount < minStakeFloor() || amount > config.maxStake * config.blindSeenMultiplier) {
+        val requestedAmount = if (raise) Engine.getPlayerRaiseStake(round, seat, config) else Engine.getPlayerMinimumStake(round, seat, config)
+        if (requestedAmount < minStakeFloor() || requestedAmount > config.maxStake * config.blindSeenMultiplier) {
             throw IllegalStateException("Stake is outside the table limits.")
         }
-        if (seat.balance < amount) {
-            throw IllegalStateException("Insufficient balance.")
-        }
-        if (round.potAmount + amount > config.maxPotAmount) {
-            throw IllegalStateException("Maximum pot amount reached.")
+        val amount = capContributionAmount(round, seat, requestedAmount)
+        if (amount <= 0) {
+            finishRoundByPotLimit()
+            return
         }
         seat.balance -= amount
         seat.totalContributed += amount
@@ -758,6 +785,10 @@ internal class RoundTableService(
         syncBankrolls(round)
         logAction(seat.id, seat.lastAction!!.type, amount, "${seat.name} placed $amount.")
         round.message = seat.name + if (raise) " raised" else " matched" + " the stake."
+        if (isPotLimitReached(round)) {
+            finishRoundByPotLimit()
+            return
+        }
         advanceTurn(actorIndex)
         updateVariantProgressAfterTurn(round, seat.id)
     }
@@ -789,19 +820,18 @@ internal class RoundTableService(
             throw IllegalStateException("Sideshow is not allowed right now.")
         }
         val requestAmount = Engine.getPlayerMinimumStake(round, seat, config)
-        if (seat.balance < requestAmount) {
-            throw IllegalStateException("Insufficient balance.")
-        }
-        if (round.potAmount + requestAmount > config.maxPotAmount) {
-            throw IllegalStateException("Maximum pot amount reached.")
+        val amount = capContributionAmount(round, seat, requestAmount)
+        if (amount <= 0) {
+            finishRoundByPotLimit()
+            return
         }
         clearExpiredSideShowResult(round)
         val nowMs = clockProvider.now().toEpochMilli()
         val now = clockProvider.isoFromMillis(nowMs)
-        seat.balance -= requestAmount
-        seat.totalContributed += requestAmount
-        seat.lastAction = LastAction("sideshow-requested", requestAmount, now)
-        round.potAmount += requestAmount
+        seat.balance -= amount
+        seat.totalContributed += amount
+        seat.lastAction = LastAction("sideshow-requested", amount, now)
+        round.potAmount += amount
         syncBankrolls(round)
         val request = SideShowRequest()
         request.requesterId = seat.id
@@ -810,16 +840,20 @@ internal class RoundTableService(
         request.targetName = target.name
         request.requestedAt = now
         request.expiresAt = clockProvider.isoFromMillis(nowMs + config.turnDurationMs)
-        request.forcedRaiseAmount = requestAmount
+        request.forcedRaiseAmount = amount
         request.status = "pending"
         round.pendingSideShow = request
         round.message = "${seat.name} requested a side show with ${target.name}."
         logAction(
             seat.id,
             "sideshow-requested",
-            requestAmount,
-            "${seat.name} paid $requestAmount to request a side show against ${target.name}.",
+            amount,
+            "${seat.name} paid $amount to request a side show against ${target.name}.",
         )
+        if (isPotLimitReached(round)) {
+            round.pendingSideShow = null
+            finishRoundByPotLimit()
+        }
     }
 
     private fun handlePendingSideShowAction(round: RoundState, seat: SeatState, actorIndex: Int, type: String) {
@@ -843,23 +877,22 @@ internal class RoundTableService(
             throw IllegalStateException("Show is only allowed when two players remain.")
         }
         val showCost = Engine.getPlayerMinimumStake(round, seat, config)
-        if (seat.balance < showCost) {
-            throw IllegalStateException("Insufficient balance for show.")
+        val amount = capContributionAmount(round, seat, showCost)
+        if (amount <= 0) {
+            finishRoundByPotLimit()
+            return
         }
-        if (round.potAmount + showCost > config.maxPotAmount) {
-            throw IllegalStateException("Maximum pot amount reached.")
-        }
-        seat.balance -= showCost
-        seat.totalContributed += showCost
-        round.potAmount += showCost
+        seat.balance -= amount
+        seat.totalContributed += amount
+        round.potAmount += amount
         syncBankrolls(round)
         val opponent = Engine.getActiveSeats(round).first { it.id != seat.id }
         val winner = if (Engine.compareSeatHands(seat, opponent, round, config) > 0) seat else opponent
-        logAction(seat.id, "show", showCost, "${seat.name} called show.")
-        finishRound(winner, "Showdown complete.")
+        logAction(seat.id, "show", amount, "${seat.name} called show.")
+        finishRound(winner, if (isPotLimitReached(round)) "Maximum pot amount reached." else "Showdown complete.", potLimitReached = isPotLimitReached(round))
     }
 
-    private fun finishRound(winner: SeatState, reason: String) {
+    private fun finishRound(winner: SeatState, reason: String, potLimitReached: Boolean = false) {
         val round = state.round!!
         clearTimers()
         round.status = "complete"
@@ -869,6 +902,7 @@ internal class RoundTableService(
         val settlement = calculateSettlement(round, winner, 0)
         Engine.validateSettlementConsistency(round, settlement)
         round.result = buildRoundResult(winner, hand, reason, settlement, false)
+        round.result!!.potLimitReached = potLimitReached
         if (winner.isBot) {
             finalizeRoundSettlement(winner, hand, settlement)
         } else {
@@ -917,10 +951,11 @@ internal class RoundTableService(
         val actorIndex = indexOfSeat(round, playerId)
         val actor = round.seats[actorIndex]
         if (dealerTip > 0) {
-            if (actor.chips < dealerTip) {
+            if (actor.balance < dealerTip) {
                 throw IllegalStateException("Insufficient balance to tip dealer.")
             }
-            actor.chips -= dealerTip
+            actor.balance -= dealerTip
+            syncBankrolls(round)
             round.message = "${actor.name} tipped the dealer ₹${dealerTip}!"
         }
         persistState()

@@ -73,6 +73,7 @@ internal class RoundResult {
     var winnerReceivableBeforeTip: Int = 0
     var payout: Int = 0
     var reason: String? = null
+    var potLimitReached: Boolean = false
 }
 
 internal class DealerTipState {
