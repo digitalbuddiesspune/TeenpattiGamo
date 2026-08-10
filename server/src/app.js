@@ -5,6 +5,8 @@ const { connectMongo, getMongoClient } = require("./config/mongo");
 const teenPattiRoundsRouter = require("./routes/teenPattiRounds");
 const teenPattiRoundDetailRouter = require("./routes/teenPattiRoundDetail");
 const teenPattiEarningsSummaryRouter = require("./routes/teenPattiEarningsSummary");
+const adminAuthRouter = require("./routes/adminAuth");
+const adminProfitLossRouter = require("./routes/adminProfitLoss");
 
 const app = express();
 
@@ -35,6 +37,9 @@ app.use("/api/teen-patti", teenPattiRoundsRouter);
 app.use("/api/teen-patti", teenPattiRoundDetailRouter);
 app.use("/api/teen-patti", teenPattiEarningsSummaryRouter);
 
+app.use("/api/v1/admin/auth", adminAuthRouter);
+app.use("/api/v1/admin/profit-loss", adminProfitLossRouter);
+
 app.use((request, response) => {
   response.status(404).json({
     error: {
@@ -48,7 +53,7 @@ app.use((error, _request, response, _next) => {
   const statusCode = error.statusCode || 500;
   response.status(statusCode).json({
     error: {
-      code: statusCode === 400 ? "bad_request" : "internal_server_error",
+      code: statusCode === 400 ? "bad_request" : statusCode === 401 ? "unauthorized" : statusCode === 404 ? "not_found" : "internal_server_error",
       message: error.message || "Unexpected server error.",
     },
   });

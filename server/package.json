@@ -1,7 +1,7 @@
 {
   "name": "teen-patti-round-history-api",
   "version": "1.0.0",
-  "description": "Node API for paginated Teen Patti round history.",
+  "description": "Node admin + round history API for Teen Patti (separate from the game backend).",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

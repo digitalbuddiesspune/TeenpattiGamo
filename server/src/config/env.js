@@ -3,7 +3,14 @@ const path = require("path");
 
 dotenv.config();
 if (!process.env.MONGODB_URI) {
-  dotenv.config({ path: path.resolve(__dirname, "../../../serverJavaNew/.env") });
+  // Pull DB settings from the game backend env without adopting its PORT.
+  const gameEnv = dotenv.config({
+    path: path.resolve(__dirname, "../../../serverJavaNew/.env"),
+    override: false,
+  });
+  const shared = gameEnv.parsed || {};
+  process.env.MONGODB_URI ||= shared.MONGODB_URI;
+  process.env.MONGODB_DB_NAME ||= shared.MONGODB_DB_NAME;
 }
 
 const toInteger = (value, fallback) => {
@@ -16,6 +23,10 @@ const config = {
   corsOrigin: process.env.CORS_ORIGIN || "*",
   mongoUri: process.env.MONGODB_URI,
   mongoDbName: process.env.MONGODB_DB_NAME || "teen_patti_casino",
+  adminEmail: process.env.ADMIN_EMAIL || "admin@gmail.com",
+  adminPassword: process.env.ADMIN_PASSWORD || "admin123",
+  adminDisplayName: process.env.ADMIN_DISPLAY_NAME || "Teen Patti Admin",
+  adminSessionTtlMs: toInteger(process.env.ADMIN_SESSION_TTL_MS, 1000 * 60 * 60 * 12),
 };
 
 if (!config.mongoUri) {
