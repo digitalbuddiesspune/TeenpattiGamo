@@ -2,11 +2,14 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import PlayingCard from "./PlayingCard";
 import Seat from "./Seat";
+import TableCelebration from "./TableCelebration";
 
 const DEAL_SEQUENCE_ORDER = [2, 3, 4, 0, 1];
 const FALLBACK_DEALING_WINDOW_MS = 1800;
 const POT_PAYOUT_DURATION_MS = 2800;
 const POT_CHIP_COUNT = 8;
+const CHIP_TRANSFER_COUNT = 5;
+const CHIP_TRANSFER_DURATION_MS = 1800;
 const CELEBRATION_DURATION_MS = 5000;
 
 function HiddenDealCard({ className = "" }) {
@@ -26,6 +29,29 @@ function getRelativeCenter(rect, surfaceRect) {
     x: rect.left - surfaceRect.left + (rect.width / 2),
     y: rect.top - surfaceRect.top + (rect.height / 2),
   };
+}
+
+function buildChipFlightsBetweenPoints(startCenter, targetCenter, idPrefix, amount, amountPrefix = "+") {
+  return Array.from({ length: CHIP_TRANSFER_COUNT }, (_, index) => {
+    const spread = (index - (CHIP_TRANSFER_COUNT - 1) / 2) * 10;
+    const deltaX = targetCenter.x - startCenter.x + spread;
+    const deltaY = targetCenter.y - startCenter.y + (index % 2 === 0 ? -6 : 6);
+
+    return {
+      id: `${idPrefix}-${index}`,
+      startX: startCenter.x,
+      startY: startCenter.y,
+      deltaX,
+      deltaY,
+      midX: deltaX * 0.45,
+      midY: deltaY * 0.35 - 40,
+      delayMs: index * 100,
+      durationMs: CHIP_TRANSFER_DURATION_MS,
+      showAmount: index === Math.floor(CHIP_TRANSFER_COUNT / 2),
+      amount,
+      amountPrefix,
+    };
+  });
 }
 
 function getClockwiseSeatOrder(seats = []) {
@@ -176,6 +202,7 @@ export default function CasinoTable({
   variantState,
   variant,
   chipBalance = 0,
+  maxPotAmount = 0,
   roomCode = "",
   roomName = "",
   isPrivateMode = false,
@@ -185,14 +212,13 @@ export default function CasinoTable({
 }) {
   const [dismissedSideShowResultAt, setDismissedSideShowResultAt] = useState(null);
   const [midGameTipAmount, setMidGameTipAmount] = useState(10);
-  const [tipModalOpen, setTipModalOpen] = useState(false);
   const [midGameTipSending, setMidGameTipSending] = useState(false);
-  const [midGameTipSuccess, setMidGameTipSuccess] = useState(null);
   const [dealFlightCards, setDealFlightCards] = useState([]);
   const [dealtCounts, setDealtCounts] = useState({});
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [revealedCompleteRoundId, setRevealedCompleteRoundId] = useState(null);
   const [potPayoutFlights, setPotPayoutFlights] = useState([]);
+  const [chipTransferFlights, setChipTransferFlights] = useState([]);
   const [potCollected, setPotCollected] = useState(false);
   const [potTransferring, setPotTransferring] = useState(false);
   const [celebrateWin, setCelebrateWin] = useState(false);
@@ -204,6 +230,7 @@ export default function CasinoTable({
   const dealTimersRef = useRef([]);
   const potPayoutRoundIdRef = useRef("");
   const celebrationRoundIdRef = useRef("");
+  const chipTransferKeyRef = useRef("");
   const activeDealAnimationKeyRef = useRef("");
   const lastNotifiedActionRef = useRef("");
   const isStarting = round?.status === "starting";
@@ -225,15 +252,38 @@ export default function CasinoTable({
   const viewerReady = Boolean(nextRoundState?.viewerAccepted);
   const isQueuedSpectator = waitingForSeat;
   const showHostStartAction = isPrivateMode && isHost && !isQueuedSpectator;
+  const potLimitReachedFromResult = Boolean(result?.potLimitReached);
+  const potLimitReachedFromPot =
+    isComplete &&
+    maxPotAmount > 0 &&
+    typeof round?.potAmount === "number" &&
+    round.potAmount >= maxPotAmount;
+  const potLimitReachedFromMessage = /maximum pot amount reached/i.test(
+    `${result?.reason || ""} ${round?.message || ""}`,
+  );
+  const potLimitReached =
+    potLimitReachedFromResult || potLimitReachedFromPot || potLimitReachedFromMessage;
   const isHoldingRoundCompleteOverlay =
     isComplete &&
-    revealedCompleteRoundId !== round?.id;
+    revealedCompleteRoundId !== round?.id &&
+    !potLimitReached;
   const showRoundCompleteOverlay =
     isComplete &&
     (result || isQueuedSpectator) &&
     !isHoldingRoundCompleteOverlay &&
     !(viewerReady && nextRoundDecision?.expired);
   const finalPayout = typeof result?.payout === "number" ? result.payout : 0;
+  const roundPotAmount = typeof round?.potAmount === "number" ? round.potAmount : 0;
+  const winnerDisplayName =
+    tableSeats?.find((seat) => seat.id === result?.winnerId)?.name ||
+    result?.winnerName ||
+    "Winner";
+  const displayPotWinAmount = roundPotAmount > 0 ? roundPotAmount : finalPayout;
+  const roundWinSummary = result
+    ? displayPotWinAmount > 0
+      ? `${winnerDisplayName} won ₹${displayPotWinAmount.toLocaleString("en-IN")} with ${result.winningHand}.`
+      : `${winnerDisplayName} won with ${result.winningHand}.`
+    : "";
   const pendingSideShowSeconds = pendingSideShow?.expiresAt
     ? Math.max(0, Math.ceil((new Date(pendingSideShow.expiresAt).getTime() - nowMs) / 1000))
     : 0;
@@ -272,6 +322,62 @@ export default function CasinoTable({
     }
 
     seatAnchorRef.current.delete(seatId);
+  }, []);
+
+  const launchChipTransferToPot = useCallback((fromSeatId, amount, dedupeKey) => {
+    if (!fromSeatId || chipTransferKeyRef.current === dedupeKey) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let retryTimer = null;
+    let clearTimer = null;
+
+    const startFlight = (attempt = 0) => {
+      if (cancelled) {
+        return;
+      }
+
+      const surface = surfaceRef.current;
+      const potNode = potRef.current;
+      const fromNode = seatAnchorRef.current.get(fromSeatId);
+
+      if (!surface || !potNode || !fromNode) {
+        if (attempt < 30) {
+          retryTimer = window.setTimeout(() => startFlight(attempt + 1), 50);
+        }
+        return;
+      }
+
+      chipTransferKeyRef.current = dedupeKey;
+      const surfaceRect = surface.getBoundingClientRect();
+      const fromCenter = getRelativeCenter(fromNode.getBoundingClientRect(), surfaceRect);
+      const potCenter = getRelativeCenter(potNode.getBoundingClientRect(), surfaceRect);
+      const flights = buildChipFlightsBetweenPoints(
+        fromCenter,
+        potCenter,
+        dedupeKey,
+        amount,
+        "-",
+      );
+
+      setChipTransferFlights(flights);
+      clearTimer = window.setTimeout(() => {
+        setChipTransferFlights([]);
+      }, CHIP_TRANSFER_DURATION_MS + CHIP_TRANSFER_COUNT * 100 + 240);
+    };
+
+    startFlight();
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) {
+        window.clearTimeout(retryTimer);
+      }
+      if (clearTimer) {
+        window.clearTimeout(clearTimer);
+      }
+    };
   }, []);
 
   useEffect(() => () => {
@@ -332,13 +438,32 @@ export default function CasinoTable({
   }, [round?.id, round?.lastAction, round?.status, viewerSeat?.id]);
 
   useEffect(() => {
+    if (round?.status !== "active") {
+      return undefined;
+    }
+
+    const lastAction = round?.lastAction;
+    const actionType = String(lastAction?.actionType || "").toLowerCase();
+    if (!lastAction?.playerId || actionType !== "raise" || lastAction.playerId !== viewerSeat?.id) {
+      return undefined;
+    }
+
+    const actionKey = `${round.id}:${lastAction.id || lastAction.timestamp || ""}:${lastAction.playerId}:chip-transfer`;
+    const amount = typeof lastAction.amount === "number" ? lastAction.amount : 0;
+
+    return launchChipTransferToPot(viewerSeat.id, amount, actionKey);
+  }, [launchChipTransferToPot, round?.id, round?.lastAction, round?.status, viewerSeat?.id]);
+
+  useEffect(() => {
     if (!isComplete) {
       setPotPayoutFlights([]);
+      setChipTransferFlights([]);
       setPotCollected(false);
       setPotTransferring(false);
       setCelebrateWin(false);
       potPayoutRoundIdRef.current = "";
       celebrationRoundIdRef.current = "";
+      chipTransferKeyRef.current = "";
       return undefined;
     }
 
@@ -676,6 +801,28 @@ export default function CasinoTable({
     await onDeclineNextRound();
   }
 
+  async function handleSendTip() {
+    if (midGameTipSending) {
+      return;
+    }
+
+    setMidGameTipSending(true);
+    try {
+      await onAction("dealer_tip", { amount: midGameTipAmount });
+      if (viewerSeat?.id) {
+        launchChipTransferToPot(
+          viewerSeat.id,
+          midGameTipAmount,
+          `tip-${round?.id || "table"}-${Date.now()}`,
+        );
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setMidGameTipSending(false);
+    }
+  }
+
   return (
     <section className="casino-table-scene relative h-dvh overflow-hidden bg-black text-white">
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
@@ -683,32 +830,7 @@ export default function CasinoTable({
       </div>
 
       {celebrateWin ? (
-        <div className="casino-table-scene__celebration pointer-events-none fixed inset-0 z-[55]" aria-hidden="true">
-          <div className="casino-table-scene__celebration-veil" />
-          <div className="casino-table-scene__celebration-burst" />
-          <div className="casino-table-scene__celebration-banner">
-            <strong>You Win!</strong>
-          </div>
-          {Array.from({ length: 36 }, (_, index) => (
-            <span
-              key={`confetti-${index}`}
-              className="casino-table-scene__confetti"
-              style={{
-                left: `${4 + (index * 29) % 92}%`,
-                animationDelay: `${(index % 10) * 110}ms`,
-                animationDuration: `${2200 + (index % 6) * 280}ms`,
-                background: [
-                  "#ffd56a",
-                  "#ff7a59",
-                  "#7ef0e4",
-                  "#fff1b0",
-                  "#ff9f43",
-                  "#9bffb0",
-                ][index % 6],
-              }}
-            />
-          ))}
-        </div>
+        <TableCelebration title="You Win!" tone="win" />
       ) : null}
 
       <div className="casino-table-scene__page relative z-[20] mx-auto h-dvh w-full max-w-none overflow-x-hidden overflow-y-auto overscroll-y-contain">
@@ -740,25 +862,53 @@ export default function CasinoTable({
                 <InfoBadge label="Variant" value={variant?.label || "Teen Patti"} tone="red" />
               </div>
 
-              <div className="pointer-events-auto absolute left-1/2 top-1/2 z-[2] -translate-x-1/2 -translate-y-1/2">
-                <button
-                  type="button"
-                  onClick={() => setTipModalOpen(true)}
-                  className="group relative flex items-center gap-1.5 rounded-full border border-[#ffe888]/60 bg-[linear-gradient(135deg,rgba(40,25,5,0.94)_0%,rgba(15,10,2,0.98)_100%)] px-2.5 py-1 text-white shadow-[0_4px_14px_rgba(0,0,0,0.5),0_0_12px_rgba(255,232,136,0.3)] transition-all duration-200 hover:scale-105 hover:border-[#ffe888] active:scale-95 sm:px-3 sm:py-1.5"
-                  title="Tip Dealer"
-                >
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full border border-[#ffe888]/80 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] text-[10px] shadow-sm sm:h-6 sm:w-6 sm:text-[11px]">
-                    🪙
-                  </div>
-                  <div className="flex flex-col text-left">
-                    <span className="text-[7.5px] font-black uppercase tracking-[0.14em] text-[#ffe888] sm:text-[8px]">
-                      TIP DEALER
-                    </span>
-                    <span className="text-[9px] font-extrabold text-[#fff7d6] sm:text-[10px]">
-                      ₹{midGameTipAmount}
-                    </span>
-                  </div>
-                </button>
+              <div
+                className="pointer-events-auto absolute left-1/2 top-1/2 z-[2] -translate-x-1/2 -translate-y-1/2"
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                <div className="flex items-center gap-0.5 rounded-full border border-[#ffe888]/60 bg-[linear-gradient(135deg,rgba(40,25,5,0.94)_0%,rgba(15,10,2,0.98)_100%)] p-0.5 text-white shadow-[0_4px_14px_rgba(0,0,0,0.5),0_0_12px_rgba(255,232,136,0.3)] sm:gap-1 sm:p-1">
+                  <button
+                    type="button"
+                    onClick={() => setMidGameTipAmount((prev) => Math.max(10, prev - 10))}
+                    disabled={midGameTipAmount <= 10 || midGameTipSending}
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/8 text-sm font-black text-white transition-transform active:scale-90 disabled:opacity-40 sm:h-8 sm:w-8 sm:text-base"
+                    aria-label="Decrease tip amount"
+                  >
+                    −
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleSendTip();
+                    }}
+                    disabled={midGameTipSending}
+                    className="group flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded-full px-2 py-1 transition-all duration-200 hover:bg-white/6 active:scale-95 disabled:opacity-70 sm:min-w-[8.5rem] sm:px-2.5 sm:py-1.5"
+                    title="Tip Dealer"
+                  >
+                    <div className="flex h-5 w-5 items-center justify-center rounded-full border border-[#ffe888]/80 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] text-[10px] shadow-sm sm:h-6 sm:w-6 sm:text-[11px]">
+                      🪙
+                    </div>
+                    <div className="flex flex-col text-left">
+                      <span className="text-[7.5px] font-black uppercase tracking-[0.14em] text-[#ffe888] sm:text-[8px]">
+                        {midGameTipSending ? "Sending..." : "Tip Dealer"}
+                      </span>
+                      <span className="text-[9px] font-extrabold text-[#fff7d6] sm:text-[10px]">
+                        ₹{midGameTipAmount}
+                      </span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMidGameTipAmount((prev) => prev + 10)}
+                    disabled={midGameTipSending}
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#ffe888]/40 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] text-sm font-black text-[#4a2e00] shadow-sm transition-transform active:scale-90 disabled:opacity-40 sm:h-8 sm:w-8 sm:text-base"
+                    aria-label="Increase tip amount"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
 
               <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
@@ -887,9 +1037,9 @@ export default function CasinoTable({
                 </strong>
               </div>
 
-              {potPayoutFlights.length > 0 ? (
+              {(potPayoutFlights.length > 0 || chipTransferFlights.length > 0) ? (
                 <div className="casino-table-scene__pot-flight-layer pointer-events-none absolute inset-0 z-[35]">
-                  {potPayoutFlights.map((flight) => (
+                  {[...chipTransferFlights, ...potPayoutFlights].map((flight) => (
                     <div
                       key={flight.id}
                       className="casino-table-scene__pot-flight"
@@ -911,11 +1061,11 @@ export default function CasinoTable({
                         height={30}
                         aria-hidden="true"
                         className="object-contain drop-shadow-[0_10px_16px_rgba(0,0,0,0.35)]"
-                        style={{ width: 34, height: "auto" }}
+                        style={{ width: flight.amountPrefix === "-" ? 28 : 34, height: "auto" }}
                       />
                       {flight.showAmount && flight.amount > 0 ? (
                         <strong className="casino-table-scene__pot-flight-amount">
-                          +{flight.amount.toLocaleString("en-IN")}
+                          {flight.amountPrefix || "+"}{flight.amount.toLocaleString("en-IN")}
                         </strong>
                       ) : null}
                     </div>
@@ -926,87 +1076,115 @@ export default function CasinoTable({
               {showRoundCompleteOverlay ? (
                 <div className="casino-table-scene__complete-shell pointer-events-none fixed inset-x-0 bottom-0 z-[34] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:pb-5">
                   <div className="casino-table-scene__complete-card pointer-events-auto flex w-full max-w-[22rem] flex-col items-center gap-3 rounded-[22px] border border-[#ffffff18] bg-[linear-gradient(180deg,rgba(7,44,48,0.48),rgba(3,16,19,0.58))] px-5 py-4 text-center shadow-[0_22px_40px_rgba(0,0,0,0.22)] backdrop-blur-[10px]">
-                    {!isQueuedSpectator && result?.potLimitReached ? (
-                      <div className="rounded-full border border-[#ffd08a]/35 bg-[rgba(88,52,18,0.88)] px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-[#ffe8bf]">
-                        Maximum pot amount reached
-                      </div>
-                    ) : null}
+                    {potLimitReached && !isQueuedSpectator ? (
+                      <>
+                        <div>
+                          <strong className="block text-lg font-black text-[#ffe8bf] sm:text-xl">
+                            Pot Limit Reached. No More Rounds.
+                          </strong>
+                          <span className="mt-1.5 block text-sm font-medium text-white/86 sm:text-[15px]">
+                            {roundWinSummary}
+                          </span>
+                        </div>
 
-                    <div>
-                      <strong className="block text-lg font-black text-white sm:text-xl">
-                        {isQueuedSpectator
-                          ? (isPrivateMode ? "Waiting to join next round" : "You are in for the next round")
-                          : isWinningViewer
-                            ? (isPrivateMode && isHost ? "Start next round?" : "Play next round?")
-                            : isPrivateMode && isHost
-                              ? "Start another round?"
-                              : "Play another round?"}
-                      </strong>
-                      <span className="mt-1.5 block text-sm font-medium text-white/86 sm:text-[15px]">
-                        {isQueuedSpectator
-                          ? `You will be seated automatically as soon as the ${isPrivateMode ? "host starts" : "next"} round begins.`
-                          : isWinningViewer
-                            ? viewerReady
-                              ? (isPrivateMode
-                                  ? (isHost
-                                      ? (canStartNextRound
-                                          ? "Everyone is ready. Start the next round when you want."
-                                          : "Wait for another player to join or get ready before starting the next round.")
-                                      : "You are ready for the host to start the next round.")
-                                  : "You are in for the next round.")
-                              : (round?.message || "").trim()
-                            : viewerReady
-                              ? (isPrivateMode
-                                  ? (isHost
-                                      ? (canStartNextRound
-                                          ? "Everyone is ready. Start the next round when you want."
-                                          : "Wait for another player to join or get ready before starting the next round.")
-                                      : "You are ready. Waiting for the host to start the next round.")
-                                  : "You are in for the next round.")
-                              : round?.message || `${result.winnerName} won with ${result.winningHand}.`}
-                      </span>
-                    </div>
+                        {isWinningViewer && finalPayout > 0 ? (
+                          <div className="rounded-full border border-[#3be7de]/24 bg-black/22 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[#a6fff2]">
+                            {finalPayout !== displayPotWinAmount
+                              ? `You receive ₹${finalPayout.toLocaleString("en-IN")} after commission`
+                              : `Final payout ₹${finalPayout.toLocaleString("en-IN")}`}
+                          </div>
+                        ) : null}
 
-                    {!isQueuedSpectator && isWinningViewer && finalPayout > 0 ? (
-                      <div className="rounded-full border border-[#3be7de]/24 bg-black/22 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[#a6fff2]">
-                        Final payout {finalPayout.toLocaleString("en-IN")}
-                      </div>
-                    ) : null}
-
-                    <div className="rounded-full border border-white/12 bg-white/8 px-4 py-2 text-[13px] font-bold uppercase tracking-[0.14em] text-white/90">
-                      {isPrivateMode
-                        ? isQueuedSpectator
-                          ? "Waiting for host"
-                          : isHost
-                            ? (canStartNextRound ? "Start when ready" : "Waiting for players")
-                            : viewerReady
-                              ? "Waiting for host"
-                              : "Ready up"
-                        : viewerReady || isQueuedSpectator
-                          ? `Round will begin in ${nextRoundDecision?.secondsRemaining ?? 0}s`
-                          : `${nextRoundDecision?.secondsRemaining ?? 0}s to decide`}
-                    </div>
-
-                    {isQueuedSpectator || (viewerReady && !showHostStartAction) ? null : (
-                      <div className="flex flex-wrap justify-center gap-2">
-                        <ActionPillButton
-                          tone="green"
-                          onClick={() => {
-                            void handleNextRoundAccept();
-                          }}
-                          disabled={acting || (isPrivateMode && isHost && !canStartNextRound)}
-                        >
-                          {isPrivateMode && isHost ? "Start" : "Play"}
-                        </ActionPillButton>
                         <ActionPillButton
                           onClick={() => {
-                            void handleNextRoundDecline();
+                            void onExitTable();
                           }}
                           disabled={acting}
                         >
-                          No
+                          Leave Table
                         </ActionPillButton>
-                      </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <strong className="block text-lg font-black text-white sm:text-xl">
+                            {isQueuedSpectator
+                              ? (isPrivateMode ? "Waiting to join next round" : "You are in for the next round")
+                              : isWinningViewer
+                                ? (isPrivateMode && isHost ? "Start next round?" : "Play next round?")
+                                : isPrivateMode && isHost
+                                  ? "Start another round?"
+                                  : "Play another round?"}
+                          </strong>
+                          <span className="mt-1.5 block text-sm font-medium text-white/86 sm:text-[15px]">
+                            {isQueuedSpectator
+                              ? `You will be seated automatically as soon as the ${isPrivateMode ? "host starts" : "next"} round begins.`
+                              : isWinningViewer
+                                ? viewerReady
+                                  ? (isPrivateMode
+                                      ? (isHost
+                                          ? (canStartNextRound
+                                              ? "Everyone is ready. Start the next round when you want."
+                                              : "Wait for another player to join or get ready before starting the next round.")
+                                          : "You are ready for the host to start the next round.")
+                                      : "You are in for the next round.")
+                                  : roundWinSummary
+                                : viewerReady
+                                  ? (isPrivateMode
+                                      ? (isHost
+                                          ? (canStartNextRound
+                                              ? "Everyone is ready. Start the next round when you want."
+                                              : "Wait for another player to join or get ready before starting the next round.")
+                                          : "You are ready. Waiting for the host to start the next round.")
+                                      : "You are in for the next round.")
+                                  : roundWinSummary}
+                          </span>
+                        </div>
+
+                        {!isQueuedSpectator && isWinningViewer && finalPayout > 0 ? (
+                          <div className="rounded-full border border-[#3be7de]/24 bg-black/22 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[#a6fff2]">
+                            {finalPayout !== displayPotWinAmount
+                              ? `You receive ₹${finalPayout.toLocaleString("en-IN")} after commission`
+                              : `Final payout ₹${finalPayout.toLocaleString("en-IN")}`}
+                          </div>
+                        ) : null}
+
+                        <div className="rounded-full border border-white/12 bg-white/8 px-4 py-2 text-[13px] font-bold uppercase tracking-[0.14em] text-white/90">
+                          {isPrivateMode
+                            ? isQueuedSpectator
+                              ? "Waiting for host"
+                              : isHost
+                                ? (canStartNextRound ? "Start when ready" : "Waiting for players")
+                                : viewerReady
+                                  ? "Waiting for host"
+                                  : "Ready up"
+                            : viewerReady || isQueuedSpectator
+                              ? `Round will begin in ${nextRoundDecision?.secondsRemaining ?? 0}s`
+                              : `${nextRoundDecision?.secondsRemaining ?? 0}s to decide`}
+                        </div>
+
+                        {isQueuedSpectator || (viewerReady && !showHostStartAction) ? null : (
+                          <div className="flex flex-wrap justify-center gap-2">
+                            <ActionPillButton
+                              tone="green"
+                              onClick={() => {
+                                void handleNextRoundAccept();
+                              }}
+                              disabled={acting || (isPrivateMode && isHost && !canStartNextRound)}
+                            >
+                              {isPrivateMode && isHost ? "Start" : "Play"}
+                            </ActionPillButton>
+                            <ActionPillButton
+                              onClick={() => {
+                                void handleNextRoundDecline();
+                              }}
+                              disabled={acting}
+                            >
+                              No
+                            </ActionPillButton>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1114,115 +1292,6 @@ export default function CasinoTable({
               <span className="mt-1 block text-[12px] text-white/74">
                 {waitingMessage}
               </span>
-            </div>
-          </div>
-        ) : null}
-
-        {midGameTipSuccess ? (
-          <div className="pointer-events-none fixed inset-x-0 top-16 z-[55] flex justify-center px-4">
-            <div className="rounded-full border border-[#ffe888]/40 bg-[linear-gradient(180deg,rgba(35,25,5,0.96),rgba(15,10,2,0.98))] px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-[#ffe888] shadow-lg">
-              {midGameTipSuccess}
-            </div>
-          </div>
-        ) : null}
-
-        {tipModalOpen ? (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
-            <div className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-[#ffe888]/40 bg-[linear-gradient(180deg,rgba(20,28,32,0.98),rgba(8,12,15,0.99))] p-5 text-center shadow-[0_25px_60px_rgba(0,0,0,0.6)]">
-              <button
-                type="button"
-                onClick={() => setTipModalOpen(false)}
-                className="absolute right-3.5 top-3.5 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xs text-white/60 transition-colors hover:bg-white/15 hover:text-white"
-              >
-                ✕
-              </button>
-
-              <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full border-2 border-[#ffe888]/80 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] text-2xl shadow-[0_0_20px_rgba(255,232,136,0.4)]">
-                🪙
-              </div>
-
-              <h3 className="text-base font-black uppercase tracking-[0.16em] text-[#ffe888]">
-                Tip The Dealer
-              </h3>
-              <p className="mt-1 text-xs text-white/60">
-                Show appreciation to the dealer anytime
-              </p>
-
-              <div className="my-5 flex items-center justify-center gap-4">
-                <button
-                  type="button"
-                  onClick={() => setMidGameTipAmount((prev) => Math.max(10, prev - 10))}
-                  className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/15 bg-white/8 text-xl font-black text-white transition-transform active:scale-90 disabled:opacity-40"
-                  disabled={midGameTipAmount <= 10}
-                >
-                  −
-                </button>
-
-                <div className="min-w-[110px] rounded-2xl border border-[#ffe888]/30 bg-black/40 px-4 py-2">
-                  <span className="block text-[10px] font-black uppercase tracking-[0.16em] text-white/50">
-                    Tip Amount
-                  </span>
-                  <span className="text-2xl font-black text-[#ffe888]">
-                    ₹{midGameTipAmount}
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setMidGameTipAmount((prev) => prev + 10)}
-                  className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#ffe888]/40 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] text-xl font-black text-[#4a2e00] shadow-md transition-transform active:scale-90"
-                >
-                  +
-                </button>
-              </div>
-
-              <div className="mb-5 flex justify-center gap-2">
-                {[10, 20, 50, 100].map((amt) => (
-                  <button
-                    key={amt}
-                    type="button"
-                    onClick={() => setMidGameTipAmount(amt)}
-                    className={`rounded-xl border px-3 py-1.5 text-xs font-black transition-all ${
-                      midGameTipAmount === amt
-                        ? "border-[#ffe888] bg-[#ffe888] text-[#3a2200]"
-                        : "border-white/12 bg-white/5 text-white/80 hover:border-white/30"
-                    }`}
-                  >
-                    ₹{amt}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setTipModalOpen(false)}
-                  className="flex-1 rounded-2xl border border-white/12 bg-white/6 py-2.5 text-xs font-black uppercase tracking-[0.14em] text-white/80 transition-colors hover:bg-white/12"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  disabled={midGameTipSending}
-                  onClick={async () => {
-                    setMidGameTipSending(true);
-                    try {
-                      await onAction("dealer_tip", { amount: midGameTipAmount });
-                      setMidGameTipSuccess(`You tipped the dealer ₹${midGameTipAmount}!`);
-                      setTipModalOpen(false);
-                      setTimeout(() => setMidGameTipSuccess(null), 3000);
-                    } catch (err) {
-                      console.error(err);
-                    } finally {
-                      setMidGameTipSending(false);
-                    }
-                  }}
-                  className="flex-1 rounded-2xl border border-[#ffe888]/60 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] py-2.5 text-xs font-black uppercase tracking-[0.14em] text-[#4a2e00] shadow-[0_8px_20px_rgba(208,162,46,0.35)] transition-transform active:scale-95 disabled:opacity-60"
-                >
-                  {midGameTipSending ? "Sending..." : `Send Tip ₹${midGameTipAmount}`}
-                </button>
-              </div>
             </div>
           </div>
         ) : null}

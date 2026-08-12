@@ -1013,17 +1013,12 @@ export default function GameClient({
     selectedStake,
   });
 
-  const handleAdjustStake = useCallback((direction) => {
-    const { selectedIndex, stakeOptions } = stakeControlState;
-
-    if (!stakeOptions.length) {
+  const handleSelectStake = useCallback((stake) => {
+    if (!Number.isFinite(stake) || stake <= 0) {
       return;
     }
-
-    const fallbackIndex = selectedIndex === -1 ? 0 : selectedIndex;
-    const nextIndex = Math.max(0, Math.min(stakeOptions.length - 1, fallbackIndex + direction));
-    setSelectedStake(stakeOptions[nextIndex]);
-  }, [stakeControlState]);
+    setSelectedStake(stake);
+  }, []);
 
   function handleSelectVariant(variantId) {
     try {
@@ -1179,6 +1174,7 @@ export default function GameClient({
                 variant={publicTableState?.config?.variant || null}
                 variantState={round?.variantState || null}
                 chipBalance={displayedChipBalance || 0}
+                maxPotAmount={publicTableState?.config?.maxPotAmount || 0}
                 isPublicTable={isPublicTableView}
               />
 
@@ -1190,7 +1186,7 @@ export default function GameClient({
                   acting={activeActing}
                   onAction={handleGameplayAction}
                   stakeState={stakeControlState}
-                  onAdjustStake={handleAdjustStake}
+                  onSelectStake={handleSelectStake}
                 />
               ) : waitingForSeat ? null : (
                   <div className="table-screen__status pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:px-6 sm:pb-5">

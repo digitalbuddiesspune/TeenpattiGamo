@@ -276,6 +276,9 @@ internal class PrivateRoom(
         if (state.status != "between_rounds") {
             throw AppException.badRequest("private_room_not_between_rounds", "The room is not waiting for the next round.")
         }
+        if (state.round?.result?.potLimitReached == true) {
+            throw AppException.badRequest("private_room_pot_limit_reached", "Pot limit reached. No more rounds.")
+        }
         if (requestingPlayerId != state.hostPlayerId) {
             throw AppException.badRequest("private_room_host_required", "Only the host can start the next round.")
         }
@@ -308,6 +311,9 @@ internal class PrivateRoom(
     fun acceptNextRound(requestingPlayerId: String): Map<String, Any?> {
         if (state.status != "between_rounds") {
             throw AppException.badRequest("private_room_not_between_rounds", "The room is not waiting for the next round.")
+        }
+        if (state.round?.result?.potLimitReached == true) {
+            throw AppException.badRequest("private_room_pot_limit_reached", "Pot limit reached. No more rounds.")
         }
         if (state.acceptedNextRoundPlayerIds.none { it == requestingPlayerId }) {
             state.acceptedNextRoundPlayerIds.add(requestingPlayerId)

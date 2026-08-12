@@ -39,6 +39,10 @@ const SOUND_LIBRARY = {
     src: "/sounds/Blind.mp3",
     volume: 0.8,
   },
+  raise: {
+    src: "/sounds/Raise.mp3",
+    volume: 0.8,
+  },
   seen: {
     src: "/sounds/Seen.mp3",
     volume: 0.8,
@@ -57,6 +61,7 @@ const ACTION_SOUND_BY_TYPE = {
   blind: "blind",
   see: "seen",
   chaal: "chaal",
+  raise: "raise",
   pack: "pack",
   show: "show",
 };

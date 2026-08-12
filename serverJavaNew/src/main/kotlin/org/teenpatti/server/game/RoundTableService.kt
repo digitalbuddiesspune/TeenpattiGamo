@@ -492,13 +492,8 @@ internal class RoundTableService(
             item["packed"] = seat.packed
             item["seen"] = seat.seen
             item["cards"] = cards
-            if (seat.cards.isNotEmpty()) {
-                val includeHandLabel =
-                    canReveal ||
-                        (isViewer && round.status in setOf("active", "complete"))
-                if (includeHandLabel) {
-                    item["handLabel"] = Engine.evaluateSeatHand(seat, round, config).label
-                }
+            if (seat.cards.isNotEmpty() && canReveal) {
+                item["handLabel"] = Engine.evaluateSeatHand(seat, round, config).label
             }
             item["publicCards"] = seat.publicCards
             item["totalContributed"] = seat.totalContributed
@@ -532,7 +527,7 @@ internal class RoundTableService(
         response["lastAction"] = round.lastAction
         response["actionLog"] = if (round.actionLog.size > 10) round.actionLog.takeLast(10) else round.actionLog
         response["message"] = round.message
-        response["result"] = round.result
+        response["result"] = serializeRoundResult(round.result)
         response["provablyFair"] = TokenSupport.copyProvablyFairState(round.provablyFair, round.status == "complete")
         response["dealerTipPending"] = round.dealerTipState?.pending == true
         response["dealerTipResolvedAt"] = round.dealerTipState?.resolvedAt
@@ -562,6 +557,31 @@ internal class RoundTableService(
                 if (index < variantState.revealedSharedJokerCount) card else Card("hidden-${card.id}", null, null, null, true)
             }
         payload["revealedSharedJokerCount"] = variantState.revealedSharedJokerCount
+        return payload
+    }
+
+    private fun serializeRoundResult(result: RoundResult?): Map<String, Any?>? {
+        if (result == null) {
+            return null
+        }
+        val payload = linkedMapOf<String, Any?>()
+        payload["winnerId"] = result.winnerId
+        payload["winnerName"] = result.winnerName
+        payload["winningHand"] = result.winningHand
+        payload["bootContributionTotal"] = result.bootContributionTotal
+        payload["realPlayerContributionTotal"] = result.realPlayerContributionTotal
+        payload["botContributionTotal"] = result.botContributionTotal
+        payload["bootCommission"] = result.bootCommission
+        payload["actualBootCommission"] = result.actualBootCommission
+        payload["winCommission"] = result.winCommission
+        payload["actualWinCommission"] = result.actualWinCommission
+        payload["dealerTip"] = result.dealerTip
+        payload["casinoCommissionTotal"] = result.casinoCommissionTotal
+        payload["actualCasinoIncomeTotal"] = result.actualCasinoIncomeTotal
+        payload["winnerReceivableBeforeTip"] = result.winnerReceivableBeforeTip
+        payload["payout"] = result.payout
+        payload["reason"] = result.reason
+        payload["potLimitReached"] = result.potLimitReached
         return payload
     }
 
@@ -921,7 +941,12 @@ internal class RoundTableService(
         clearTimers()
         round.status = "complete"
         round.settledAt = null
-        round.nextRoundDecisionExpiresAt = clockProvider.isoFromMillis(clockProvider.now().toEpochMilli() + NEXT_ROUND_DECISION_WINDOW_MS)
+        round.nextRoundDecisionExpiresAt =
+            if (potLimitReached) {
+                null
+            } else {
+                clockProvider.isoFromMillis(clockProvider.now().toEpochMilli() + NEXT_ROUND_DECISION_WINDOW_MS)
+            }
         val hand = Engine.evaluateSeatHand(winner, round, config)
         val settlement = calculateSettlement(round, winner, 0)
         Engine.validateSettlementConsistency(round, settlement)
@@ -1064,13 +1089,15 @@ internal class RoundTableService(
         round.settledAt = clockProvider.nowIso()
         winner.balance += settlement.payout
         syncBankrolls(round)
+        val potLimitReached = round.result?.potLimitReached == true
         round.result = buildRoundResult(winner, hand, round.result?.reason ?: "", settlement, true)
+        round.result!!.potLimitReached = potLimitReached
         if (round.dealerTipState != null) {
             round.dealerTipState!!.pending = false
             round.dealerTipState!!.expiresAt = null
             round.dealerTipState!!.resolvedAt = clockProvider.nowIso()
         }
-        round.message = "${winner.name} won ${TokenSupport.formatIndianNumber(settlement.payout)} with ${hand.label}."
+        round.message = "${winner.name} won ${TokenSupport.formatIndianNumber(round.potAmount)} with ${hand.label}."
         val historyItem = TableHistoryItem()
         val trackedSeat = round.seats.firstOrNull { !it.isBot } ?: round.seats.first()
         historyItem.id = idGenerator.newId()

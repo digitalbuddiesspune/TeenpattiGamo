@@ -185,6 +185,87 @@ function StepButton({ symbol, onClick, disabled, busy = false, compact = false }
   );
 }
 
+function RaiseStakeButton({ label, amount, selected, onClick, disabled, busy }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || busy}
+      className={[
+        "table-controls__raise-option relative flex min-w-0 flex-1 items-center justify-center gap-1 rounded-[10px] border px-1.5 py-1 transition sm:gap-1.5 sm:px-2 sm:py-1.5",
+        selected
+          ? "border-[#ffe888]/65 bg-[linear-gradient(180deg,rgba(72,48,10,0.98),rgba(36,20,4,0.98))] text-[#fff4d0]"
+          : "border-[#f0ddb3]/16 bg-[linear-gradient(180deg,rgba(16,30,32,0.94),rgba(8,14,16,0.98))] text-[#d8c89a]",
+        disabled || busy
+          ? "cursor-not-allowed opacity-45"
+          : "cursor-pointer active:translate-y-[1px]",
+      ].join(" ")}
+    >
+      <span className="text-[9px] font-black uppercase leading-none tracking-[0.06em] sm:text-[11px]">
+        {label}
+      </span>
+      <Image
+        src="/newAssets/chip.png"
+        alt=""
+        width={14}
+        height={13}
+        className="object-contain"
+        style={{ width: 11, height: "auto" }}
+        aria-hidden="true"
+      />
+      <span className="text-[11px] font-black leading-none sm:text-[13px]">
+        {amount.toLocaleString("en-IN")}
+      </span>
+      {busy ? (
+        <span className="absolute inset-0 flex items-center justify-center rounded-[inherit] bg-black/20">
+          <span className="h-1 w-1 animate-pulse rounded-full bg-[#ffe888]" />
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+export function RaiseStakeSelector({
+  stakeOptions,
+  resolvedStake,
+  onSelectStake,
+  acting,
+  disabled = false,
+  className = "",
+}) {
+  const primaryStake = stakeOptions[0] || 0;
+  const doubleRaiseStake = stakeOptions[1] || 0;
+  const showDoubleRaise = stakeOptions.length > 1 && doubleRaiseStake > primaryStake;
+
+  return (
+    <div
+      className={[
+        "pointer-events-auto flex max-w-[11rem] items-stretch justify-center gap-1 rounded-[14px] border border-[#f0ddb3]/18 bg-[linear-gradient(180deg,rgba(13,28,30,0.72),rgba(7,16,19,0.84))] px-1.5 py-1 shadow-[0_12px_22px_rgba(0,0,0,0.28)] backdrop-blur-md sm:max-w-[12.5rem] sm:gap-1.5 sm:px-2 sm:py-1.5",
+        className,
+      ].join(" ")}
+    >
+      <RaiseStakeButton
+        label="Raise"
+        amount={primaryStake}
+        selected={resolvedStake === primaryStake}
+        onClick={() => onSelectStake(primaryStake)}
+        disabled={disabled || !primaryStake}
+        busy={acting}
+      />
+      {showDoubleRaise ? (
+        <RaiseStakeButton
+          label="2X"
+          amount={doubleRaiseStake}
+          selected={resolvedStake === doubleRaiseStake}
+          onClick={() => onSelectStake(doubleRaiseStake)}
+          disabled={disabled}
+          busy={acting}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 export function StakeSelector({
   amount,
   canIncreaseStake,
@@ -228,9 +309,10 @@ export default function TableControls({
   acting,
   onAction,
   stakeState,
-  onAdjustStake,
+  onSelectStake,
 }) {
   const [pendingAction, setPendingAction] = useState(null);
+  const [raiseIntent, setRaiseIntent] = useState(false);
   const viewerLegalActions = new Set(round?.viewerLegalActions || []);
   const computedStakeState = stakeState || buildStakeControlState({ round, userSeat, acting, selectedStake: 0 });
   const {
@@ -238,9 +320,8 @@ export default function TableControls({
     isTurn,
     minimumStake,
     displayStake,
+    stakeOptions,
     canAffordCall,
-    canIncreaseStake,
-    canDecreaseStake,
   } = computedStakeState;
   const pendingSideShow = round?.pendingSideShow || null;
   const sideShowViewerRole = pendingSideShow?.viewerRole || null;
@@ -266,9 +347,8 @@ export default function TableControls({
   const canUseSideAction = canShow || canSideshow;
   const actionBlocked = hasPendingSideShow || sideShowViewerRole === "target";
   const controlsDisabled = acting || actionBlocked;
-  const isRaisedStake = displayStake > minimumStake;
-  const blindLabel = isRaisedStake ? "Raise" : "Blind";
-  const chaalLabel = isRaisedStake ? "Raise" : "Chaal";
+  const blindLabel = raiseIntent ? "Raise" : "Blind";
+  const chaalLabel = raiseIntent ? "Raise" : "Chaal";
   const sideLabel = canShow ? "Show" : "Side Show";
 
   useEffect(() => {
@@ -276,6 +356,17 @@ export default function TableControls({
       setPendingAction(null);
     }
   }, [acting]);
+
+  useEffect(() => {
+    if (!isTurn) {
+      setRaiseIntent(false);
+    }
+  }, [isTurn, round?.id]);
+
+  function handleSelectRaiseStake(stake) {
+    onSelectStake(stake);
+    setRaiseIntent(true);
+  }
 
   async function triggerAction(actionType) {
     if (acting || !actionType) {
@@ -294,27 +385,26 @@ export default function TableControls({
     if (roundInactive || !canBlind || controlsDisabled || !displayStake) {
       return;
     }
-    await triggerAction(isRaisedStake ? "raise" : "blind");
+    await triggerAction(raiseIntent ? "raise" : "blind");
   }
 
   async function handleChaal() {
     if (roundInactive || !canChaal || controlsDisabled || !displayStake) {
       return;
     }
-    await triggerAction(isRaisedStake ? "raise" : "chaal");
+    await triggerAction(raiseIntent ? "raise" : "chaal");
   }
 
   return (
     <section className="table-controls pointer-events-none fixed bottom-0 left-1/2 z-50 flex w-full max-w-none -translate-x-1/2 flex-col items-center px-2 pb-[calc(env(safe-area-inset-bottom)+10px)] sm:px-4 sm:pb-4">
       <div className="flex w-full flex-col items-center gap-1.5 sm:gap-2">
         <div className="pointer-events-auto flex w-full items-center justify-between gap-2">
-          <StakeSelector
-            amount={displayStake}
-            canIncreaseStake={canIncreaseStake}
-            canDecreaseStake={canDecreaseStake}
-            onAdjustStake={onAdjustStake}
+          <RaiseStakeSelector
+            stakeOptions={stakeOptions}
+            resolvedStake={displayStake}
+            onSelectStake={handleSelectRaiseStake}
             acting={acting}
-            compact
+            disabled={roundInactive || !isTurn || actionBlocked}
           />
           <ActionButton
             label="See"

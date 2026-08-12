@@ -326,7 +326,7 @@ export default function Seat({
     Boolean(handLabel) &&
     !isStarting &&
     !isDealing &&
-    (isUser || cardsRevealed || isRoundComplete);
+    (isUser ? seat.seen : (cardsRevealed || isRoundComplete));
   const handLabelTone = getHandLabelTone(handLabel);
 
   return (

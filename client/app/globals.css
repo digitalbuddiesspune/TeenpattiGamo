@@ -2981,6 +2981,42 @@ body.app-body-portrait-blocked {
   color: #fff4d0;
 }
 
+.casino-table-scene__celebration--raise .casino-table-scene__celebration-veil,
+.casino-table-scene__celebration--tip .casino-table-scene__celebration-veil {
+  animation-duration: 3.2s;
+}
+
+.casino-table-scene__celebration--raise .casino-table-scene__celebration-burst,
+.casino-table-scene__celebration--tip .casino-table-scene__celebration-burst {
+  animation-duration: 1.2s;
+}
+
+.casino-table-scene__celebration--raise .casino-table-scene__celebration-banner {
+  animation-duration: 3s;
+  border-color: rgba(142, 198, 255, 0.62);
+  background: linear-gradient(180deg, rgba(18, 52, 88, 0.96), rgba(8, 24, 42, 0.98));
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.42), 0 0 40px rgba(110, 180, 255, 0.22);
+}
+
+.casino-table-scene__celebration--raise .casino-table-scene__celebration-banner strong {
+  color: #d8ecff;
+  text-shadow: 0 0 28px rgba(110, 180, 255, 0.45);
+}
+
+.casino-table-scene__celebration--raise .casino-table-scene__celebration-burst {
+  background:
+    radial-gradient(circle, rgba(142, 198, 255, 0.68) 0%, rgba(67, 216, 204, 0.24) 34%, transparent 68%);
+}
+
+.casino-table-scene__celebration--tip .casino-table-scene__celebration-banner {
+  animation-duration: 3s;
+}
+
+.casino-table-scene__celebration--tip .casino-table-scene__celebration-burst {
+  background:
+    radial-gradient(circle, rgba(255, 232, 136, 0.72) 0%, rgba(255, 170, 60, 0.28) 34%, transparent 68%);
+}
+
 .casino-table-scene__confetti {
   position: absolute;
   top: -12px;

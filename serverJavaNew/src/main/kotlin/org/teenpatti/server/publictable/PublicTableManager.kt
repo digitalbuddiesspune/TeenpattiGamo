@@ -202,6 +202,9 @@ internal class PublicTableManager(
             if (table.service.state.round == null || table.service.state.round?.status != "complete") {
                 throw IllegalStateException("The next round can only be confirmed after the current round completes.")
             }
+            if (table.service.state.round?.result?.potLimitReached == true) {
+                throw IllegalStateException("Pot limit reached. No more rounds.")
+            }
             if (session.status == "left") {
                 throw IllegalStateException("Player already left the table.")
             }
@@ -597,7 +600,9 @@ internal class PublicTableManager(
                     saveSession(session)
                 }
             }
-            scheduleNextRoundTask(table)
+            if (table.service.state.round?.result?.potLimitReached != true) {
+                scheduleNextRoundTask(table)
+            }
         }
         notifyTableUpdated(table, eventType)
     }
