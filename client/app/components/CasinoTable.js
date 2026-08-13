@@ -265,8 +265,7 @@ export default function CasinoTable({
     potLimitReachedFromResult || potLimitReachedFromPot || potLimitReachedFromMessage;
   const isHoldingRoundCompleteOverlay =
     isComplete &&
-    revealedCompleteRoundId !== round?.id &&
-    !potLimitReached;
+    revealedCompleteRoundId !== round?.id;
   const showRoundCompleteOverlay =
     isComplete &&
     (result || isQueuedSpectator) &&
@@ -1077,114 +1076,88 @@ export default function CasinoTable({
                 <div className="casino-table-scene__complete-shell pointer-events-none fixed inset-x-0 bottom-0 z-[34] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:pb-5">
                   <div className="casino-table-scene__complete-card pointer-events-auto flex w-full max-w-[22rem] flex-col items-center gap-3 rounded-[22px] border border-[#ffffff18] bg-[linear-gradient(180deg,rgba(7,44,48,0.48),rgba(3,16,19,0.58))] px-5 py-4 text-center shadow-[0_22px_40px_rgba(0,0,0,0.22)] backdrop-blur-[10px]">
                     {potLimitReached && !isQueuedSpectator ? (
-                      <>
-                        <div>
-                          <strong className="block text-lg font-black text-[#ffe8bf] sm:text-xl">
-                            Pot Limit Reached. No More Rounds.
-                          </strong>
-                          <span className="mt-1.5 block text-sm font-medium text-white/86 sm:text-[15px]">
-                            {roundWinSummary}
-                          </span>
-                        </div>
+                      <div className="rounded-full border border-[#ffd08a]/35 bg-[rgba(88,52,18,0.88)] px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-[#ffe8bf]">
+                        Pot Limit Reached This Round
+                      </div>
+                    ) : null}
 
-                        {isWinningViewer && finalPayout > 0 ? (
-                          <div className="rounded-full border border-[#3be7de]/24 bg-black/22 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[#a6fff2]">
-                            {finalPayout !== displayPotWinAmount
-                              ? `You receive ₹${finalPayout.toLocaleString("en-IN")} after commission`
-                              : `Final payout ₹${finalPayout.toLocaleString("en-IN")}`}
-                          </div>
-                        ) : null}
+                    <div>
+                      <strong className="block text-lg font-black text-white sm:text-xl">
+                        {isQueuedSpectator
+                          ? (isPrivateMode ? "Waiting to join next round" : "You are in for the next round")
+                          : isWinningViewer
+                            ? (isPrivateMode && isHost ? "Start next round?" : "Play next round?")
+                            : isPrivateMode && isHost
+                              ? "Start another round?"
+                              : "Play another round?"}
+                      </strong>
+                      <span className="mt-1.5 block text-sm font-medium text-white/86 sm:text-[15px]">
+                        {isQueuedSpectator
+                          ? `You will be seated automatically as soon as the ${isPrivateMode ? "host starts" : "next"} round begins.`
+                          : isWinningViewer
+                            ? viewerReady
+                              ? (isPrivateMode
+                                  ? (isHost
+                                      ? (canStartNextRound
+                                          ? "Everyone is ready. Start the next round when you want."
+                                          : "Wait for another player to join or get ready before starting the next round.")
+                                      : "You are ready for the host to start the next round.")
+                                  : "You are in for the next round.")
+                              : roundWinSummary
+                            : viewerReady
+                              ? (isPrivateMode
+                                  ? (isHost
+                                      ? (canStartNextRound
+                                          ? "Everyone is ready. Start the next round when you want."
+                                          : "Wait for another player to join or get ready before starting the next round.")
+                                      : "You are ready. Waiting for the host to start the next round.")
+                                  : "You are in for the next round.")
+                              : roundWinSummary}
+                      </span>
+                    </div>
 
+                    {!isQueuedSpectator && isWinningViewer && finalPayout > 0 ? (
+                      <div className="rounded-full border border-[#3be7de]/24 bg-black/22 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[#a6fff2]">
+                        {finalPayout !== displayPotWinAmount
+                          ? `You receive ₹${finalPayout.toLocaleString("en-IN")} after commission`
+                          : `Final payout ₹${finalPayout.toLocaleString("en-IN")}`}
+                      </div>
+                    ) : null}
+
+                    <div className="rounded-full border border-white/12 bg-white/8 px-4 py-2 text-[13px] font-bold uppercase tracking-[0.14em] text-white/90">
+                      {isPrivateMode
+                        ? isQueuedSpectator
+                          ? "Waiting for host"
+                          : isHost
+                            ? (canStartNextRound ? "Start when ready" : "Waiting for players")
+                            : viewerReady
+                              ? "Waiting for host"
+                              : "Ready up"
+                        : viewerReady || isQueuedSpectator
+                          ? `Round will begin in ${nextRoundDecision?.secondsRemaining ?? 0}s`
+                          : `${nextRoundDecision?.secondsRemaining ?? 0}s to decide`}
+                    </div>
+
+                    {isQueuedSpectator || (viewerReady && !showHostStartAction) ? null : (
+                      <div className="flex flex-wrap justify-center gap-2">
+                        <ActionPillButton
+                          tone="green"
+                          onClick={() => {
+                            void handleNextRoundAccept();
+                          }}
+                          disabled={acting || (isPrivateMode && isHost && !canStartNextRound)}
+                        >
+                          {isPrivateMode && isHost ? "Start" : "Play"}
+                        </ActionPillButton>
                         <ActionPillButton
                           onClick={() => {
-                            void onExitTable();
+                            void handleNextRoundDecline();
                           }}
                           disabled={acting}
                         >
-                          Leave Table
+                          No
                         </ActionPillButton>
-                      </>
-                    ) : (
-                      <>
-                        <div>
-                          <strong className="block text-lg font-black text-white sm:text-xl">
-                            {isQueuedSpectator
-                              ? (isPrivateMode ? "Waiting to join next round" : "You are in for the next round")
-                              : isWinningViewer
-                                ? (isPrivateMode && isHost ? "Start next round?" : "Play next round?")
-                                : isPrivateMode && isHost
-                                  ? "Start another round?"
-                                  : "Play another round?"}
-                          </strong>
-                          <span className="mt-1.5 block text-sm font-medium text-white/86 sm:text-[15px]">
-                            {isQueuedSpectator
-                              ? `You will be seated automatically as soon as the ${isPrivateMode ? "host starts" : "next"} round begins.`
-                              : isWinningViewer
-                                ? viewerReady
-                                  ? (isPrivateMode
-                                      ? (isHost
-                                          ? (canStartNextRound
-                                              ? "Everyone is ready. Start the next round when you want."
-                                              : "Wait for another player to join or get ready before starting the next round.")
-                                          : "You are ready for the host to start the next round.")
-                                      : "You are in for the next round.")
-                                  : roundWinSummary
-                                : viewerReady
-                                  ? (isPrivateMode
-                                      ? (isHost
-                                          ? (canStartNextRound
-                                              ? "Everyone is ready. Start the next round when you want."
-                                              : "Wait for another player to join or get ready before starting the next round.")
-                                          : "You are ready. Waiting for the host to start the next round.")
-                                      : "You are in for the next round.")
-                                  : roundWinSummary}
-                          </span>
-                        </div>
-
-                        {!isQueuedSpectator && isWinningViewer && finalPayout > 0 ? (
-                          <div className="rounded-full border border-[#3be7de]/24 bg-black/22 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[#a6fff2]">
-                            {finalPayout !== displayPotWinAmount
-                              ? `You receive ₹${finalPayout.toLocaleString("en-IN")} after commission`
-                              : `Final payout ₹${finalPayout.toLocaleString("en-IN")}`}
-                          </div>
-                        ) : null}
-
-                        <div className="rounded-full border border-white/12 bg-white/8 px-4 py-2 text-[13px] font-bold uppercase tracking-[0.14em] text-white/90">
-                          {isPrivateMode
-                            ? isQueuedSpectator
-                              ? "Waiting for host"
-                              : isHost
-                                ? (canStartNextRound ? "Start when ready" : "Waiting for players")
-                                : viewerReady
-                                  ? "Waiting for host"
-                                  : "Ready up"
-                            : viewerReady || isQueuedSpectator
-                              ? `Round will begin in ${nextRoundDecision?.secondsRemaining ?? 0}s`
-                              : `${nextRoundDecision?.secondsRemaining ?? 0}s to decide`}
-                        </div>
-
-                        {isQueuedSpectator || (viewerReady && !showHostStartAction) ? null : (
-                          <div className="flex flex-wrap justify-center gap-2">
-                            <ActionPillButton
-                              tone="green"
-                              onClick={() => {
-                                void handleNextRoundAccept();
-                              }}
-                              disabled={acting || (isPrivateMode && isHost && !canStartNextRound)}
-                            >
-                              {isPrivateMode && isHost ? "Start" : "Play"}
-                            </ActionPillButton>
-                            <ActionPillButton
-                              onClick={() => {
-                                void handleNextRoundDecline();
-                              }}
-                              disabled={acting}
-                            >
-                              No
-                            </ActionPillButton>
-                          </div>
-                        )}
-                      </>
+                      </div>
                     )}
                   </div>
                 </div>

@@ -942,11 +942,7 @@ internal class RoundTableService(
         round.status = "complete"
         round.settledAt = null
         round.nextRoundDecisionExpiresAt =
-            if (potLimitReached) {
-                null
-            } else {
-                clockProvider.isoFromMillis(clockProvider.now().toEpochMilli() + NEXT_ROUND_DECISION_WINDOW_MS)
-            }
+            clockProvider.isoFromMillis(clockProvider.now().toEpochMilli() + NEXT_ROUND_DECISION_WINDOW_MS)
         val hand = Engine.evaluateSeatHand(winner, round, config)
         val settlement = calculateSettlement(round, winner, 0)
         Engine.validateSettlementConsistency(round, settlement)
