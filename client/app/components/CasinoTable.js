@@ -443,15 +443,16 @@ export default function CasinoTable({
 
     const lastAction = round?.lastAction;
     const actionType = String(lastAction?.actionType || "").toLowerCase();
-    if (!lastAction?.playerId || actionType !== "raise" || lastAction.playerId !== viewerSeat?.id) {
+    const isChipAction = ["blind", "chaal", "raise"].includes(actionType);
+    if (!lastAction?.playerId || !isChipAction) {
       return undefined;
     }
 
     const actionKey = `${round.id}:${lastAction.id || lastAction.timestamp || ""}:${lastAction.playerId}:chip-transfer`;
     const amount = typeof lastAction.amount === "number" ? lastAction.amount : 0;
 
-    return launchChipTransferToPot(viewerSeat.id, amount, actionKey);
-  }, [launchChipTransferToPot, round?.id, round?.lastAction, round?.status, viewerSeat?.id]);
+    return launchChipTransferToPot(lastAction.playerId, amount, actionKey);
+  }, [launchChipTransferToPot, round?.id, round?.lastAction, round?.status]);
 
   useEffect(() => {
     if (!isComplete) {
