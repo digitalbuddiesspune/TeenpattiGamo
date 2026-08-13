@@ -41,57 +41,72 @@ internal class PublicMatchmakingTest {
     }
 
     @Test
-    fun batchesBelowThresholdIsolateEveryHumanWithOneBot() {
-        listOf(1, 24).forEach { playerCount ->
+    fun soloPlayerReceivesBotsInMatchmaking() {
+        val fixture = fixture()
+        val joined = joinPlayers(fixture.manager, 1)
+        assertTrue(joined.all { it["playerStatus"] == "matchmaking" && it["tableId"] == null })
+
+        fixture.scheduler.runLast()
+
+        assertEquals(1, fixture.tableRepository.state.size)
+        val table = fixture.tableRepository.state.values.single()
+        val seats = table.round!!.seats
+        assertEquals(1, seats.count { !it.isBot })
+        assertEquals(4, seats.count { it.isBot })
+        assertTrue(fixture.sessionRepository.sessions.values.all { it.status == "active_at_table" })
+    }
+
+    @Test
+    fun multipleHumanPlayersAreGroupedTogetherOnSameTable() {
+        listOf(2, 3, 5).forEach { playerCount ->
             val fixture = fixture()
-            val joined = joinPlayers(fixture.manager, playerCount)
-            assertTrue(joined.all { it["playerStatus"] == "matchmaking" && it["tableId"] == null })
+            joinPlayers(fixture.manager, playerCount)
 
             fixture.scheduler.runLast()
 
-            assertEquals(playerCount, fixture.tableRepository.state.size)
-            fixture.tableRepository.state.values.forEach { table ->
-                val seats = table.round!!.seats
-                assertEquals(1, seats.count { !it.isBot })
-                assertEquals(1, seats.count { it.isBot })
+            assertEquals(1, fixture.tableRepository.state.size)
+            val table = fixture.tableRepository.state.values.single()
+            val seats = table.round!!.seats
+            assertEquals(playerCount, seats.size)
+            assertEquals(playerCount, seats.count { !it.isBot })
+            assertEquals(0, seats.count { it.isBot })
+            assertTrue(fixture.sessionRepository.sessions.values.all { it.status == "active_at_table" })
+        }
+    }
+
+    @Test
+    fun batchesAboveCapacityCreateFullTablesAndGroupRemaindersTogether() {
+        mapOf(6 to listOf(5, 1), 7 to listOf(5, 2), 12 to listOf(5, 5, 2)).forEach { (playerCount, expectedGroupSizes) ->
+            val fixture = fixture()
+            joinPlayers(fixture.manager, playerCount)
+
+            fixture.scheduler.runLast()
+
+            assertEquals(expectedGroupSizes.size, fixture.tableRepository.state.size)
+            val sortedTables = fixture.tableRepository.state.values.sortedByDescending { it.round!!.seats.size }
+            sortedTables.zip(expectedGroupSizes).forEach { (table, expectedSize) ->
+                val humanCount = table.round!!.seats.count { !it.isBot }
+                assertEquals(expectedSize, humanCount)
             }
             assertTrue(fixture.sessionRepository.sessions.values.all { it.status == "active_at_table" })
         }
     }
 
     @Test
-    fun batchesAtOrAboveThresholdCreateOnlyFullHumanTablesAndQueueRemainders() {
-        mapOf(25 to 0, 26 to 1, 29 to 4).forEach { (playerCount, expectedRemainder) ->
-            val fixture = fixture()
-            joinPlayers(fixture.manager, playerCount)
-
-            fixture.scheduler.runLast()
-
-            assertEquals(5, fixture.tableRepository.state.size)
-            fixture.tableRepository.state.values.forEach { table ->
-                assertEquals(5, table.round!!.seats.size)
-                assertEquals(0, table.round!!.seats.count { it.isBot })
-            }
-            val waiting = fixture.sessionRepository.sessions.values.filter { it.status == "matchmaking" }
-            assertEquals(expectedRemainder, waiting.size)
-            assertTrue(waiting.all { it.tableId == null })
-            assertEquals(expectedRemainder, fixture.coordinator.queued.size)
-        }
-    }
-
-    @Test
-    fun duplicatePlatformUserDoesNotCountTwiceTowardPvpThreshold() {
+    fun duplicatePlatformUserDoesNotCountTwiceInSameTableGroup() {
         val fixture = fixture()
-        val platformUserIds = (1..24).map { "platform-user-$it" } + "platform-user-1"
+        val platformUserIds = (1..4).map { "platform-user-$it" } + "platform-user-1"
         joinPlatformPlayers(fixture.manager, platformUserIds)
 
         fixture.scheduler.runLast()
 
-        assertEquals(25, fixture.tableRepository.state.size)
+        assertEquals(2, fixture.tableRepository.state.size)
         fixture.tableRepository.state.values.forEach { table ->
             val seats = table.round!!.seats
-            assertEquals(1, seats.count { !it.isBot })
-            assertEquals(1, seats.count { it.isBot })
+            val platformIds = seats.filter { !it.isBot }.map { seat ->
+                fixture.sessionRepository.sessions.getValue(seat.id).platformUserId
+            }
+            assertEquals(platformIds.size, platformIds.toSet().size)
         }
         assertTrue(fixture.sessionRepository.sessions.values.all { it.status == "active_at_table" })
     }
@@ -104,21 +119,16 @@ internal class PublicMatchmakingTest {
 
         fixture.scheduler.runLast()
 
-        assertEquals(5, fixture.tableRepository.state.size)
+        assertEquals(6, fixture.tableRepository.state.size)
         fixture.tableRepository.state.values.forEach { table ->
             val humanSeatIds = table.round!!.seats.filter { !it.isBot }.map { it.id }
             val platformIds =
                 humanSeatIds.map { playerId ->
                     fixture.sessionRepository.sessions.getValue(playerId).platformUserId
                 }
-            assertEquals(5, platformIds.size)
-            assertEquals(5, platformIds.toSet().size)
-            assertEquals(0, table.round!!.seats.count { it.isBot })
+            assertEquals(platformIds.size, platformIds.toSet().size)
         }
-        val waiting = fixture.sessionRepository.sessions.values.filter { it.status == "matchmaking" }
-        assertEquals(1, waiting.size)
-        assertEquals("platform-user-1", waiting.single().platformUserId)
-        assertEquals(1, fixture.coordinator.queued.size)
+        assertTrue(fixture.sessionRepository.sessions.values.all { it.status == "active_at_table" })
     }
 
     @Test
@@ -173,7 +183,7 @@ internal class PublicMatchmakingTest {
                 instanceId = "node-a",
                 matchmakingCoordinator = coordinator,
                 matchmakingWindowMs = 5_000L,
-                matchmakingPvpThreshold = 25,
+                matchmakingPvpThreshold = 1,
             )
         manager.initialize()
         return MatchmakingFixture(manager, tableRepository, sessionRepository, scheduler, coordinator)

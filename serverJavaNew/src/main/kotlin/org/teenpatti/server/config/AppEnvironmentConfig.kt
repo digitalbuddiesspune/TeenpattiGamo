@@ -30,7 +30,7 @@ internal class AppEnvironmentConfig {
         env.playerCount = number(environment, "PLAYER_COUNT", 5)
         env.publicTableMaxBots = number(environment, "MAX_PUBLIC_TABLE_BOTS", env.playerCount - 1)
         env.matchmakingWindowMs = longNumber(environment, "MATCHMAKING_WINDOW_MS", 5_000L)
-        env.matchmakingPvpThreshold = number(environment, "MATCHMAKING_PVP_THRESHOLD", 25)
+        env.matchmakingPvpThreshold = number(environment, "MATCHMAKING_PVP_THRESHOLD", 1)
         env.casinoBootCommissionPercent = number(environment, "CASINO_BOOT_COMMISSION_PERCENT", 5)
         env.casinoWinCommissionPercent = number(environment, "CASINO_WIN_COMMISSION_PERCENT", 10)
         env.initialBalance = number(environment, "INITIAL_BALANCE", 30000000)
@@ -63,8 +63,8 @@ internal class AppEnvironmentConfig {
         check(env.publicTableMaxBots >= 1) { "MAX_PUBLIC_TABLE_BOTS must be at least 1." }
         check(env.publicTableMaxBots < env.playerCount) { "MAX_PUBLIC_TABLE_BOTS must be less than PLAYER_COUNT." }
         check(env.matchmakingWindowMs >= 1_000L) { "MATCHMAKING_WINDOW_MS must be at least 1000." }
-        check(env.matchmakingPvpThreshold >= env.playerCount) {
-            "MATCHMAKING_PVP_THRESHOLD must be at least PLAYER_COUNT."
+        check(env.matchmakingPvpThreshold >= 1) {
+            "MATCHMAKING_PVP_THRESHOLD must be at least 1."
         }
     }
 

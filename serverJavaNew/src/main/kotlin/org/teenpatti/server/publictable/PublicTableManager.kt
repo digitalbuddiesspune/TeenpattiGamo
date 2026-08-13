@@ -38,7 +38,7 @@ internal class PublicTableManager(
     private val platformWalletService: PlatformWalletService? = null,
     private val matchmakingCoordinator: MatchmakingCoordinator? = null,
     private val matchmakingWindowMs: Long = PUBLIC_TABLE_JOIN_WAIT_MS,
-    private val matchmakingPvpThreshold: Int = 25,
+    private val matchmakingPvpThreshold: Int = 1,
 ) {
     private val tables = LinkedHashMap<String, ManagedPublicTable>()
     private val players = LinkedHashMap<String, PublicPlayerSessionState>()
@@ -402,7 +402,7 @@ internal class PublicTableManager(
             "queuedRemainder" to eligible.size - assignableCount,
         )
         groups.forEach { group ->
-            tryAssignMatchmakingTable(group, false)
+            tryAssignMatchmakingTable(group, group.size == 1)
         }
         val assignedIds = groups.flatten().map { it.id }.toSet()
         return eligible.filter { !assignedIds.contains(it.id) }.map { it.id }
@@ -424,7 +424,7 @@ internal class PublicTableManager(
         val remaining = sessions.toMutableList()
         val groups = mutableListOf<List<PublicPlayerSessionState>>()
 
-        while (remaining.size >= groupSize) {
+        while (remaining.isNotEmpty()) {
             val group = mutableListOf<PublicPlayerSessionState>()
             val identities = linkedSetOf<String>()
             val selected = mutableListOf<PublicPlayerSessionState>()
@@ -440,7 +440,7 @@ internal class PublicTableManager(
                 }
             }
 
-            if (group.size < groupSize) {
+            if (group.isEmpty()) {
                 break
             }
 
@@ -486,7 +486,7 @@ internal class PublicTableManager(
         val table = createTable()
         val seating = seating(table)
         seating.seatedPlayerIds = sessions.map { it.id }.toMutableList()
-        val participants = buildParticipants(table, seating.seatedPlayerIds, if (botFallback) 1 else 0)
+        val participants = buildParticipants(table, seating.seatedPlayerIds, if (botFallback) null else 0)
         val roundId = idGenerator.newId()
         try {
             debitBootsIfNeeded(table, participants, roundId)
@@ -499,13 +499,14 @@ internal class PublicTableManager(
             activatePublicSession(session.id, table.tableId)
         }
         table.service.startRound(participants, roundId)
+        val botCount = participants.count { it.isBot }
         GameEventLog.info(
             "matchmaking_assigned",
             "variantId" to config.variant.id,
             "lobbyId" to table.tableId,
             "roundId" to roundId,
             "humanPlayers" to sessions.size,
-            "botPlayers" to if (botFallback) 1 else 0,
+            "botPlayers" to botCount,
         )
         notifyTableUpdated(table, "matchmaking_assigned")
     }
