@@ -223,6 +223,8 @@ export default function CasinoTable({
   const [potTransferring, setPotTransferring] = useState(false);
   const [celebrateWin, setCelebrateWin] = useState(false);
   const [seatActionNotice, setSeatActionNotice] = useState(null);
+  const [bootPotReadyRoundId, setBootPotReadyRoundId] = useState("");
+  const bootTransferRoundIdRef = useRef("");
   const surfaceRef = useRef(null);
   const potRef = useRef(null);
   const deckAnchorRef = useRef(null);
@@ -237,6 +239,11 @@ export default function CasinoTable({
   const isDealing = round?.status === "dealing";
   const isComplete = round?.status === "complete";
   const tableSeats = seats ?? round?.seats;
+  const isBootPotPending =
+    Boolean(round?.id) &&
+    (isStarting || isDealing) &&
+    bootPotReadyRoundId !== round?.id;
+  const displayedPotAmount = isBootPotPending ? 0 : (round?.potAmount || 0);
   const result = round?.result || null;
   const viewerSeat = tableSeats?.find((seat) => seat.isUser) || null;
   const isWinningViewer = Boolean(result?.winnerId && viewerSeat?.id === result.winnerId);
@@ -459,6 +466,78 @@ export default function CasinoTable({
     };
   }, [findSeatAnchorNode]);
 
+  const launchMultiSeatBootTransfer = useCallback((bootAmount, dedupeKey) => {
+    if (!bootAmount) {
+      return undefined;
+    }
+
+    if (dedupeKey) {
+      if (processedChipKeysRef.current.has(dedupeKey)) {
+        return undefined;
+      }
+      processedChipKeysRef.current.add(dedupeKey);
+    }
+
+    let cancelled = false;
+    let retryTimer = null;
+    let clearTimer = null;
+
+    const startFlight = (attempt = 0) => {
+      if (cancelled) {
+        return;
+      }
+
+      const surface = surfaceRef.current;
+      const potNode = potRef.current;
+      const seats = tableSeatsRef.current || [];
+
+      if (!surface || !potNode || !seats.length) {
+        if (attempt < 30) {
+          retryTimer = window.setTimeout(() => startFlight(attempt + 1), 50);
+        }
+        return;
+      }
+
+      const surfaceRect = surface.getBoundingClientRect();
+      const potCenter = getRelativeCenter(potNode.getBoundingClientRect(), surfaceRect);
+
+      const allFlights = [];
+      seats.forEach((seat, seatIdx) => {
+        if (!seat) return;
+        const fromNode = findSeatAnchorNode(seat.id || seat.playerId || seat.seatIndex);
+        if (!fromNode) return;
+        const fromCenter = getRelativeCenter(fromNode.getBoundingClientRect(), surfaceRect);
+        const seatFlights = buildChipFlightsBetweenPoints(
+          fromCenter,
+          potCenter,
+          `${dedupeKey}-seat-${seat.id || seatIdx}`,
+          bootAmount,
+          "-",
+        );
+        allFlights.push(...seatFlights);
+      });
+
+      if (allFlights.length > 0) {
+        setChipTransferFlights(allFlights);
+        clearTimer = window.setTimeout(() => {
+          setChipTransferFlights([]);
+        }, CHIP_TRANSFER_DURATION_MS + CHIP_TRANSFER_COUNT * 100 + 240);
+      }
+    };
+
+    startFlight();
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) {
+        window.clearTimeout(retryTimer);
+      }
+      if (clearTimer) {
+        window.clearTimeout(clearTimer);
+      }
+    };
+  }, [findSeatAnchorNode]);
+
   useEffect(() => () => {
     clearDealTimers();
   }, [clearDealTimers]);
@@ -563,6 +642,55 @@ export default function CasinoTable({
     round?.lastAction,
     round?.actionLog,
     round?.status,
+  ]);
+
+  useEffect(() => {
+    if (!round?.id) {
+      return undefined;
+    }
+
+    if (round.status === "starting" || round.status === "dealing") {
+      if (bootTransferRoundIdRef.current === round.id) {
+        return undefined;
+      }
+      bootTransferRoundIdRef.current = round.id;
+
+      const bootAmount =
+        typeof round.bootAmount === "number" && round.bootAmount > 0
+          ? round.bootAmount
+          : Math.max(
+              10,
+              Math.round((round.potAmount || 0) / Math.max(1, tableSeats?.length || 1)),
+            );
+
+      const cleanupFlight = launchMultiSeatBootTransfer(
+        bootAmount,
+        `boot-transfer-${round.id}`,
+      );
+
+      const potRevealTimer = window.setTimeout(() => {
+        setBootPotReadyRoundId(round.id);
+      }, Math.min(1200, CHIP_TRANSFER_DURATION_MS));
+
+      return () => {
+        if (typeof cleanupFlight === "function") cleanupFlight();
+        window.clearTimeout(potRevealTimer);
+      };
+    }
+
+    if (round.status === "active") {
+      if (bootPotReadyRoundId !== round.id) {
+        setBootPotReadyRoundId(round.id);
+      }
+    }
+  }, [
+    round?.id,
+    round?.status,
+    round?.bootAmount,
+    round?.potAmount,
+    tableSeats?.length,
+    launchMultiSeatBootTransfer,
+    bootPotReadyRoundId,
   ]);
 
   useEffect(() => {
@@ -1141,8 +1269,8 @@ export default function CasinoTable({
                 <span className="mt-0.5 block text-[8px] font-black uppercase tracking-[0.16em] text-white/54">
                   Table Pot
                 </span>
-                <strong className="block text-[28px] font-black leading-none text-[#ffde83] sm:text-[32px]">
-                  {round?.potAmount?.toLocaleString("en-IN") || "0"}
+                <strong className="block text-[28px] font-black leading-none text-[#ffde83] sm:text-[32px] transition-transform duration-300">
+                  {displayedPotAmount.toLocaleString("en-IN")}
                 </strong>
               </div>
 
