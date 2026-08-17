@@ -303,6 +303,16 @@ export default function CasinoTable({
   const cardsPerSeat = Math.max(3, Number(variant?.cardsPerSeat) || 3);
   const showSharedJokersTray = sharedJokers.length > 0 && variant?.publicCardMode !== "third_card_rank_joker";
 
+  const processedChipKeysRef = useRef(new Set());
+  const tableSeatsRef = useRef(tableSeats);
+  useEffect(() => {
+    tableSeatsRef.current = tableSeats;
+  }, [tableSeats]);
+
+  useEffect(() => {
+    processedChipKeysRef.current.clear();
+  }, [round?.id]);
+
   const clearDealTimers = useCallback(() => {
     dealTimersRef.current.forEach((timerId) => {
       window.clearTimeout(timerId);
@@ -317,15 +327,84 @@ export default function CasinoTable({
 
     if (node) {
       seatAnchorRef.current.set(seatId, node);
-      return;
+    }
+  }, []);
+
+  const findSeatAnchorNode = useCallback((fromSeatId) => {
+    if (!fromSeatId) {
+      return null;
+    }
+    const map = seatAnchorRef.current;
+    if (map.has(fromSeatId)) {
+      const node = map.get(fromSeatId);
+      if (node && typeof document !== "undefined" && document.body.contains(node)) {
+        return node;
+      }
+    }
+    const seats = tableSeatsRef.current || [];
+    const seatIdStr = String(fromSeatId).toLowerCase();
+    const match = seats.find((s) => {
+      if (!s) return false;
+      const sId = String(s.id || "").toLowerCase();
+      const sPlayerId = String(s.playerId || "").toLowerCase();
+      const sIndex = String(s.seatIndex);
+      return (
+        sId === seatIdStr ||
+        sPlayerId === seatIdStr ||
+        sIndex === seatIdStr ||
+        (sId && (sId.includes(seatIdStr) || seatIdStr.includes(sId))) ||
+        (sPlayerId && (sPlayerId.includes(seatIdStr) || seatIdStr.includes(sPlayerId)))
+      );
+    });
+
+    if (match) {
+      const candidates = [
+        match.id,
+        match.playerId,
+        `index-${match.seatIndex}`,
+        match.seatIndex,
+      ];
+      for (const cand of candidates) {
+        if (cand !== undefined && cand !== null && map.has(cand)) {
+          const node = map.get(cand);
+          if (node && typeof document !== "undefined" && document.body.contains(node)) {
+            return node;
+          }
+        }
+      }
     }
 
-    seatAnchorRef.current.delete(seatId);
+    if (typeof document !== "undefined" && surfaceRef.current) {
+      const domNode =
+        surfaceRef.current.querySelector(`[data-seat-id="${fromSeatId}"]`) ||
+        (match ? surfaceRef.current.querySelector(`.table-seat--index-${match.seatIndex}`) : null);
+      if (domNode) {
+        return domNode;
+      }
+    }
+
+    if (typeof document !== "undefined") {
+      const domNode =
+        document.querySelector(`[data-seat-id="${fromSeatId}"]`) ||
+        (match ? document.querySelector(`.table-seat--index-${match.seatIndex}`) : null);
+      if (domNode) {
+        return domNode;
+      }
+    }
+
+    return null;
   }, []);
 
   const launchChipTransferToPot = useCallback((fromSeatId, amount, dedupeKey) => {
-    if (!fromSeatId || chipTransferKeyRef.current === dedupeKey) {
+    if (!fromSeatId) {
       return undefined;
+    }
+
+    if (dedupeKey) {
+      if (processedChipKeysRef.current.has(dedupeKey)) {
+        return undefined;
+      }
+      processedChipKeysRef.current.add(dedupeKey);
     }
 
     let cancelled = false;
@@ -339,7 +418,7 @@ export default function CasinoTable({
 
       const surface = surfaceRef.current;
       const potNode = potRef.current;
-      const fromNode = seatAnchorRef.current.get(fromSeatId);
+      const fromNode = findSeatAnchorNode(fromSeatId);
 
       if (!surface || !potNode || !fromNode) {
         if (attempt < 30) {
@@ -348,14 +427,13 @@ export default function CasinoTable({
         return;
       }
 
-      chipTransferKeyRef.current = dedupeKey;
       const surfaceRect = surface.getBoundingClientRect();
       const fromCenter = getRelativeCenter(fromNode.getBoundingClientRect(), surfaceRect);
       const potCenter = getRelativeCenter(potNode.getBoundingClientRect(), surfaceRect);
       const flights = buildChipFlightsBetweenPoints(
         fromCenter,
         potCenter,
-        dedupeKey,
+        dedupeKey || `chip-${Date.now()}`,
         amount,
         "-",
       );
@@ -377,7 +455,7 @@ export default function CasinoTable({
         window.clearTimeout(clearTimer);
       }
     };
-  }, []);
+  }, [findSeatAnchorNode]);
 
   useEffect(() => () => {
     clearDealTimers();
@@ -390,13 +468,23 @@ export default function CasinoTable({
       return undefined;
     }
 
-    const lastAction = round?.lastAction;
-    const actionType = String(lastAction?.actionType || "").toLowerCase();
+    const actionLog = Array.isArray(round?.actionLog) ? round.actionLog : [];
+    const lastAction =
+      round?.lastAction ||
+      (actionLog.length > 0 ? actionLog[actionLog.length - 1] : null);
+    const actionType = String(
+      lastAction?.actionType || lastAction?.type || ""
+    ).toLowerCase();
     if (!lastAction?.playerId || actionType === "boot") {
       return undefined;
     }
 
-    const actionKey = `${round.id}:${lastAction.id || lastAction.timestamp || ""}:${lastAction.playerId}:${actionType}`;
+    const actionSeq =
+      lastAction.id ||
+      lastAction.timestamp ||
+      (actionLog.length ? `seq-${actionLog.length}` : "") ||
+      Date.now();
+    const actionKey = `${round.id}:${actionSeq}:${lastAction.playerId}:${actionType}`;
     if (lastNotifiedActionRef.current === actionKey) {
       return undefined;
     }
@@ -413,6 +501,7 @@ export default function CasinoTable({
       "sideshow-accepted": "Accepted",
       "sideshow-loss": "Lost side",
       show: "Show",
+      "dealer_tip": "Tipped!",
     };
 
     let label = shortLabelByType[actionType];
@@ -434,36 +523,57 @@ export default function CasinoTable({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [round?.id, round?.lastAction, round?.status, viewerSeat?.id]);
+  }, [round?.id, round?.lastAction, round?.actionLog, round?.status, viewerSeat?.id]);
 
   useEffect(() => {
     if (round?.status !== "active") {
       return undefined;
     }
 
-    const lastAction = round?.lastAction;
-    const actionType = String(lastAction?.actionType || "").toLowerCase();
-    const isChipAction = ["blind", "chaal", "raise"].includes(actionType);
-    if (!lastAction?.playerId || !isChipAction) {
+    const actionLog = Array.isArray(round?.actionLog) ? round.actionLog : [];
+    const lastAction =
+      round?.lastAction ||
+      (actionLog.length > 0 ? actionLog[actionLog.length - 1] : null);
+
+    if (!lastAction?.playerId) {
       return undefined;
     }
 
-    const actionKey = `${round.id}:${lastAction.id || lastAction.timestamp || ""}:${lastAction.playerId}:chip-transfer`;
+    const actionType = String(
+      lastAction.actionType || lastAction.type || ""
+    ).toLowerCase();
+    if (!["blind", "chaal", "raise", "dealer_tip"].includes(actionType)) {
+      return undefined;
+    }
+
     const amount = typeof lastAction.amount === "number" ? lastAction.amount : 0;
+    const actionSeq =
+      lastAction.id ||
+      lastAction.timestamp ||
+      (actionLog.length ? `seq-${actionLog.length}` : "") ||
+      Date.now();
+    const actionKey = `${round.id}:${actionSeq}:${lastAction.playerId}:${actionType}:${amount}:chip-transfer`;
 
     return launchChipTransferToPot(lastAction.playerId, amount, actionKey);
-  }, [launchChipTransferToPot, round?.id, round?.lastAction, round?.status]);
+  }, [
+    launchChipTransferToPot,
+    round?.id,
+    round?.lastAction,
+    round?.actionLog,
+    round?.status,
+  ]);
 
   useEffect(() => {
     if (!isComplete) {
       setPotPayoutFlights([]);
-      setChipTransferFlights([]);
+      // NOTE: Do NOT clear chipTransferFlights here — it is managed by
+      // launchChipTransferToPot's own timeout. Clearing here was cancelling
+      // every chip-flight animation because potAmount changes on every action.
       setPotCollected(false);
       setPotTransferring(false);
       setCelebrateWin(false);
       potPayoutRoundIdRef.current = "";
       celebrationRoundIdRef.current = "";
-      chipTransferKeyRef.current = "";
       return undefined;
     }
 
@@ -524,6 +634,7 @@ export default function CasinoTable({
       });
 
       setPotPayoutFlights(flights);
+      setChipTransferFlights([]);   // clear any lingering chip-transfer flights
       setPotTransferring(true);
       setPotCollected(false);
 
@@ -808,14 +919,10 @@ export default function CasinoTable({
 
     setMidGameTipSending(true);
     try {
+      // The server now logs dealer_tip into lastAction/actionLog.
+      // The chip transfer animation is triggered for ALL players (including
+      // the tipper) via the chip-transfer useEffect watching round.lastAction.
       await onAction("dealer_tip", { amount: midGameTipAmount });
-      if (viewerSeat?.id) {
-        launchChipTransferToPot(
-          viewerSeat.id,
-          midGameTipAmount,
-          `tip-${round?.id || "table"}-${Date.now()}`,
-        );
-      }
     } catch (error) {
       console.error(error);
     } finally {

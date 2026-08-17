@@ -331,6 +331,18 @@ export default function Seat({
 
   return (
     <div
+      ref={(node) => {
+        if (typeof registerCardAnchor === "function" && seat) {
+          if (seat.id) registerCardAnchor(seat.id, node);
+          if (seat.playerId) registerCardAnchor(seat.playerId, node);
+          if (seat.seatIndex !== undefined) {
+            registerCardAnchor(seat.seatIndex, node);
+            registerCardAnchor(`index-${seat.seatIndex}`, node);
+          }
+        }
+      }}
+      data-seat-id={seat.id || seat.playerId}
+      data-seat-index={seat.seatIndex}
       className={`table-seat table-seat--index-${seat.seatIndex} absolute ${layout.wrapper} ${
         isUser ? "table-seat--user" : "table-seat--opponent"
       }`}
@@ -338,7 +350,7 @@ export default function Seat({
       <div className="relative">
         <div
           ref={(node) => {
-            if (typeof registerCardAnchor === "function") {
+            if (typeof registerCardAnchor === "function" && seat?.id) {
               registerCardAnchor(seat.id, node);
             }
           }}

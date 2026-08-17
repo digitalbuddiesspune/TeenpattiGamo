@@ -991,6 +991,7 @@ internal class RoundTableService(
             }
             actor.balance -= dealerTip
             syncBankrolls(round)
+            logAction(actor.id, "dealer_tip", dealerTip, "${actor.name} tipped the dealer ₹${dealerTip}!")
             round.message = "${actor.name} tipped the dealer ₹${dealerTip}!"
         }
         persistState()
