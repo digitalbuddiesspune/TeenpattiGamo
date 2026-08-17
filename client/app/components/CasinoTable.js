@@ -299,7 +299,9 @@ export default function CasinoTable({
   const roundStatusProgress = isStarting
     ? Math.min(1, Math.max(0, (roundStartClock?.progress ?? 0) / 100))
     : dealingProgress;
-  const sharedJokers = variantState?.sharedJokers || [];
+  // The server sends all joker slots including hidden (not-yet-revealed) ones.
+  // Only show jokers that have actually been revealed (hidden !== true).
+  const sharedJokers = (variantState?.sharedJokers || []).filter((c) => !c.hidden);
   const cardsPerSeat = Math.max(3, Number(variant?.cardsPerSeat) || 3);
   const showSharedJokersTray = sharedJokers.length > 0 && variant?.publicCardMode !== "third_card_rank_joker";
 
@@ -1300,8 +1302,6 @@ export default function CasinoTable({
             </div>
           </div>
         ) : null}
-
-        {showSharedJokersTray ? <SharedJokersTray sharedJokers={sharedJokers} /> : null}
 
         {pendingSideShow ? (
           <div className="casino-table-scene__side-show fixed inset-x-0 top-[154px] z-[32] flex justify-center px-4 sm:top-[164px]">
