@@ -567,6 +567,23 @@ internal class GameSmokeTest {
     }
 
     @Test
+    fun flipperActiveCardEvaluatesWildcardCombinations() {
+        val config = testGameConfig("flipper")
+        val service = roundService(config = config)
+        service.startRound(listOf(participant("player-1", "Alpha"), participant("player-2", "Bravo")))
+        service.state.round!!.status = "active"
+
+        // Suited connector cards A♠ K♠ Q♣ + Flipper Q♠ matching Q:
+        // C(4,3) subset includes A♠ K♠ Q♠ forming Pure Sequence (A K Q in spades)
+        val p1 = seat(service, "player-1")
+        setSeatCards(p1, card("A", "spades"), card("K", "spades"), card("Q", "clubs"))
+        p1.reserveCards = mutableListOf(card("Q", "spades"))
+
+        val hand = Engine.evaluateSeatHand(p1, service.state.round!!, config)
+        assertEquals("Pure Sequence", hand.label)
+    }
+
+    @Test
     fun jhanduUnlocksSeeingAfterFirstCycleAndRevealsFirstSharedJoker() {
         val config = testGameConfig("jhandu")
         val service = roundService(config = config)

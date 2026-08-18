@@ -278,17 +278,24 @@ internal object Engine {
         val rankMatches = normalCards.any { it.rank == flipperRank }
         if (!rankMatches) return baseHand
 
-        // Flipper is active — evaluate all 4 three-card subsets and return the best.
-        val allFour = normalCards + flipper
         var best = baseHand
+
+        // 1. Natural 4-card subsets C(4,3)
+        val allFour = normalCards + flipper
         for (skipIndex in allFour.indices) {
             val subset = allFour.filterIndexed { index, _ -> index != skipIndex }
-            // subset always has exactly 3 cards
             val eval = evaluateNaturalHand(subset, config)
             if (compareEvaluations(eval, best, config) > 0) {
                 best = eval
             }
         }
+
+        // 2. Wildcard substitution evaluation: when active, the matching rank acts as a wildcard for hand conversion
+        val wildcardEval = evaluateHand(normalCards, config, emptySet(), setOf(flipperRank))
+        if (compareEvaluations(wildcardEval, best, config) > 0) {
+            best = wildcardEval
+        }
+
         return best
     }
 
