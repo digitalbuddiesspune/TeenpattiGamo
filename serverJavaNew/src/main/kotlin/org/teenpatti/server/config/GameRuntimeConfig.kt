@@ -34,7 +34,7 @@ internal class GameRuntimeConfig {
                 "Flipper",
                 emptyList(),
                 cardsPerSeat = 4,
-                publicCardMode = "third_card_rank_joker",
+                publicCardMode = "flipper_blue_card",
             ),
             "jhandu" to createGameConfig(
                 env,

@@ -22,14 +22,16 @@ const seatLayouts = [
     stateWrap: "bottom-[calc(100%+30px)]",
     hiddenCardClass: "",
     hiddenCardStyles: [
-      { transform: "rotate(-10deg) translate(4px, 4px)", zIndex: 1 },
-      { transform: "rotate(0deg) translate(0, 0)", zIndex: 2 },
-      { transform: "rotate(10deg) translate(-4px, 4px)", zIndex: 1 }
+      { transform: "rotate(-12deg) translate(6px, 4px)", zIndex: 1 },
+      { transform: "rotate(-4deg) translate(2px, 1px)", zIndex: 2 },
+      { transform: "rotate(4deg) translate(-2px, 1px)", zIndex: 3 },
+      { transform: "rotate(12deg) translate(-6px, 4px)", zIndex: 4 }
     ],
     visibleCardStyles: [
       { transform: "rotate(-12deg) translate(10px, 6px)", zIndex: 1 },
-      { transform: "rotate(0deg) translate(0, 0)", zIndex: 2 },
-      { transform: "rotate(12deg) translate(-10px, 6px)", zIndex: 3 }
+      { transform: "rotate(-4deg) translate(3px, 2px)", zIndex: 2 },
+      { transform: "rotate(4deg) translate(-3px, 2px)", zIndex: 3 },
+      { transform: "rotate(12deg) translate(-10px, 6px)", zIndex: 4 }
     ]
   },
   {
@@ -44,14 +46,16 @@ const seatLayouts = [
     stateWrap: "top-[-20px]",
     hiddenCardClass: "",
     hiddenCardStyles: [
-      { transform: "translate(0, -2px) rotate(80deg)", zIndex: 1 },
-      { transform: "translate(0, 0) rotate(90deg)", zIndex: 2 },
-      { transform: "translate(0, 2px) rotate(100deg)", zIndex: 1 }
+      { transform: "translate(0, -3px) rotate(75deg)", zIndex: 1 },
+      { transform: "translate(0, -1px) rotate(85deg)", zIndex: 2 },
+      { transform: "translate(0, 1px) rotate(95deg)", zIndex: 3 },
+      { transform: "translate(0, 3px) rotate(105deg)", zIndex: 4 }
     ],
     visibleCardStyles: [
-      { transform: "translate(0, -3px) rotate(88deg)", zIndex: 1 },
-      { transform: "translate(0, 0) rotate(90deg)", zIndex: 2 },
-      { transform: "translate(0, 3px) rotate(92deg)", zIndex: 3 }
+      { transform: "translate(0, -3px) rotate(85deg)", zIndex: 1 },
+      { transform: "translate(0, -1px) rotate(88deg)", zIndex: 2 },
+      { transform: "translate(0, 1px) rotate(92deg)", zIndex: 3 },
+      { transform: "translate(0, 3px) rotate(95deg)", zIndex: 4 }
     ]
   },
   {
@@ -66,14 +70,16 @@ const seatLayouts = [
     stateWrap: "top-[-20px]",
     hiddenCardClass: "",
     hiddenCardStyles: [
-      { transform: "translate(0, -2px) rotate(80deg)", zIndex: 1 },
-      { transform: "translate(0, 0) rotate(90deg)", zIndex: 2 },
-      { transform: "translate(0, 2px) rotate(100deg)", zIndex: 1 }
+      { transform: "translate(0, -3px) rotate(75deg)", zIndex: 1 },
+      { transform: "translate(0, -1px) rotate(85deg)", zIndex: 2 },
+      { transform: "translate(0, 1px) rotate(95deg)", zIndex: 3 },
+      { transform: "translate(0, 3px) rotate(105deg)", zIndex: 4 }
     ],
     visibleCardStyles: [
-      { transform: "translate(0, -3px) rotate(88deg)", zIndex: 1 },
-      { transform: "translate(0, 0) rotate(90deg)", zIndex: 2 },
-      { transform: "translate(0, 3px) rotate(92deg)", zIndex: 3 }
+      { transform: "translate(0, -3px) rotate(85deg)", zIndex: 1 },
+      { transform: "translate(0, -1px) rotate(88deg)", zIndex: 2 },
+      { transform: "translate(0, 1px) rotate(92deg)", zIndex: 3 },
+      { transform: "translate(0, 3px) rotate(95deg)", zIndex: 4 }
     ]
   },
   {
@@ -88,14 +94,16 @@ const seatLayouts = [
     stateWrap: "top-[-20px]",
     hiddenCardClass: "",
     hiddenCardStyles: [
-      { transform: "translate(0, -2px) rotate(-80deg)", zIndex: 1 },
-      { transform: "translate(0, 0) rotate(-90deg)", zIndex: 2 },
-      { transform: "translate(0, 2px) rotate(-100deg)", zIndex: 1 }
+      { transform: "translate(0, -3px) rotate(-75deg)", zIndex: 1 },
+      { transform: "translate(0, -1px) rotate(-85deg)", zIndex: 2 },
+      { transform: "translate(0, 1px) rotate(-95deg)", zIndex: 3 },
+      { transform: "translate(0, 3px) rotate(-105deg)", zIndex: 4 }
     ],
     visibleCardStyles: [
-      { transform: "translate(0, -3px) rotate(-88deg)", zIndex: 1 },
-      { transform: "translate(0, 0) rotate(-90deg)", zIndex: 2 },
-      { transform: "translate(0, 3px) rotate(-92deg)", zIndex: 3 }
+      { transform: "translate(0, -3px) rotate(-85deg)", zIndex: 1 },
+      { transform: "translate(0, -1px) rotate(-88deg)", zIndex: 2 },
+      { transform: "translate(0, 1px) rotate(-92deg)", zIndex: 3 },
+      { transform: "translate(0, 3px) rotate(-95deg)", zIndex: 4 }
     ]
   },
   {
@@ -110,14 +118,16 @@ const seatLayouts = [
     stateWrap: "top-[-20px]",
     hiddenCardClass: "",
     hiddenCardStyles: [
-      { transform: "translate(0, -2px) rotate(-80deg)", zIndex: 1 },
-      { transform: "translate(0, 0) rotate(-90deg)", zIndex: 2 },
-      { transform: "translate(0, 2px) rotate(-100deg)", zIndex: 1 }
+      { transform: "translate(0, -3px) rotate(-75deg)", zIndex: 1 },
+      { transform: "translate(0, -1px) rotate(-85deg)", zIndex: 2 },
+      { transform: "translate(0, 1px) rotate(-95deg)", zIndex: 3 },
+      { transform: "translate(0, 3px) rotate(-105deg)", zIndex: 4 }
     ],
     visibleCardStyles: [
-      { transform: "translate(0, -3px) rotate(-88deg)", zIndex: 1 },
-      { transform: "translate(0, 0) rotate(-90deg)", zIndex: 2 },
-      { transform: "translate(0, 3px) rotate(-92deg)", zIndex: 3 }
+      { transform: "translate(0, -3px) rotate(-85deg)", zIndex: 1 },
+      { transform: "translate(0, -1px) rotate(-88deg)", zIndex: 2 },
+      { transform: "translate(0, 1px) rotate(-92deg)", zIndex: 3 },
+      { transform: "translate(0, 3px) rotate(-95deg)", zIndex: 4 }
     ]
   }
 ];
@@ -234,15 +244,15 @@ export default function Seat({
   const revealedCardStyles = isUser
     ? [
         { transform: "rotate(-6deg) translateY(2px)", zIndex: 1 },
-        { transform: "rotate(0deg) translateY(0)", zIndex: 2 },
-        { transform: "rotate(6deg) translateY(2px)", zIndex: 3 },
-        { transform: "rotate(10deg) translateY(4px)", zIndex: 4 },
+        { transform: "rotate(-2deg) translateY(0)", zIndex: 2 },
+        { transform: "rotate(2deg) translateY(0)", zIndex: 3 },
+        { transform: "rotate(6deg) translateY(2px)", zIndex: 4 },
       ]
     : [
-        { transform: "rotate(-2deg)", zIndex: 1 },
-        { transform: "rotate(0deg)", zIndex: 2 },
-        { transform: "rotate(2deg)", zIndex: 3 },
-        { transform: "rotate(4deg)", zIndex: 4 },
+        { transform: "rotate(-3deg)", zIndex: 1 },
+        { transform: "rotate(-1deg)", zIndex: 2 },
+        { transform: "rotate(1deg)", zIndex: 3 },
+        { transform: "rotate(3deg)", zIndex: 4 },
       ];
   const cardsRowClass = cardsRevealed
     ? isUser
@@ -255,15 +265,17 @@ export default function Seat({
       : "right-[calc(100%-2px)] top-1/2 -translate-y-1/2"
     : layout.cardsWrap;
   const publicCards = Array.isArray(seat.publicCards) ? seat.publicCards.filter(Boolean) : [];
+  const isFlipperVariant = publicCardMode === "flipper_blue_card";
   const showPublicCards = publicCardMode === "third_card_rank_joker" && publicCards.length > 0 && !isStarting && !isDealing;
-  const shouldShowReservePlaceholder = publicCardMode === "third_card_rank_joker" && !isStarting && !isDealing && publicCards.length < 2;
   const rawHandCards = Array.isArray(seat.cards) ? seat.cards : [];
-  const duplicatedPublicCardCount = showPublicCards && rawHandCards.length > 0 ? 1 : 0;
-  const privateHandCards = duplicatedPublicCardCount > 0 ? rawHandCards.slice(0, rawHandCards.length - duplicatedPublicCardCount) : rawHandCards;
-  const handCardCount = privateHandCards.length || Math.max(2, cardsPerSeat - publicCards.length - duplicatedPublicCardCount);
+  const handCardCount = rawHandCards.length || 3;
   const dealtCardCount = Number.isInteger(dealtCount) ? Math.max(0, Math.min(cardsPerSeat, dealtCount)) : 0;
   const handCardsToRender = hasVisibleCards
-    ? privateHandCards.map((card, index) => ({ ...card, displayType: "hand", renderKey: `${seat.id}-hand-${index}-${card.id || "card"}` }))
+    ? rawHandCards.map((card, index) => ({
+        ...card,
+        displayType: "hand",
+        renderKey: `${seat.id}-hand-${index}-${card.id || "card"}`
+      }))
     : isStarting
       ? []
       : isDealing
@@ -288,19 +300,21 @@ export default function Seat({
         renderKey: `${seat.id}-public-${index}-${card.id || "card"}`
       }))
     : [];
-  const reservePlaceholderCard = shouldShowReservePlaceholder
-    ? {
-        id: `${seat.id}-reserve-placeholder`,
-        hidden: true,
-        displayType: "reserve_placeholder",
-        cardAccent: "reserve",
-        renderKey: `${seat.id}-reserve-placeholder`
-      }
-    : null;
+  // Flipper blue card — always shown as a separate card with blue accent.
+  // During active play opponents get a hidden placeholder (server sends hidden:true).
+  const rawFlipperCard = isFlipperVariant ? seat.flipperCard ?? null : null;
+  const flipperCardsToRender = rawFlipperCard && !isStarting && !isDealing
+    ? [{
+        ...rawFlipperCard,
+        displayType: "flipper",
+        cardAccent: "flipper",
+        renderKey: `${seat.id}-flipper-${rawFlipperCard.id || "card"}`
+      }]
+    : [];
   const cardsToRender = [
     ...handCardsToRender,
     ...publicCardsToRender,
-    ...(reservePlaceholderCard ? [reservePlaceholderCard] : [])
+    ...flipperCardsToRender,
   ];
   const seatState = seat.packed ? "PACK" : seat.seen ? "SEEN" : "BLIND";
   const sideShowStatus = sideShowResult
@@ -365,20 +379,22 @@ export default function Seat({
                 key={card.renderKey || `${seat.id}-${index}`}
                 className={`table-seat__dealt-card ${
                   cardsRevealed || index === 0 ? "" : layout.overlap
-                }`}
+                } ${card.cardAccent === "flipper" ? "ml-1.5 sm:ml-2" : ""}`}
               >
                 <PlayingCard
                   card={card}
-                  revealed={card.displayType === "public" || (hasVisibleCards && shouldRevealCards)}
+                  revealed={card.displayType === "public" || card.displayType === "flipper" || (hasVisibleCards && shouldRevealCards)}
                   compact={!isUser}
                   className={
                     card.hidden
                       ? layout.hiddenCardClass
-                      : card.cardAccent === "joker"
-                        ? "ring-1 ring-[#7ef6eb]/80"
-                        : card.cardAccent === "reserve"
-                          ? "ring-1 ring-[#ffd08a]/85"
-                          : ""
+                      : card.cardAccent === "flipper"
+                        ? "ring-2 ring-[#5ac8fa]/90 shadow-[0_0_10px_rgba(90,200,250,0.55)]"
+                        : card.cardAccent === "joker"
+                          ? "ring-1 ring-[#7ef6eb]/80"
+                          : card.cardAccent === "reserve"
+                            ? "ring-1 ring-[#ffd08a]/85"
+                            : ""
                   }
                   style={
                     card.hidden
@@ -387,7 +403,7 @@ export default function Seat({
                         ? revealedCardStyles[Math.min(index, revealedCardStyles.length - 1)]
                       : hasVisibleCards
                         ? layout.visibleCardStyles?.[index] ?? layout.visibleCardStyles?.[layout.visibleCardStyles.length - 1]
-                        : card.displayType === "public"
+                        : card.displayType === "public" || card.displayType === "flipper"
                           ? revealedCardStyles[Math.min(index, revealedCardStyles.length - 1)]
                           : undefined
                   }

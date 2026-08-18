@@ -32,21 +32,83 @@ internal object ProvablyFairSupport {
         val openingPlayerIndex = random.nextInt(participants.size)
         shuffleDeck(deck, random)
 
+        val remainingDeck = deck.toMutableList()
         val result = CreatedDeal()
         result.openingPlayerIndex = openingPlayerIndex
         repeat(participants.size) {
             result.hands.add(mutableListOf())
         }
 
-        var cursor = 0
-        repeat(config.variant.cardsPerSeat) {
+        // Deal first 3 normal cards to each participant
+        val initialCards = Math.min(3, config.variant.cardsPerSeat)
+        repeat(initialCards) {
             for (player in participants.indices) {
-                result.hands[player].add(deck[cursor++])
+                result.hands[player].add(remainingDeck.removeAt(0))
             }
         }
+
+        // For flipper_blue_card mode: weighted random selection of active flipper counts per round
+        if (config.variant.publicCardMode == "flipper_blue_card" && config.variant.cardsPerSeat >= 4) {
+            val playerCount = participants.size
+            val roll = random.nextInt(100)
+            val activeTargetCount = when {
+                roll < 40 -> if (playerCount == 4) 3 else Math.round(playerCount * 3.0 / 4.0).toInt()
+                roll < 70 -> if (playerCount == 4) 2 else Math.round(playerCount * 2.0 / 4.0).toInt()
+                roll < 85 -> if (playerCount == 4) 1 else Math.round(playerCount * 1.0 / 4.0).toInt()
+                roll < 95 -> playerCount
+                else -> 0
+            }.coerceIn(0, playerCount)
+
+            val playerIndices = participants.indices.toMutableList()
+            for (i in playerIndices.indices.reversed()) {
+                val j = random.nextInt(i + 1)
+                val temp = playerIndices[i]
+                playerIndices[i] = playerIndices[j]
+                playerIndices[j] = temp
+            }
+
+            val activePlayerSet = playerIndices.take(activeTargetCount).toSet()
+
+            for (player in participants.indices) {
+                val normalCards = result.hands[player]
+                val normalRanks = normalCards.mapNotNull { it.rank }.toSet()
+
+                if (activePlayerSet.contains(player)) {
+                    val matchingIndices = remainingDeck.indices.filter { idx ->
+                        normalRanks.contains(remainingDeck[idx].rank)
+                    }
+                    if (matchingIndices.isNotEmpty()) {
+                        val chosenDeckIdx = matchingIndices[random.nextInt(matchingIndices.size)]
+                        result.hands[player].add(remainingDeck.removeAt(chosenDeckIdx))
+                    } else {
+                        result.hands[player].add(remainingDeck.removeAt(0))
+                    }
+                } else {
+                    val nonMatchingIndices = remainingDeck.indices.filter { idx ->
+                        !normalRanks.contains(remainingDeck[idx].rank)
+                    }
+                    if (nonMatchingIndices.isNotEmpty()) {
+                        val chosenDeckIdx = nonMatchingIndices[random.nextInt(nonMatchingIndices.size)]
+                        result.hands[player].add(remainingDeck.removeAt(chosenDeckIdx))
+                    } else {
+                        result.hands[player].add(remainingDeck.removeAt(0))
+                    }
+                }
+            }
+        } else {
+            val remainingPerSeat = config.variant.cardsPerSeat - initialCards
+            if (remainingPerSeat > 0) {
+                repeat(remainingPerSeat) {
+                    for (player in participants.indices) {
+                        result.hands[player].add(remainingDeck.removeAt(0))
+                    }
+                }
+            }
+        }
+
         if (config.variant.sharedJokerMode == "progressive_three") {
             repeat(3) {
-                result.sharedCards.add(deck[cursor++])
+                result.sharedCards.add(remainingDeck.removeAt(0))
             }
         }
 

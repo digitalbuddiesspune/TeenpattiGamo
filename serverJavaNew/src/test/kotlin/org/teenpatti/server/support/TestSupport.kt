@@ -204,7 +204,7 @@ internal fun testGameConfig(variantId: String): GameConfig {
     variant.wildcardRanks = if (variantId == "ak47") mutableListOf("A", "K", "4", "7") else mutableListOf()
     variant.evaluationMode = if (variantId == "muflis") "lowball" else "standard"
     variant.cardsPerSeat = if (variantId == "flipper") 4 else 3
-    variant.publicCardMode = if (variantId == "flipper") "third_card_rank_joker" else "none"
+    variant.publicCardMode = if (variantId == "flipper") "flipper_blue_card" else "none"
     variant.sharedJokerMode = if (variantId == "jhandu") "progressive_three" else "none"
     variant.forceBlindCycles = if (variantId == "jhandu") 1 else 0
     variant.showUnlockCycle = if (variantId == "jhandu") 4 else 0

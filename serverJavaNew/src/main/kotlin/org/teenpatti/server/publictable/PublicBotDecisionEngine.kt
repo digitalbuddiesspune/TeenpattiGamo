@@ -560,6 +560,10 @@ internal class PublicBotDecisionEngine(
     }
 
     private fun evaluateOwnSeenHand(seat: SeatState, visibleState: BotVisibleState): EvaluatedHand {
+        if (config.variant.publicCardMode == "flipper_blue_card") {
+            val flipperCards = if (seat.reserveCards.isNotEmpty()) seat.reserveCards else seat.publicCards
+            return Engine.evaluateFlipperHand(seat.cards, flipperCards, config)
+        }
         val unavailable = visibleState.knownUnavailableCardIds.toMutableSet()
         for (card in seat.cards) {
             unavailable.remove(card.id)

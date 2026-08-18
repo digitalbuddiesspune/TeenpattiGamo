@@ -105,6 +105,12 @@ internal object Engine {
 
     @JvmStatic
     fun evaluateSeatHand(seat: SeatState, round: RoundState, config: GameConfig): EvaluatedHand {
+        // Flipper variant: blue card is a conditional match, not a wildcard.
+        // Route through the dedicated flipper evaluator which ignores the wildcard mechanism.
+        if (config.variant.publicCardMode == "flipper_blue_card") {
+            val flipperCards = if (seat.reserveCards.isNotEmpty()) seat.reserveCards else seat.publicCards
+            return evaluateFlipperHand(seat.cards, flipperCards, config)
+        }
         val unavailableCardIds = collectDealtCardIds(round)
         unavailableCardIds.removeAll(seat.cards.map { it.id }.toSet())
         return evaluateHand(seat.cards, config, unavailableCardIds, getWildcardRanks(round, config))
@@ -112,16 +118,9 @@ internal object Engine {
 
     @JvmStatic
     fun compareSeatHands(first: SeatState, second: SeatState, round: RoundState, config: GameConfig): Int {
-        val all = collectDealtCardIds(round)
-        val firstUnavailable = HashSet(all)
-        firstUnavailable.removeAll(first.cards.map { it.id }.toSet())
-        val secondUnavailable = HashSet(all)
-        secondUnavailable.removeAll(second.cards.map { it.id }.toSet())
-        return compareEvaluations(
-            evaluateHand(first.cards, config, firstUnavailable, getWildcardRanks(round, config)),
-            evaluateHand(second.cards, config, secondUnavailable, getWildcardRanks(round, config)),
-            config,
-        )
+        val firstHand = evaluateSeatHand(first, round, config)
+        val secondHand = evaluateSeatHand(second, round, config)
+        return compareEvaluations(firstHand, secondHand, config)
     }
 
     @JvmStatic
@@ -249,6 +248,48 @@ internal object Engine {
             searchWildcards(depth + 1, wildcardIndexes, working, original, substitutionDeck, config, best)
         }
         working[wildcardIndex] = original[wildcardIndex]
+    }
+
+    /**
+     * Evaluates a Flipper hand.
+     *
+     * Rules:
+     *  - [normalCards] contains exactly 3 standard dealt cards.
+     *  - [reserveCards] contains exactly 1 Blue Flipper card.
+     *  - The Flipper is NOT a wildcard. It can only activate when its rank already
+     *    appears in at least one of the three normal cards.
+     *  - When active, the engine considers all C(4,3) = 4 three-card subsets
+     *    formed from (normalCards + flipper) and returns the best evaluation.
+     *  - When inactive, only the original three normal cards are evaluated.
+     */
+    @JvmStatic
+    fun evaluateFlipperHand(
+        normalCards: List<Card>,
+        reserveCards: List<Card>,
+        config: GameConfig,
+    ): EvaluatedHand {
+        val baseHand = evaluateNaturalHand(normalCards, config)
+        if (reserveCards.isEmpty()) return baseHand
+
+        val flipper = reserveCards[0]
+        val flipperRank = flipper.rank ?: return baseHand
+
+        // Activation check: at least one normal card must share the flipper's rank.
+        val rankMatches = normalCards.any { it.rank == flipperRank }
+        if (!rankMatches) return baseHand
+
+        // Flipper is active — evaluate all 4 three-card subsets and return the best.
+        val allFour = normalCards + flipper
+        var best = baseHand
+        for (skipIndex in allFour.indices) {
+            val subset = allFour.filterIndexed { index, _ -> index != skipIndex }
+            // subset always has exactly 3 cards
+            val eval = evaluateNaturalHand(subset, config)
+            if (compareEvaluations(eval, best, config) > 0) {
+                best = eval
+            }
+        }
+        return best
     }
 
     private fun evaluateNaturalHand(cards: List<Card>, config: GameConfig): EvaluatedHand {

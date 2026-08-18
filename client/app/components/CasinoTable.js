@@ -310,7 +310,7 @@ export default function CasinoTable({
   // Only show jokers that have actually been revealed (hidden !== true).
   const sharedJokers = (variantState?.sharedJokers || []).filter((c) => !c.hidden);
   const cardsPerSeat = Math.max(3, Number(variant?.cardsPerSeat) || 3);
-  const showSharedJokersTray = sharedJokers.length > 0 && variant?.publicCardMode !== "third_card_rank_joker";
+  const showSharedJokersTray = sharedJokers.length > 0 && variant?.publicCardMode !== "third_card_rank_joker" && variant?.publicCardMode !== "flipper_blue_card";
 
   const processedChipKeysRef = useRef(new Set());
   const tableSeatsRef = useRef(tableSeats);

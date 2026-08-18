@@ -186,13 +186,22 @@ internal class RoundTableService(
             seat.connected = participant.connected
             seat.active = true
             val dealtCards = deal.hands[index]
-            if (config.variant.publicCardMode == "third_card_rank_joker") {
-                seat.cards = dealtCards.take(3).toMutableList()
-                seat.publicCards = dealtCards.drop(2).take(1).toMutableList()
-                seat.reserveCards = dealtCards.drop(3).toMutableList()
-            } else {
-                seat.cards = dealtCards.take(3).toMutableList()
-                seat.reserveCards = dealtCards.drop(3).toMutableList()
+            when (config.variant.publicCardMode) {
+                "third_card_rank_joker" -> {
+                    seat.cards = dealtCards.take(3).toMutableList()
+                    seat.publicCards = dealtCards.drop(2).take(1).toMutableList()
+                    seat.reserveCards = dealtCards.drop(3).toMutableList()
+                }
+                "flipper_blue_card" -> {
+                    // 3 normal cards are played; the 4th (blue Flipper) is held privately
+                    // in reserveCards. It is NOT shown publicly at deal time.
+                    seat.cards = dealtCards.take(3).toMutableList()
+                    seat.reserveCards = dealtCards.drop(3).take(1).toMutableList()
+                }
+                else -> {
+                    seat.cards = dealtCards.take(3).toMutableList()
+                    seat.reserveCards = dealtCards.drop(3).toMutableList()
+                }
             }
             seat.totalContributed = config.bootAmount
             seat.lastAction = LastAction("boot", config.bootAmount, now)
@@ -495,6 +504,27 @@ internal class RoundTableService(
             if (seat.cards.isNotEmpty() && canReveal) {
                 item["handLabel"] = Engine.evaluateSeatHand(seat, round, config).label
             }
+            // Flipper blue card: send to the seat owner always so they can see their own card.
+            // On round complete, reveal to all players (same rules as normal card reveal).
+            // During active play for opponents: send a hidden placeholder so the UI
+            // knows a blue card slot exists without leaking its identity.
+            if (config.variant.publicCardMode == "flipper_blue_card") {
+                val blueCard: Card? = when {
+                    seat.reserveCards.isNotEmpty() -> seat.reserveCards[0]
+                    seat.publicCards.isNotEmpty() -> seat.publicCards[0]
+                    else -> null
+                }
+                if (blueCard != null) {
+                    val revealBlue = isViewer || round.status == "complete" || seat.publicCards.isNotEmpty()
+                    item["flipperCard"] = linkedMapOf<String, Any?>().also { c ->
+                        c["id"] = if (revealBlue) blueCard.id else "hidden-flipper-${seat.id}"
+                        c["rank"] = if (revealBlue) blueCard.rank else null
+                        c["suit"] = if (revealBlue) blueCard.suit else null
+                        c["value"] = if (revealBlue) blueCard.value else null
+                        c["hidden"] = !revealBlue
+                    }
+                }
+            }
             item["publicCards"] = seat.publicCards
             item["totalContributed"] = seat.totalContributed
             item["lastAction"] = seat.lastAction
@@ -722,6 +752,7 @@ internal class RoundTableService(
                 variantState.sharedJokerCards = deal.sharedCards.toMutableList()
             }
         }
+        // third_card_rank_joker: the 3rd dealt card of every hand becomes a shared wildcard rank.
         if (config.variant.publicCardMode == "third_card_rank_joker") {
             for (hand in deal.hands) {
                 if (hand.size >= 3) {
@@ -729,6 +760,8 @@ internal class RoundTableService(
                 }
             }
         }
+        // flipper_blue_card: the blue card is a per-player conditional activator.
+        // It is NOT a shared wildcard — no entries are added to sharedJokerCards.
         syncVariantWildcardRanks(variantState)
         return variantState
     }
@@ -786,13 +819,20 @@ internal class RoundTableService(
     }
 
     private fun revealFlipperReserveCard(round: RoundState, seat: SeatState) {
-        if (config.variant.publicCardMode != "third_card_rank_joker" || seat.reserveCards.isEmpty()) {
+        val isFlipperMode = config.variant.publicCardMode == "third_card_rank_joker" ||
+            config.variant.publicCardMode == "flipper_blue_card"
+        if (!isFlipperMode || seat.reserveCards.isEmpty()) {
             return
         }
         val revealed = seat.reserveCards.removeAt(0)
         seat.publicCards.add(revealed)
-        round.variantState?.sharedJokerCards?.add(revealed)
-        round.variantState?.let { syncVariantWildcardRanks(it) }
+        // For third_card_rank_joker: the revealed card also becomes a shared wildcard rank.
+        // For flipper_blue_card: the card is shown publicly for transparency / provably fair,
+        // but it is NOT added to the shared wildcard pool.
+        if (config.variant.publicCardMode == "third_card_rank_joker") {
+            round.variantState?.sharedJokerCards?.add(revealed)
+            round.variantState?.let { syncVariantWildcardRanks(it) }
+        }
     }
 
     private fun handleSee(seat: SeatState) {

@@ -16,20 +16,59 @@ export default function PlayingCard({ card, revealed, compact = false, className
   const suitClass = compact ? "text-[0.9rem]" : "text-[2rem] sm:text-[2.35rem]";
   const isJokerCard = card.cardAccent === "joker";
   const isReserveCard = card.cardAccent === "reserve";
+  const isFlipperCard = card.cardAccent === "flipper";
+
   const surfaceClasses = compact
-    ? isJokerCard
-      ? "border-[#48d7d1] bg-[linear-gradient(180deg,#d8fffb_0%,#8cebe2_100%)] text-[#053436]"
-      : isReserveCard
-        ? "border-[#ffb867] bg-[linear-gradient(180deg,#fff0cc_0%,#f7be68_100%)] text-[#4b2700]"
-        : "border-[#d2ae58] bg-[linear-gradient(180deg,#ffefb2_0%,#f1c764_100%)] text-[#080808]"
+    ? isFlipperCard
+      ? "border-[#5ac8fa] bg-[linear-gradient(180deg,#e8f8ff_0%,#a8dcf8_100%)] text-[#003a5c]"
+      : isJokerCard
+        ? "border-[#48d7d1] bg-[linear-gradient(180deg,#d8fffb_0%,#8cebe2_100%)] text-[#053436]"
+        : isReserveCard
+          ? "border-[#ffb867] bg-[linear-gradient(180deg,#fff0cc_0%,#f7be68_100%)] text-[#4b2700]"
+          : "border-[#d2ae58] bg-[linear-gradient(180deg,#ffefb2_0%,#f1c764_100%)] text-[#080808]"
+    : isFlipperCard
+      ? "border-[#5ac8fa] bg-[linear-gradient(180deg,#eaf7ff_0%,#a0d8f8_100%)] text-[#003a5c]"
+      : isJokerCard
+        ? "border-[#42d8d1] bg-[linear-gradient(180deg,#d9fffb_0%,#90eee5_100%)] text-[#053436]"
+        : isReserveCard
+          ? "border-[#ffb663] bg-[linear-gradient(180deg,#fff1cf_0%,#f3be67_100%)] text-[#4b2700]"
+          : "border-[#d8b45b] bg-[linear-gradient(180deg,#ffefb5_0%,#f3cd69_100%)] text-[#080808]";
+
+  const inkClass = isFlipperCard
+    ? "text-[#003a5c]"
     : isJokerCard
-      ? "border-[#42d8d1] bg-[linear-gradient(180deg,#d9fffb_0%,#90eee5_100%)] text-[#053436]"
+      ? "text-[#053436]"
       : isReserveCard
-        ? "border-[#ffb663] bg-[linear-gradient(180deg,#fff1cf_0%,#f3be67_100%)] text-[#4b2700]"
-        : "border-[#d8b45b] bg-[linear-gradient(180deg,#ffefb5_0%,#f3cd69_100%)] text-[#080808]";
-  const inkClass = isJokerCard ? "text-[#053436]" : isReserveCard ? "text-[#4b2700]" : "text-[#080808]";
+        ? "text-[#4b2700]"
+        : "text-[#080808]";
 
   if (hidden) {
+    // Flipper card hidden back: blue-tinted so opponents know a blue Flipper card exists
+    if (isFlipperCard) {
+      return (
+        <div
+          className={[
+            "hidden-playing-card hidden-playing-card--flipper relative overflow-hidden border border-[#5ac8fa]/70 drop-shadow-[0_12px_18px_rgba(0,0,0,0.28)]",
+            sizeClasses,
+            className
+          ].join(" ")}
+          style={style}
+        >
+          <span className="absolute inset-0 bg-[linear-gradient(145deg,#d6f0ff_0%,#6ab8e8_42%,#1a6a9e_100%)]" />
+          <span className="absolute inset-[2px] rounded-[inherit] border border-white/28 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.42),transparent_32%),linear-gradient(160deg,rgba(220,245,255,0.94)_0%,rgba(100,185,235,0.96)_52%,rgba(20,90,140,0.98)_100%)]" />
+          <span
+            className="absolute inset-[10%] rounded-[inherit] opacity-40"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(45deg, rgba(10,60,110,0.38) 0 6px, rgba(200,235,255,0.06) 6px 12px)",
+            }}
+          />
+          <span className="absolute inset-[18%] rounded-[inherit] border border-[#c8eeff]/50 bg-[linear-gradient(135deg,rgba(210,240,255,0.48),rgba(30,110,175,0.22))] shadow-[inset_0_0_0_1px_rgba(10,70,130,0.18)]" />
+          <span className="absolute left-1/2 top-1/2 h-[26%] w-[26%] -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[4px] border border-[#aadcf8]/35 bg-[linear-gradient(135deg,rgba(220,245,255,0.92),rgba(60,150,210,0.72))]" />
+        </div>
+      );
+    }
+
     return (
       <div
         className={[

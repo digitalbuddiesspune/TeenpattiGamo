@@ -396,24 +396,25 @@ internal class GameSmokeTest {
     }
 
     @Test
-    fun flipperDealsThreeActiveCardsOnePublicCardAndOneReserveCard() {
+    fun flipperDealsThreeNormalCardsAndOnePrivateBlueCard() {
         val config = testGameConfig("flipper")
         val service = roundService(config = config)
         service.startRound(listOf(participant("player-1", "Alpha"), participant("player-2", "Bravo")))
 
         val round = service.state.round!!
-        assertEquals(2, round.variantState!!.sharedJokerCards.size)
-        assertEquals(2, round.variantState!!.wildcardRanks.size)
+        // Blue card is NOT a global wildcard — sharedJokerCards and wildcardRanks must be empty
+        assertEquals(0, round.variantState!!.sharedJokerCards.size)
+        assertEquals(0, round.variantState!!.wildcardRanks.size)
         round.seats.forEach { seat ->
             assertEquals(3, seat.cards.size)
-            assertEquals(1, seat.publicCards.size)
+            // Blue card is kept private (not in publicCards at deal time)
+            assertEquals(0, seat.publicCards.size)
             assertEquals(1, seat.reserveCards.size)
-            assertEquals(seat.cards[2].id, seat.publicCards[0].id)
         }
     }
 
     @Test
-    fun flipperPackRevealsReserveCardAsAnotherJoker() {
+    fun flipperPackRevealsBluecardPubliclyButDoesNotAddSharedWildcard() {
         val config = testGameConfig("flipper")
         val service = roundService(config = config)
         service.startRound(
@@ -429,13 +430,140 @@ internal class GameSmokeTest {
         val round = service.state.round!!
         val actor = seat(service, "player-1")
         actor.reserveCards = mutableListOf(card("9", "spades"))
-        val beforeCount = round.variantState!!.sharedJokerCards.size
+        val wildcardCountBefore = round.variantState!!.wildcardRanks.size
 
         service.performAction("player-1", "pack", emptyMap())
 
-        assertEquals(beforeCount + 1, round.variantState!!.sharedJokerCards.size)
+        // Blue card is revealed publicly for transparency
         assertTrue(actor.publicCards.any { it.rank == "9" })
-        assertTrue(round.variantState!!.wildcardRanks.contains("9"))
+        // But it must NOT become a shared wildcard
+        assertEquals(wildcardCountBefore, round.variantState!!.wildcardRanks.size)
+        assertFalse(round.variantState!!.wildcardRanks.contains("9"))
+    }
+
+    // --- Flipper activation rule tests (examples from the spec) ---
+
+    @Test
+    fun flipperBlueCardInactiveWhenNoRankMatch() {
+        // Spec example: A♠ K♥ 7♣ + Blue Q♦  →  Flipper inactive  →  High Card (A K 7)
+        val config = testGameConfig("flipper")
+        val service = roundService(config = config)
+        service.startRound(listOf(participant("player-1", "Alpha"), participant("player-2", "Bravo")))
+        service.state.round!!.status = "active"
+
+        val p1 = seat(service, "player-1")
+        setSeatCards(p1, card("A", "spades"), card("K", "hearts"), card("7", "clubs"))
+        p1.reserveCards = mutableListOf(card("Q", "diamonds"))
+
+        val hand = Engine.evaluateSeatHand(p1, service.state.round!!, config)
+        assertEquals("High Card", hand.label)
+    }
+
+    @Test
+    fun flipperBlueCardActivatesWhenRankMatchesPair() {
+        // Spec example: A♠ K♥ K♣ + Blue K♦  →  Flipper active  →  Trail (KKK) beats Pair
+        val config = testGameConfig("flipper")
+        val service = roundService(config = config)
+        service.startRound(listOf(participant("player-1", "Alpha"), participant("player-2", "Bravo")))
+        service.state.round!!.status = "active"
+
+        val p1 = seat(service, "player-1")
+        setSeatCards(p1, card("A", "spades"), card("K", "hearts"), card("K", "clubs"))
+        p1.reserveCards = mutableListOf(card("K", "diamonds"))
+
+        val hand = Engine.evaluateSeatHand(p1, service.state.round!!, config)
+        assertEquals("Trail", hand.label)
+    }
+
+    @Test
+    fun flipperBlueCardActivatesTrailFromExistingPair() {
+        // Spec example: A♠ A♥ 7♣ + Blue A♦  →  Flipper active  →  Trail (AAA)
+        val config = testGameConfig("flipper")
+        val service = roundService(config = config)
+        service.startRound(listOf(participant("player-1", "Alpha"), participant("player-2", "Bravo")))
+        service.state.round!!.status = "active"
+
+        val p1 = seat(service, "player-1")
+        setSeatCards(p1, card("A", "spades"), card("A", "hearts"), card("7", "clubs"))
+        p1.reserveCards = mutableListOf(card("A", "diamonds"))
+
+        val hand = Engine.evaluateSeatHand(p1, service.state.round!!, config)
+        assertEquals("Trail", hand.label)
+    }
+
+    @Test
+    fun flipperBlueCardActivatesPairUpgradeKeepsBestThree() {
+        // Spec example: 2♦ 7♥ Q♥ + Blue Q♠  →  Flipper active  →  Pair (QQ7)
+        val config = testGameConfig("flipper")
+        val service = roundService(config = config)
+        service.startRound(listOf(participant("player-1", "Alpha"), participant("player-2", "Bravo")))
+        service.state.round!!.status = "active"
+
+        val p1 = seat(service, "player-1")
+        setSeatCards(p1, card("2", "diamonds"), card("7", "hearts"), card("Q", "hearts"))
+        p1.reserveCards = mutableListOf(card("Q", "spades"))
+
+        val hand = Engine.evaluateSeatHand(p1, service.state.round!!, config)
+        assertEquals("Pair", hand.label)
+        // The pair rank should be Q (12)
+        assertEquals(12, hand.ranks[0])
+    }
+
+    @Test
+    fun flipperWinnerResolvesCorrectlyAcrossAllPlayers() {
+        // Round from the spec example table:
+        // Player A: A♠ A♥ 7♣ + Blue A♦  → Trail AAA
+        // Player B: K♠ K♦ 5♣ + Blue K♥  → Trail KKK
+        // Player C: Q♠ 9♥ 9♣ + Blue 9♦  → Trail 999
+        // Player D: A♠ K♥ 7♣ + Blue Q♦  → High Card (flipper inactive)
+        // Winner: Player A (Trail AAA > KKK > 999 > High Card)
+        val config = testGameConfig("flipper")
+        val service = roundService(config = config)
+        service.startRound(
+            listOf(
+                participant("player-a", "PlayerA"),
+                participant("player-b", "PlayerB"),
+                participant("player-c", "PlayerC"),
+                participant("player-d", "PlayerD"),
+            ),
+        )
+        service.state.round!!.status = "active"
+
+        val a = seat(service, "player-a")
+        val b = seat(service, "player-b")
+        val c = seat(service, "player-c")
+        val d = seat(service, "player-d")
+
+        setSeatCards(a, card("A", "spades"), card("A", "hearts"), card("7", "clubs"))
+        a.reserveCards = mutableListOf(card("A", "diamonds"))
+
+        setSeatCards(b, card("K", "spades"), card("K", "diamonds"), card("5", "clubs"))
+        b.reserveCards = mutableListOf(card("K", "hearts"))
+
+        setSeatCards(c, card("Q", "spades"), card("9", "hearts"), card("9", "clubs"))
+        c.reserveCards = mutableListOf(card("9", "diamonds"))
+
+        setSeatCards(d, card("A", "clubs"), card("K", "clubs"), card("7", "hearts"))
+        d.reserveCards = mutableListOf(card("Q", "clubs"))
+
+        val round = service.state.round!!
+        val handA = Engine.evaluateSeatHand(a, round, config)
+        val handB = Engine.evaluateSeatHand(b, round, config)
+        val handC = Engine.evaluateSeatHand(c, round, config)
+        val handD = Engine.evaluateSeatHand(d, round, config)
+
+        assertEquals("Trail", handA.label)
+        assertEquals("Trail", handB.label)
+        assertEquals("Trail", handC.label)
+        assertEquals("High Card", handD.label)
+
+        // A (AAA=14) beats B (KKK=13) beats C (999=9) beats D
+        assertTrue(Engine.compareEvaluations(handA, handB, config) > 0)
+        assertTrue(Engine.compareEvaluations(handB, handC, config) > 0)
+        assertTrue(Engine.compareEvaluations(handC, handD, config) > 0)
+
+        val winner = Engine.resolveWinner(listOf(a, b, c, d), round, config)
+        assertEquals("player-a", winner.id)
     }
 
     @Test
@@ -481,6 +609,11 @@ internal class GameSmokeTest {
             ),
         )
         service.state.round!!.status = "active"
+        service.state.round!!.variantState!!.sharedJokerCards = mutableListOf(
+            card("7", "spades"),
+            card("8", "hearts"),
+            card("9", "diamonds"),
+        )
         setActivePlayer(service, "player-1")
 
         repeat(3) {
