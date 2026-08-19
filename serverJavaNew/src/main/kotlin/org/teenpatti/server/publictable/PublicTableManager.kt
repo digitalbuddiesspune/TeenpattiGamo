@@ -635,7 +635,23 @@ internal class PublicTableManager(
         val availableSlots = maxOf(0, config.playerCount - retained.size)
         val promoted = waitingEligible.take(availableSlots)
         val remainingWaiting = waitingEligible.drop(promoted.size).toMutableList()
-        val nextSeatedPlayerIds = retained + promoted
+
+        // If there are still open slots after waiting players, pull from the matchmaking queue
+        val slotsAfterWaiting = availableSlots - promoted.size
+        val matchmakingPromoted = if (slotsAfterWaiting > 0) {
+            players.values
+                .filter { it.status == "matchmaking" && it.tableId == null && isLiveMatchmakingPlayer(it) }
+                .take(slotsAfterWaiting)
+                .also { fromQueue ->
+                    fromQueue.forEach { session ->
+                        matchmakingCoordinator?.remove(config.variant.id, session.id)
+                    }
+                }
+        } else {
+            emptyList()
+        }
+
+        val nextSeatedPlayerIds = retained + promoted + matchmakingPromoted.map { it.id }
         if (nextSeatedPlayerIds.isEmpty()) {
             cleanupTableIfEmpty(table)
             return
@@ -645,6 +661,7 @@ internal class PublicTableManager(
         debitBootsIfNeeded(table, participants, roundId)
         retained.forEach { activatePublicSession(it, table.tableId) }
         promoted.forEach { activatePublicSession(it, table.tableId) }
+        matchmakingPromoted.forEach { activatePublicSession(it.id, table.tableId) }
         remainingWaiting.forEach { playerId ->
             val session = loadSession(playerId)
             if (session != null) {
@@ -658,13 +675,15 @@ internal class PublicTableManager(
             addAll(nextSeatedPlayerIds)
         }
         seating.waitingPlayerIds = remainingWaiting
+        val allPromotedCount = promoted.size + matchmakingPromoted.size
         seating.lastPromotionMessage =
-            if (promoted.isEmpty()) {
+            if (allPromotedCount == 0) {
                 null
-            } else if (promoted.size == 1) {
-                "${loadSession(promoted.first())!!.displayName} joins this round."
+            } else if (allPromotedCount == 1) {
+                val newPlayerId = (promoted + matchmakingPromoted.map { it.id }).first()
+                "${loadSession(newPlayerId)!!.displayName} joins this round."
             } else {
-                "${promoted.size} waiting players joined this round."
+                "$allPromotedCount new players joined this round."
             }
         seating.joinWaitStartedAt = null
         seating.joinWaitEndsAt = null
