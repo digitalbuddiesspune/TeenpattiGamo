@@ -4,7 +4,6 @@ import PlayingCard from "./PlayingCard";
 import Seat from "./Seat";
 import TableCelebration from "./TableCelebration";
 
-const DEAL_SEQUENCE_ORDER = [2, 3, 4, 0, 1];
 const FALLBACK_DEALING_WINDOW_MS = 1800;
 const POT_PAYOUT_DURATION_MS = 2800;
 const POT_CHIP_COUNT = 8;
@@ -55,8 +54,7 @@ function buildChipFlightsBetweenPoints(startCenter, targetCenter, idPrefix, amou
 }
 
 function getClockwiseSeatOrder(seats = []) {
-  const seatLookup = new Map(seats.map((seat) => [seat.seatIndex, seat]));
-  return DEAL_SEQUENCE_ORDER.map((seatIndex) => seatLookup.get(seatIndex)).filter(Boolean);
+  return [...seats].sort((left, right) => left.seatIndex - right.seatIndex);
 }
 
 function ActionPillButton({ children, tone = "dark", disabled, onClick }) {
@@ -225,6 +223,7 @@ export default function CasinoTable({
   const [seatActionNotice, setSeatActionNotice] = useState(null);
   const [bootPotReadyRoundId, setBootPotReadyRoundId] = useState("");
   const bootTransferRoundIdRef = useRef("");
+  const bootPotRevealTimerRef = useRef(null);
   const surfaceRef = useRef(null);
   const potRef = useRef(null);
   const deckAnchorRef = useRef(null);
@@ -320,6 +319,13 @@ export default function CasinoTable({
 
   useEffect(() => {
     processedChipKeysRef.current.clear();
+    bootTransferRoundIdRef.current = "";
+    if (bootPotRevealTimerRef.current) {
+      window.clearTimeout(bootPotRevealTimerRef.current);
+      bootPotRevealTimerRef.current = null;
+    }
+    setBootPotReadyRoundId("");
+    setChipTransferFlights([]);
   }, [round?.id]);
 
   const clearDealTimers = useCallback(() => {
@@ -663,31 +669,32 @@ export default function CasinoTable({
               Math.round((round.potAmount || 0) / Math.max(1, tableSeats?.length || 1)),
             );
 
-      const cleanupFlight = launchMultiSeatBootTransfer(
+      launchMultiSeatBootTransfer(
         bootAmount,
         `boot-transfer-${round.id}`,
       );
 
-      const potRevealTimer = window.setTimeout(() => {
+      if (bootPotRevealTimerRef.current) {
+        window.clearTimeout(bootPotRevealTimerRef.current);
+      }
+      bootPotRevealTimerRef.current = window.setTimeout(() => {
         setBootPotReadyRoundId(round.id);
+        setChipTransferFlights([]);
+        bootPotRevealTimerRef.current = null;
       }, Math.min(1200, CHIP_TRANSFER_DURATION_MS));
 
-      return () => {
-        if (typeof cleanupFlight === "function") cleanupFlight();
-        window.clearTimeout(potRevealTimer);
-      };
+      return undefined;
     }
 
-    if (round.status === "active") {
-      if (bootPotReadyRoundId !== round.id) {
-        setBootPotReadyRoundId(round.id);
-      }
+    if (round.status === "active" && bootPotReadyRoundId !== round.id) {
+      setBootPotReadyRoundId(round.id);
     }
+
+    return undefined;
   }, [
     round?.id,
     round?.status,
     round?.bootAmount,
-    round?.potAmount,
     tableSeats?.length,
     launchMultiSeatBootTransfer,
     bootPotReadyRoundId,

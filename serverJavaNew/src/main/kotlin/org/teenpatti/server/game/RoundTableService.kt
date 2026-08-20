@@ -786,15 +786,6 @@ internal class RoundTableService(
 
     private fun updateVariantProgressAfterTurn(round: RoundState, actorId: String) {
         val variantState = round.variantState ?: return
-        if (variantState.pendingAutoSeePlayerId == actorId) {
-            round.seats.firstOrNull { it.id == actorId && !it.packed }?.let { seat ->
-                if (!seat.seen) {
-                    seat.seen = true
-                    logAction(seat.id, "see", 0, "${seat.name} was automatically marked seen by variant rules.")
-                }
-            }
-            variantState.pendingAutoSeePlayerId = null
-        }
         if (config.variant.publicCardMode == "third_card_rank_joker") {
             syncVariantWildcardRanks(variantState)
         }
@@ -811,11 +802,7 @@ internal class RoundTableService(
         variantState.forceBlindActive = variantState.cycleNumber < config.variant.forceBlindCycles
         variantState.showUnlocked = config.variant.showUnlockCycle == 0 || variantState.cycleNumber >= config.variant.showUnlockCycle
         syncVariantWildcardRanks(variantState)
-        if (config.variant.sharedJokerMode == "progressive_three") {
-            val unseenActiveSeats = Engine.getActiveSeats(round).filter { !it.seen }
-            variantState.pendingAutoSeePlayerId =
-                if (unseenActiveSeats.size == 1 && unseenActiveSeats[0].id != actorId) unseenActiveSeats[0].id else null
-        }
+        variantState.pendingAutoSeePlayerId = null
     }
 
     private fun revealFlipperReserveCard(round: RoundState, seat: SeatState) {

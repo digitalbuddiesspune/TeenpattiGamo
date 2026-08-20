@@ -104,16 +104,8 @@ function getNextRoundDecision(round, nowMs) {
   };
 }
 
-// Visual slots (user always 0 at bottom center):
-// 2 = left-upper, 3 = right-upper  → opposite on the x-axis
-// 1 = left-lower, 4 = right-lower  → two more seats below that pair
-const OPPONENT_DISPLAY_SLOTS = {
-  1: [2],
-  2: [2, 3],
-  3: [2, 3, 1],
-  4: [2, 3, 1, 4],
-};
-
+// Visual seat indices follow clockwise seating from the viewer:
+// 0 = bottom center (viewer), then 1 = left-lower, 2 = left-upper, 3 = right-upper, 4 = right-lower.
 function rotateSeatsForViewer(seats = []) {
   if (!seats.length) {
     return [];
@@ -125,17 +117,10 @@ function rotateSeatsForViewer(seats = []) {
       ? seats
       : seats.map((_, index) => seats[(viewerIndex + index) % seats.length]);
 
-  const viewer = ordered.find((seat) => seat.isUser) || ordered[0];
-  const opponents = ordered.filter((seat) => seat !== viewer);
-  const opponentSlots = OPPONENT_DISPLAY_SLOTS[opponents.length] || [1, 2, 3, 4];
-
-  return [
-    { ...viewer, seatIndex: 0 },
-    ...opponents.map((seat, index) => ({
-      ...seat,
-      seatIndex: opponentSlots[index] ?? index + 1,
-    })),
-  ];
+  return ordered.map((seat, index) => ({
+    ...seat,
+    seatIndex: index,
+  }));
 }
 
 function StatusBanner({ title, message, tone = "default", timerLabel = null }) {
@@ -605,7 +590,6 @@ export default function GameClient({
 }) {
   const router = useRouter();
   const [turnNow, setTurnNow] = useState(() => Date.now());
-  const [selectedStake, setSelectedStake] = useState(0);
   const [isMobileDevice] = useState(true);
   const [lobbyMenuOpen, setLobbyMenuOpen] = useState(false);
   const [lobbyRulesOpen, setLobbyRulesOpen] = useState(false);
@@ -1110,15 +1094,7 @@ export default function GameClient({
     round,
     userSeat,
     acting: activeActing,
-    selectedStake,
   });
-
-  const handleSelectStake = useCallback((stake) => {
-    if (!Number.isFinite(stake) || stake <= 0) {
-      return;
-    }
-    setSelectedStake(stake);
-  }, []);
 
   function handleSelectVariant(variantId) {
     try {
@@ -1286,7 +1262,6 @@ export default function GameClient({
                   acting={activeActing}
                   onAction={handleGameplayAction}
                   stakeState={stakeControlState}
-                  onSelectStake={handleSelectStake}
                 />
               ) : waitingForSeat ? null : (
                   <div className="table-screen__status pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:px-6 sm:pb-5">

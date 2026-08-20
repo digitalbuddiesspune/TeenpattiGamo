@@ -30,27 +30,12 @@ export function buildStakeControlState({
   round,
   userSeat,
   acting,
-  selectedStake,
 }) {
   const roundInactive = !round || round.status !== "active";
   const isTurn = userSeat?.isTurn && round?.status === "active";
   const balance = userSeat?.balance || 0;
   const stake = round?.currentStake || 0;
   const minimumStake = userSeat?.seen ? stake * 2 : stake;
-  const raiseStake = userSeat?.seen ? stake * 4 : stake * 2;
-  const stakeOptions = [];
-
-  if (minimumStake > 0 && balance >= minimumStake) {
-    stakeOptions.push(minimumStake);
-  }
-
-  if (raiseStake > minimumStake && balance >= raiseStake) {
-    stakeOptions.push(raiseStake);
-  }
-
-  const resolvedStake = stakeOptions.includes(selectedStake) ? selectedStake : stakeOptions[0] || 0;
-  const selectedIndex = stakeOptions.indexOf(resolvedStake);
-  const displayStake = resolvedStake || minimumStake || 0;
   const controlsLocked = Boolean(acting);
 
   return {
@@ -59,21 +44,8 @@ export function buildStakeControlState({
     balance,
     stake,
     minimumStake,
-    raiseStake,
-    stakeOptions,
-    resolvedStake,
-    selectedIndex,
-    displayStake,
     canAffordCall: balance >= minimumStake,
-    canIncreaseStake:
-      isTurn &&
-      !controlsLocked &&
-      selectedIndex !== -1 &&
-      selectedIndex < stakeOptions.length - 1,
-    canDecreaseStake:
-      isTurn &&
-      !controlsLocked &&
-      selectedIndex > 0,
+    controlsLocked,
   };
 }
 
@@ -309,18 +281,13 @@ export default function TableControls({
   acting,
   onAction,
   stakeState,
-  onSelectStake,
 }) {
   const [pendingAction, setPendingAction] = useState(null);
-  const [raiseIntent, setRaiseIntent] = useState(false);
   const viewerLegalActions = new Set(round?.viewerLegalActions || []);
-  const computedStakeState = stakeState || buildStakeControlState({ round, userSeat, acting, selectedStake: 0 });
+  const computedStakeState = stakeState || buildStakeControlState({ round, userSeat, acting });
   const {
     roundInactive,
     isTurn,
-    minimumStake,
-    displayStake,
-    stakeOptions,
     canAffordCall,
   } = computedStakeState;
   const pendingSideShow = round?.pendingSideShow || null;
@@ -329,26 +296,29 @@ export default function TableControls({
   const activePlayers = round?.remainingPlayers?.length || 0;
   const effectiveRound = seats ? { ...round, seats } : round;
   const previousActiveSeat = getPreviousActiveSeat(effectiveRound, userSeat);
+  const hasSeenCards = Boolean(userSeat?.seen);
   const canPack = isTurn && userSeat && !userSeat.packed;
   const canSee = isTurn && viewerLegalActions.has("see");
   const canBlind =
     isTurn &&
-    !userSeat?.seen &&
+    !hasSeenCards &&
     canAffordCall &&
     (viewerLegalActions.has("blind") || viewerLegalActions.has("raise"));
+  const canRaise =
+    isTurn &&
+    hasSeenCards &&
+    viewerLegalActions.has("raise");
   const canChaal =
     isTurn &&
-    userSeat?.seen &&
+    hasSeenCards &&
     canAffordCall &&
     (viewerLegalActions.has("chaal") || viewerLegalActions.has("raise"));
   const canSideshow =
-    isTurn && viewerLegalActions.has("sideshow") && userSeat?.seen && activePlayers > 2 && previousActiveSeat?.seen && !hasPendingSideShow;
+    isTurn && viewerLegalActions.has("sideshow") && hasSeenCards && activePlayers > 2 && previousActiveSeat?.seen && !hasPendingSideShow;
   const canShow = isTurn && viewerLegalActions.has("show") && activePlayers === 2 && canAffordCall;
   const canUseSideAction = canShow || canSideshow;
   const actionBlocked = hasPendingSideShow || sideShowViewerRole === "target";
   const controlsDisabled = acting || actionBlocked;
-  const blindLabel = raiseIntent ? "Raise" : "Blind";
-  const chaalLabel = raiseIntent ? "Raise" : "Chaal";
   const sideLabel = canShow ? "Show" : "Side Show";
 
   useEffect(() => {
@@ -356,17 +326,6 @@ export default function TableControls({
       setPendingAction(null);
     }
   }, [acting]);
-
-  useEffect(() => {
-    if (!isTurn) {
-      setRaiseIntent(false);
-    }
-  }, [isTurn, round?.id]);
-
-  function handleSelectRaiseStake(stake) {
-    onSelectStake(stake);
-    setRaiseIntent(true);
-  }
 
   async function triggerAction(actionType) {
     if (acting || !actionType) {
@@ -381,40 +340,47 @@ export default function TableControls({
     }
   }
 
-  async function handleBlind() {
-    if (roundInactive || !canBlind || controlsDisabled || !displayStake) {
+  async function handlePrimaryBet() {
+    if (roundInactive || controlsDisabled) {
       return;
     }
-    await triggerAction(raiseIntent ? "raise" : "blind");
+
+    if (hasSeenCards) {
+      if (!canRaise) {
+        return;
+      }
+      await triggerAction("raise");
+      return;
+    }
+
+    if (!canBlind) {
+      return;
+    }
+    await triggerAction("blind");
   }
 
   async function handleChaal() {
-    if (roundInactive || !canChaal || controlsDisabled || !displayStake) {
+    if (roundInactive || !canChaal || controlsDisabled) {
       return;
     }
-    await triggerAction(raiseIntent ? "raise" : "chaal");
+    await triggerAction("chaal");
   }
 
   return (
     <section className="table-controls pointer-events-none fixed bottom-0 left-1/2 z-50 flex w-full max-w-none -translate-x-1/2 flex-col items-center px-2 pb-[calc(env(safe-area-inset-bottom)+10px)] sm:px-4 sm:pb-4">
       <div className="flex w-full flex-col items-center gap-1.5 sm:gap-2">
-        <div className="pointer-events-auto flex w-full items-center justify-between gap-2">
-          <RaiseStakeSelector
-            stakeOptions={stakeOptions}
-            resolvedStake={displayStake}
-            onSelectStake={handleSelectRaiseStake}
-            acting={acting}
-            disabled={roundInactive || !isTurn || actionBlocked}
-          />
-          <ActionButton
-            label="See"
-            tone="info"
-            onClick={() => triggerAction("see")}
-            disabled={controlsDisabled || !canSee}
-            busy={acting && pendingAction === "see"}
-            className="!flex-none min-w-[64px] max-w-[88px] sm:min-w-[76px]"
-          />
-        </div>
+        {canSee ? (
+          <div className="pointer-events-auto flex w-full justify-end">
+            <ActionButton
+              label="See"
+              tone="info"
+              onClick={() => triggerAction("see")}
+              disabled={controlsDisabled}
+              busy={acting && pendingAction === "see"}
+              className="!flex-none min-w-[64px] max-w-[88px] sm:min-w-[76px]"
+            />
+          </div>
+        ) : null}
 
         <div className="pointer-events-auto grid w-full grid-cols-4 gap-1.5 rounded-[18px] border border-[#f2ddb3]/14 bg-[linear-gradient(180deg,rgba(8,12,18,0.78),rgba(4,8,12,0.9))] px-1.5 py-1.5 shadow-[0_18px_30px_rgba(0,0,0,0.38)] backdrop-blur-md sm:gap-2 sm:px-2 sm:py-2">
           <ActionButton
@@ -425,18 +391,18 @@ export default function TableControls({
             busy={acting && pendingAction === "pack"}
           />
           <ActionButton
-            label={blindLabel}
-            tone="blind"
-            onClick={handleBlind}
-            disabled={roundInactive || !canBlind || controlsDisabled}
-            busy={acting && ["blind", "raise"].includes(pendingAction) && !userSeat?.seen}
+            label={hasSeenCards ? "Raise" : "Blind"}
+            tone={hasSeenCards ? "gold" : "blind"}
+            onClick={handlePrimaryBet}
+            disabled={roundInactive || (hasSeenCards ? !canRaise : !canBlind) || controlsDisabled}
+            busy={acting && ["blind", "raise"].includes(pendingAction)}
           />
           <ActionButton
-            label={chaalLabel}
+            label="Chaal"
             tone="chaal"
             onClick={handleChaal}
             disabled={roundInactive || !canChaal || controlsDisabled}
-            busy={acting && ["chaal", "raise"].includes(pendingAction) && Boolean(userSeat?.seen)}
+            busy={acting && pendingAction === "chaal"}
           />
           <ActionButton
             label={sideLabel}

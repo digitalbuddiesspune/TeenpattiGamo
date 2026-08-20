@@ -716,7 +716,7 @@ internal class GameSmokeTest {
     }
 
     @Test
-    fun jhanduAutoAcceptsSideShowAndAutoSeesLastUnseenPlayer() {
+    fun jhanduKeepsLastUnseenPlayerBlindUntilTheyChooseSee() {
         val config = testGameConfig("jhandu")
         val service = roundService(config = config)
         service.startRound(
@@ -738,11 +738,47 @@ internal class GameSmokeTest {
         first.seen = true
         second.seen = true
         third.seen = false
-        round.variantState!!.pendingAutoSeePlayerId = third.id
         setActivePlayer(service, third.id)
 
         service.performAction(third.id, "blind", emptyMap())
+        service.performAction(first.id, "chaal", emptyMap())
+        service.performAction(second.id, "chaal", emptyMap())
+        setActivePlayer(service, third.id)
+        service.performAction(third.id, "blind", emptyMap())
+        setActivePlayer(service, first.id)
+        service.performAction(first.id, "chaal", emptyMap())
+        service.performAction(second.id, "chaal", emptyMap())
+        setActivePlayer(service, third.id)
+        service.performAction(third.id, "blind", emptyMap())
+
+        assertFalse(third.seen)
+
+        setActivePlayer(service, third.id)
+        service.performAction(third.id, "see", emptyMap())
         assertTrue(third.seen)
+    }
+
+    @Test
+    fun jhanduAutoAcceptsSideShow() {
+        val config = testGameConfig("jhandu")
+        val service = roundService(config = config)
+        service.startRound(
+            listOf(
+                participant("player-1", "Alpha"),
+                participant("player-2", "Bravo"),
+                participant("player-3", "Charlie"),
+            ),
+        )
+        service.state.round!!.status = "active"
+        val round = service.state.round!!
+        round.variantState!!.cycleNumber = 4
+        round.variantState!!.showUnlocked = true
+        round.variantState!!.forceBlindActive = false
+
+        val first = seat(service, "player-1")
+        val second = seat(service, "player-2")
+        first.seen = true
+        second.seen = true
 
         round.pendingSideShow = sideShow(first.id, first.name, second.id, second.name)
         val denyError = assertThrows(IllegalStateException::class.java) {
