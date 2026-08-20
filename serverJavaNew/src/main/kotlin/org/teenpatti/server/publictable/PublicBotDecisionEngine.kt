@@ -165,6 +165,11 @@ internal class PublicBotDecisionEngine(
     }
 
     private fun chooseSeenTurn(round: RoundState, seat: SeatState, actorIndex: Int, context: BotDecisionContext) {
+        if (isAk47Variant()) {
+            chooseAk47SeenTurn(round, seat, context)
+            return
+        }
+
         val activeOpponents = Engine.getActiveSeats(round).filter { it.id != seat.id }
         val deadline = System.nanoTime() + max(1, policy.maxDecisionTimeMs).toLong() * 1_000_000L
         val result =
@@ -267,6 +272,11 @@ internal class PublicBotDecisionEngine(
     }
 
     private fun chooseSeenFallback(round: RoundState, seat: SeatState, context: BotDecisionContext) {
+        if (isAk47Variant()) {
+            chooseAk47SeenTurn(round, seat, context)
+            return
+        }
+
         val evaluation = evaluateOwnSeenHand(seat, context.visibleState)
         context.fallbackUsed = true
         addScore(context, "pack", 0.0, 0.0, 0.0, "Fallback pack score.")
@@ -298,6 +308,74 @@ internal class PublicBotDecisionEngine(
                 context.rationale = "Simulation timed out, so the bot fell back to the cheapest legal continue action."
             }
         }
+    }
+
+    /**
+     * AK47 seen-hand policy:
+     * - Color / Pair / High Card → SHOW immediately (chaal if show is not yet legal)
+     * - Trail / Pure Sequence → 2x raise
+     * - Sequence → chaal only
+     */
+    private fun chooseAk47SeenTurn(round: RoundState, seat: SeatState, context: BotDecisionContext) {
+        val evaluation = evaluateOwnSeenHand(seat, context.visibleState)
+        context.winProbability = 0.0
+        val label = evaluation.label.ifBlank { "category-${evaluation.category}" }
+
+        addScore(context, "pack", 0.0, 0.0, 0.0, "AK47 pack option.")
+        addScore(context, "chaal", 0.0, 0.0, 0.0, "AK47 chaal option.")
+        addScore(context, "raise", 0.0, 0.0, 0.0, "AK47 raise option.")
+        addScore(context, "show", 0.0, 0.0, 0.0, "AK47 show option.")
+
+        when (evaluation.category) {
+            // Trail / Pure Sequence → 2X raise
+            6, 5 -> {
+                context.chosenAction = firstLegal(context, "raise", "chaal", "pack")
+                context.rationale =
+                    if (context.chosenAction == "raise") {
+                        "AK47: $label plays a 2x raise after seeing cards."
+                    } else {
+                        "AK47: $label wanted a 2x raise, so the bot used the strongest legal continue."
+                    }
+            }
+
+            // Sequence → chaal only
+            4 -> {
+                context.chosenAction = firstLegal(context, "chaal", "pack")
+                context.rationale =
+                    if (context.chosenAction == "chaal") {
+                        "AK47: Sequence plays chaal only after seeing cards."
+                    } else {
+                        "AK47: Sequence wanted chaal, so the bot used the strongest legal continue."
+                    }
+            }
+
+            // Color / Pair / High Card → SHOW immediately
+            3, 2, 1 -> {
+                context.chosenAction = firstLegal(context, "show", "chaal", "pack")
+                context.rationale =
+                    if (context.chosenAction == "show") {
+                        "AK47: $label plays SHOW immediately after seeing cards."
+                    } else {
+                        "AK47: $label wanted SHOW immediately, so the bot continued until show is legal."
+                    }
+            }
+
+            else -> {
+                context.chosenAction = firstLegal(context, "chaal", "pack")
+                context.rationale = "AK47: unrecognized seen hand category, so the bot used the cheapest continue."
+            }
+        }
+    }
+
+    private fun isAk47Variant(): Boolean = config.variant.id.equals("ak47", ignoreCase = true)
+
+    private fun firstLegal(context: BotDecisionContext, vararg actions: String): String {
+        for (action in actions) {
+            if (context.legalActions.contains(action)) {
+                return action
+            }
+        }
+        return context.legalActions.firstOrNull() ?: "pack"
     }
 
     private fun buildVisibleState(round: RoundState, seat: SeatState): BotVisibleState {

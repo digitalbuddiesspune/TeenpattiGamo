@@ -80,6 +80,52 @@ internal class GameSmokeTest {
     }
 
     @Test
+    fun ak47SeenBotShowsColorPairOrHighCardImmediately() {
+        listOf(
+            Triple(listOf(card("2", "spades"), card("6", "hearts"), card("9", "clubs")), "High Card", "show"),
+            Triple(listOf(card("9", "hearts"), card("9", "clubs"), card("2", "spades")), "Pair", "show"),
+            Triple(listOf(card("2", "hearts"), card("6", "hearts"), card("9", "hearts")), "Color", "show"),
+        ).forEach { (cards, expectedLabel, expectedAction) ->
+            val service = roundService(config = testGameConfig("ak47"))
+            service.startRound(listOf(participant("player-1", "Alpha"), botParticipant("public-bot-1", "Guest_100001", "raj")))
+            service.state.round!!.status = "active"
+            setActivePlayer(service, "public-bot-1")
+            val bot = seat(service, "public-bot-1")
+            bot.seen = true
+            setSeatCards(bot, *cards.toTypedArray())
+            setSeatCards(seat(service, "player-1"), card("8", "spades"), card("J", "diamonds"), card("Q", "clubs"))
+
+            val decision = invokeDecideBotDecision(service, bot)
+            val evaluation = org.teenpatti.server.game.Engine.evaluateSeatHand(bot, service.state.round!!, testGameConfig("ak47"))
+            assertEquals(expectedLabel, evaluation.label)
+            assertEquals(expectedAction, decision.chosenAction)
+        }
+    }
+
+    @Test
+    fun ak47SeenBotRaisesTrailPureSequenceAndSequence() {
+        listOf(
+            Triple(listOf(card("9", "hearts"), card("9", "clubs"), card("9", "diamonds")), "Trail", "raise"),
+            Triple(listOf(card("8", "hearts"), card("9", "hearts"), card("10", "hearts")), "Pure Sequence", "raise"),
+            Triple(listOf(card("8", "hearts"), card("9", "clubs"), card("10", "diamonds")), "Sequence", "chaal"),
+        ).forEach { (cards, expectedLabel, expectedAction) ->
+            val service = roundService(config = testGameConfig("ak47"))
+            service.startRound(listOf(participant("player-1", "Alpha"), botParticipant("public-bot-1", "Guest_100001", "raj")))
+            service.state.round!!.status = "active"
+            setActivePlayer(service, "public-bot-1")
+            val bot = seat(service, "public-bot-1")
+            bot.seen = true
+            setSeatCards(bot, *cards.toTypedArray())
+            setSeatCards(seat(service, "player-1"), card("2", "spades"), card("6", "diamonds"), card("J", "clubs"))
+
+            val decision = invokeDecideBotDecision(service, bot)
+            val evaluation = org.teenpatti.server.game.Engine.evaluateSeatHand(bot, service.state.round!!, testGameConfig("ak47"))
+            assertEquals(expectedLabel, evaluation.label)
+            assertEquals(expectedAction, decision.chosenAction)
+        }
+    }
+
+    @Test
     fun botSeesAfterOpponentRaise() {
         val service = roundService()
         service.startRound(listOf(participant("player-1", "Alpha"), botParticipant("public-bot-1", "Guest_100001", "raj")))
