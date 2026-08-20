@@ -325,6 +325,50 @@ function LobbyRulesModal({ open, onClose }) {
   );
 }
 
+function LeaveTableConfirmModal({ open, onCancel, onConfirm, confirming }) {
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="leave-confirm" role="dialog" aria-modal="true" aria-label="Leave table">
+      <button
+        type="button"
+        className="leave-confirm__backdrop"
+        onClick={onCancel}
+        aria-label="Stay at table"
+        disabled={confirming}
+      />
+      <div className="leave-confirm__panel">
+        <header className="leave-confirm__header">
+          <h2>Leave Table?</h2>
+        </header>
+        <p className="leave-confirm__copy">
+          You will leave this table and forfeit the current round. Are you sure you want to exit?
+        </p>
+        <div className="leave-confirm__actions">
+          <button
+            type="button"
+            className="leave-confirm__button leave-confirm__button--stay"
+            onClick={onCancel}
+            disabled={confirming}
+          >
+            Stay
+          </button>
+          <button
+            type="button"
+            className="leave-confirm__button leave-confirm__button--leave"
+            onClick={onConfirm}
+            disabled={confirming}
+          >
+            {confirming ? "Leaving..." : "Leave"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TableGameplayBackdrop({ className = "" }) {
   return (
     <div
@@ -565,6 +609,8 @@ export default function GameClient({
   const [isMobileDevice] = useState(true);
   const [lobbyMenuOpen, setLobbyMenuOpen] = useState(false);
   const [lobbyRulesOpen, setLobbyRulesOpen] = useState(false);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [leaveConfirming, setLeaveConfirming] = useState(false);
   const lobbyMenuAnchorRef = useRef(null);
   const [platformProfile, setPlatformProfile] = useState(() => {
     if (typeof window === "undefined") {
@@ -901,6 +947,30 @@ export default function GameClient({
     router.replace(withLaunchQuery("/public"));
   }, [leavePublicTable, router]);
 
+  const requestLeaveTable = useCallback(() => {
+    setLeaveConfirmOpen(true);
+  }, []);
+
+  const cancelLeaveTable = useCallback(() => {
+    if (leaveConfirming) {
+      return;
+    }
+    setLeaveConfirmOpen(false);
+  }, [leaveConfirming]);
+
+  const confirmLeaveTable = useCallback(async () => {
+    if (leaveConfirming) {
+      return;
+    }
+    setLeaveConfirming(true);
+    try {
+      await handleExitTable();
+    } catch {
+      setLeaveConfirming(false);
+      setLeaveConfirmOpen(false);
+    }
+  }, [handleExitTable, leaveConfirming]);
+
   async function handleStartNextPublicRound() {
     await refreshPlatformProfileAfterAction(() => publicReadyNextRound());
   }
@@ -1156,7 +1226,7 @@ export default function GameClient({
                 seats={displaySeats}
                 onAction={handleGameplayAction}
                 acting={activeActing}
-                onExitTable={handleExitTable}
+                onExitTable={requestLeaveTable}
                 onStartNextRound={handleStartNextPublicRound}
                 onDeclineNextRound={handleExitTable}
                 nextRoundDecision={nextRoundDecision}
@@ -1246,6 +1316,14 @@ export default function GameClient({
       <div className="app-shell__content">
         {pageContent}
       </div>
+      <LeaveTableConfirmModal
+        open={leaveConfirmOpen}
+        onCancel={cancelLeaveTable}
+        onConfirm={() => {
+          void confirmLeaveTable();
+        }}
+        confirming={leaveConfirming}
+      />
     </div>
   );
 }
