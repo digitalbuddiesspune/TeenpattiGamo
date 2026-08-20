@@ -1092,10 +1092,7 @@ export default function CasinoTable({
                   </TopHudButton>
                   <SettingsPanel
                     open={settingsOpen}
-                    onExitTable={() => {
-                      setSettingsOpen(false);
-                      onExitTable?.();
-                    }}
+                    onExitTable={onExitTable}
                   />
                 </div>
 
