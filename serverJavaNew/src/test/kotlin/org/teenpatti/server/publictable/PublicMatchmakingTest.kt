@@ -1,6 +1,7 @@
 package org.teenpatti.server
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -38,6 +39,22 @@ internal class PublicMatchmakingTest {
                 emptyList()
             }
         assertTrue(leftoverResolved)
+    }
+
+    @Test
+    fun matchmakingPlayerJoinsExistingOpenTableImmediately() {
+        val fixture = fixture()
+        joinPlayers(fixture.manager, 1)
+        fixture.scheduler.runLast()
+
+        assertEquals(1, fixture.tableRepository.state.size)
+        val existingTableId = fixture.tableRepository.state.keys.single()
+
+        val lateJoiner = fixture.manager.joinPublicTable("Late Joiner", clientSeed("Late Joiner"))
+        assertEquals(existingTableId, lateJoiner["tableId"])
+        assertEquals("waiting_for_next_round", lateJoiner["playerStatus"])
+        assertTrue(!fixture.coordinator.queued.contains(lateJoiner["playerId"]))
+        assertEquals(1, fixture.tableRepository.state.size)
     }
 
     @Test

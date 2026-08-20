@@ -166,6 +166,18 @@ internal class PublicTableManager(
             throw error
         }
         GameEventLog.info("matchmaking_joined", "variantId" to config.variant.id, "playerId" to saved.id)
+
+        // If an open table already exists, seat them immediately for the next round
+        // instead of waiting for the full matchmaking window.
+        if (placeMatchmakingSessionOnExistingTable(saved)) {
+            GameEventLog.info(
+                "matchmaking_immediate_table",
+                "variantId" to config.variant.id,
+                "playerId" to saved.id,
+                "lobbyId" to saved.tableId,
+                "playerStatus" to saved.status,
+            )
+        }
         return serializeForPlayer(saved.id, rawToken)
     }
 
@@ -379,33 +391,58 @@ internal class PublicTableManager(
             return emptyList()
         }
         shuffleSessions(eligible)
-        val distinctPlayerCount = eligible.map(::matchmakingIdentity).distinct().size
+
+        // Prefer filling open seats on live tables before creating new ones.
+        val stillQueued = mutableListOf<PublicPlayerSessionState>()
+        for (session in eligible) {
+            if (!placeMatchmakingSessionOnExistingTable(session)) {
+                stillQueued.add(session)
+            }
+        }
+        if (stillQueued.isEmpty()) {
+            return emptyList()
+        }
+
+        val distinctPlayerCount = stillQueued.map(::matchmakingIdentity).distinct().size
         if (distinctPlayerCount < matchmakingPvpThreshold) {
             GameEventLog.info(
                 "matchmaking_bot_batch",
                 "variantId" to config.variant.id,
-                "playerCount" to eligible.size,
+                "playerCount" to stillQueued.size,
                 "distinctPlayerCount" to distinctPlayerCount,
             )
-            eligible.forEach { session -> tryAssignMatchmakingTable(listOf(session), true) }
+            stillQueued.forEach { session -> tryAssignMatchmakingTable(listOf(session), true) }
             return emptyList()
         }
         val groupSize = config.playerCount
-        val groups = buildDistinctMatchmakingGroups(eligible, groupSize)
+        val groups = buildDistinctMatchmakingGroups(stillQueued, groupSize)
         val assignableCount = groups.sumOf { it.size }
         GameEventLog.info(
             "matchmaking_pvp_batch",
             "variantId" to config.variant.id,
-            "playerCount" to eligible.size,
+            "playerCount" to stillQueued.size,
             "distinctPlayerCount" to distinctPlayerCount,
             "assignedCount" to assignableCount,
-            "queuedRemainder" to eligible.size - assignableCount,
+            "queuedRemainder" to stillQueued.size - assignableCount,
         )
+        val assignedIds = linkedSetOf<String>()
         groups.forEach { group ->
-            tryAssignMatchmakingTable(group, group.size == 1)
+            if (group.size == 1 && placeMatchmakingSessionOnExistingTable(group.first())) {
+                assignedIds.add(group.first().id)
+            } else {
+                tryAssignMatchmakingTable(group, group.size == 1)
+                assignedIds.addAll(group.map { it.id })
+            }
         }
-        val assignedIds = groups.flatten().map { it.id }.toSet()
-        return eligible.filter { !assignedIds.contains(it.id) }.map { it.id }
+        val leftovers = stillQueued.filter { !assignedIds.contains(it.id) }
+        val requeued = mutableListOf<String>()
+        for (session in leftovers) {
+            if (placeMatchmakingSessionOnExistingTable(session)) {
+                continue
+            }
+            requeued.add(session.id)
+        }
+        return requeued
     }
 
     private fun shuffleSessions(sessions: MutableList<PublicPlayerSessionState>) {
@@ -547,11 +584,17 @@ internal class PublicTableManager(
             }
     }
 
-    private fun findTableForJoin(): ManagedPublicTable? {
+    private fun findTableForJoin(): ManagedPublicTable? = findTableForMatchmakingJoin(null)
+
+    private fun findTableForMatchmakingJoin(session: PublicPlayerSessionState?): ManagedPublicTable? {
+        val identity = session?.let(::matchmakingIdentity)
         var fallbackTable: ManagedPublicTable? = null
 
         for (table in tables.values) {
             if (!table.leaseOwned) {
+                continue
+            }
+            if (identity != null && tableHasMatchmakingIdentity(table, identity)) {
                 continue
             }
             var waitingEligible = 0
@@ -574,6 +617,58 @@ internal class PublicTableManager(
         }
 
         return fallbackTable
+    }
+
+    private fun tableHasMatchmakingIdentity(table: ManagedPublicTable, identity: String): Boolean {
+        val seating = seating(table)
+        for (playerId in seating.seatedPlayerIds + seating.waitingPlayerIds) {
+            val existing = loadSession(playerId) ?: continue
+            if (matchmakingIdentity(existing) == identity) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * Immediately place a matchmaking player onto an existing table with open capacity.
+     * Mid-round / between-round joins wait for the next round; empty lobbies seat immediately.
+     */
+    private fun placeMatchmakingSessionOnExistingTable(session: PublicPlayerSessionState): Boolean {
+        if (session.status != "matchmaking" || session.tableId != null) {
+            return false
+        }
+        val table = findTableForMatchmakingJoin(session) ?: return false
+        matchmakingCoordinator?.remove(config.variant.id, session.id)
+
+        val round = table.service.state.round
+        val seating = seating(table)
+        session.tableId = table.tableId
+        session.leftAt = null
+        session.expiresAt = null
+        session.nextRoundReady = false
+
+        if (round == null) {
+            session.status = "active_at_table"
+            if (!seating.seatedPlayerIds.contains(session.id)) {
+                seating.seatedPlayerIds.add(session.id)
+            }
+            seating.waitingPlayerIds.remove(session.id)
+            saveSession(session)
+            scheduleInitialJoinWait(table)
+        } else {
+            // Active or between-round tables: join as waiter so next round includes them.
+            session.status = "waiting_for_next_round"
+            seating.seatedPlayerIds.remove(session.id)
+            if (!seating.waitingPlayerIds.contains(session.id)) {
+                seating.waitingPlayerIds.add(session.id)
+            }
+            saveSession(session)
+            table.service.state.expiresAt = null
+            table.service.persistSnapshot()
+            notifyTableUpdated(table, "player_waiting")
+        }
+        return true
     }
 
     private fun activePlayerCount(table: ManagedPublicTable): Int {
