@@ -80,11 +80,25 @@ internal class GameSmokeTest {
     }
 
     @Test
-    fun ak47SeenBotShowsColorPairOrHighCardImmediately() {
+    fun ak47UnseenBotSeesOnFirstTurn() {
+        val service = roundService(config = testGameConfig("ak47"))
+        service.startRound(listOf(participant("player-1", "Alpha"), botParticipant("public-bot-1", "Guest_100001", "raj")))
+        service.state.round!!.status = "active"
+        setActivePlayer(service, "public-bot-1")
+        val bot = seat(service, "public-bot-1")
+        assertFalse(bot.seen)
+
+        val decision = invokeDecideBotDecision(service, bot)
+
+        assertEquals("see", decision.chosenAction)
+    }
+
+    @Test
+    fun ak47SeenBotPacksColorPairOrHighCard() {
         listOf(
-            Triple(listOf(card("2", "spades"), card("6", "hearts"), card("9", "clubs")), "High Card", "show"),
-            Triple(listOf(card("9", "hearts"), card("9", "clubs"), card("2", "spades")), "Pair", "show"),
-            Triple(listOf(card("2", "hearts"), card("6", "hearts"), card("9", "hearts")), "Color", "show"),
+            Triple(listOf(card("2", "spades"), card("6", "hearts"), card("9", "clubs")), "High Card", "pack"),
+            Triple(listOf(card("9", "hearts"), card("9", "clubs"), card("2", "spades")), "Pair", "pack"),
+            Triple(listOf(card("2", "hearts"), card("6", "hearts"), card("9", "hearts")), "Color", "pack"),
         ).forEach { (cards, expectedLabel, expectedAction) ->
             val service = roundService(config = testGameConfig("ak47"))
             service.startRound(listOf(participant("player-1", "Alpha"), botParticipant("public-bot-1", "Guest_100001", "raj")))

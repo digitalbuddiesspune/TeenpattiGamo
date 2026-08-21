@@ -1561,8 +1561,13 @@ internal class RoundTableService(
 
     private fun decideLegacyBotAction(seat: SeatState): String {
         val round = state.round!!
-        if (!seat.seen && randomSource.nextDouble() > 0.72) {
-            return "see"
+        if (!seat.seen) {
+            if (config.variant.id.equals("ak47", ignoreCase = true)) {
+                return "see"
+            }
+            if (randomSource.nextDouble() > 0.72) {
+                return "see"
+            }
         }
         if (canBotChooseShow(round) && randomSource.nextDouble() > 0.65) {
             return "show"

@@ -115,6 +115,13 @@ internal class PublicBotDecisionEngine(
     }
 
     private fun chooseUnseenTurn(round: RoundState, seat: SeatState, context: BotDecisionContext) {
+        if (isAk47Variant() && context.legalActions.contains("see")) {
+            context.chosenAction = "see"
+            context.rationale = "AK47: the bot always sees cards on its first available turn."
+            addScore(context, "see", 3.0, 0.0, 0.0, context.rationale)
+            return
+        }
+
         val blindActions = countActions(round, seat.id, "blind")
         val shouldSee =
             context.legalActions.contains("see") &&
@@ -312,7 +319,7 @@ internal class PublicBotDecisionEngine(
 
     /**
      * AK47 seen-hand policy:
-     * - Color / Pair / High Card → SHOW immediately (chaal if show is not yet legal)
+     * - Color / Pair / High Card → pack
      * - Trail / Pure Sequence → 2x raise
      * - Sequence → chaal only
      */
@@ -349,15 +356,10 @@ internal class PublicBotDecisionEngine(
                     }
             }
 
-            // Color / Pair / High Card → SHOW immediately
+            // Color / Pair / High Card → pack
             3, 2, 1 -> {
-                context.chosenAction = firstLegal(context, "show", "chaal", "pack")
-                context.rationale =
-                    if (context.chosenAction == "show") {
-                        "AK47: $label plays SHOW immediately after seeing cards."
-                    } else {
-                        "AK47: $label wanted SHOW immediately, so the bot continued until show is legal."
-                    }
+                context.chosenAction = firstLegal(context, "pack")
+                context.rationale = "AK47: $label is too weak to continue, so the bot packs."
             }
 
             else -> {
