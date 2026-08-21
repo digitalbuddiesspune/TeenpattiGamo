@@ -57,7 +57,15 @@ internal object Engine {
         roundId: String,
         serverSeed: String,
         playerSeedInputs: List<ProvablyFairPlayerSeedInput>,
-    ): CreatedDeal = ProvablyFairSupport.createRoundDeal(config, participants, roundId, serverSeed, playerSeedInputs)
+        openingPlayerIndex: Int? = null,
+    ): CreatedDeal = ProvablyFairSupport.createRoundDeal(
+        config,
+        participants,
+        roundId,
+        serverSeed,
+        playerSeedInputs,
+        openingPlayerIndex,
+    )
 
     @JvmStatic
     fun getActiveSeats(round: RoundState): List<SeatState> = round.seats.filter { it.active && !it.packed }

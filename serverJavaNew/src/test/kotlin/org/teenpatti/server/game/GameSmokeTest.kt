@@ -94,11 +94,43 @@ internal class GameSmokeTest {
     }
 
     @Test
-    fun ak47SeenBotPacksColorPairOrHighCard() {
+    fun ak47SeenBotPacksColorPairOrHighCardInMultiwayPot() {
         listOf(
             Triple(listOf(card("2", "spades"), card("6", "hearts"), card("9", "clubs")), "High Card", "pack"),
             Triple(listOf(card("9", "hearts"), card("9", "clubs"), card("2", "spades")), "Pair", "pack"),
             Triple(listOf(card("2", "hearts"), card("6", "hearts"), card("9", "hearts")), "Color", "pack"),
+        ).forEach { (cards, expectedLabel, expectedAction) ->
+            val service = roundService(config = testGameConfig("ak47"))
+            service.startRound(
+                listOf(
+                    participant("player-1", "Alpha"),
+                    participant("player-2", "Bravo"),
+                    botParticipant("public-bot-1", "Guest_100001", "raj"),
+                ),
+            )
+            service.state.round!!.status = "active"
+            setActivePlayer(service, "public-bot-1")
+            val bot = seat(service, "public-bot-1")
+            bot.seen = true
+            seat(service, "player-1").seen = true
+            seat(service, "player-2").seen = true
+            setSeatCards(bot, *cards.toTypedArray())
+            setSeatCards(seat(service, "player-1"), card("8", "spades"), card("J", "diamonds"), card("Q", "clubs"))
+            setSeatCards(seat(service, "player-2"), card("3", "spades"), card("4", "diamonds"), card("5", "clubs"))
+
+            val decision = invokeDecideBotDecision(service, bot)
+            val evaluation = org.teenpatti.server.game.Engine.evaluateSeatHand(bot, service.state.round!!, testGameConfig("ak47"))
+            assertEquals(expectedLabel, evaluation.label)
+            assertEquals(expectedAction, decision.chosenAction)
+        }
+    }
+
+    @Test
+    fun ak47SeenBotShowsWeakHandHeadsUpInsteadOfPacking() {
+        listOf(
+            Triple(listOf(card("2", "spades"), card("6", "hearts"), card("9", "clubs")), "High Card", "show"),
+            Triple(listOf(card("9", "hearts"), card("9", "clubs"), card("2", "spades")), "Pair", "show"),
+            Triple(listOf(card("2", "hearts"), card("6", "hearts"), card("9", "hearts")), "Color", "show"),
         ).forEach { (cards, expectedLabel, expectedAction) ->
             val service = roundService(config = testGameConfig("ak47"))
             service.startRound(listOf(participant("player-1", "Alpha"), botParticipant("public-bot-1", "Guest_100001", "raj")))
@@ -106,6 +138,7 @@ internal class GameSmokeTest {
             setActivePlayer(service, "public-bot-1")
             val bot = seat(service, "public-bot-1")
             bot.seen = true
+            seat(service, "player-1").seen = true
             setSeatCards(bot, *cards.toTypedArray())
             setSeatCards(seat(service, "player-1"), card("8", "spades"), card("J", "diamonds"), card("Q", "clubs"))
 
@@ -392,7 +425,29 @@ internal class GameSmokeTest {
     }
 
     @Test
-    fun singleRealPlayerAlwaysOpensRoundAgainstBots() {
+    fun openingPlayerRotatesClockwiseEachRound() {
+        val config = testGameConfig("classic")
+        val service = roundService(config = config)
+        val participants =
+            listOf(
+                participant("player-a", "A"),
+                participant("player-b", "B"),
+                participant("player-c", "C"),
+                participant("player-d", "D"),
+            )
+        val expectedOpeners = listOf("player-a", "player-b", "player-c", "player-d", "player-a")
+
+        expectedOpeners.forEachIndexed { roundNumber, expectedOpenerId ->
+            service.startRound(participants, "round-$roundNumber")
+            val round = service.state.round!!
+            val opener = round.seats[round.activePlayerIndex]
+            assertEquals(expectedOpenerId, opener.id, "Round ${roundNumber + 1} opener")
+            round.status = "complete"
+        }
+    }
+
+    @Test
+    fun createRoundDealUsesExplicitOpeningPlayerIndex() {
         val config = testGameConfig("classic")
         val participants =
             listOf(
@@ -402,33 +457,9 @@ internal class GameSmokeTest {
             )
         val seeds = listOf(playerSeed("player-1", clientSeed("Alpha")))
 
-        repeat(20) { index ->
-            val deal = Engine.createRoundDeal(config, participants, "round-$index", "server-seed-$index", seeds)
-            assertEquals(0, deal.openingPlayerIndex)
-            assertEquals("player-1", participants[deal.openingPlayerIndex].id)
-        }
-    }
-
-    @Test
-    fun multiRealPlayerRoundStillUsesRandomOpeningPlayer() {
-        val config = testGameConfig("classic")
-        val participants =
-            listOf(
-                participant("player-1", "Alpha"),
-                participant("player-2", "Bravo"),
-                botParticipant("bot-1", "Bot One", "raj"),
-            )
-        val seeds =
-            listOf(
-                playerSeed("player-1", clientSeed("Alpha")),
-                playerSeed("player-2", clientSeed("Bravo")),
-            )
-
-        val openingIndexes = (0 until 30).map { index ->
-            Engine.createRoundDeal(config, participants, "round-$index", "server-seed-$index", seeds).openingPlayerIndex
-        }.toSet()
-
-        assertTrue(openingIndexes.size > 1)
+        val deal = Engine.createRoundDeal(config, participants, "round-1", "server-seed-1", seeds, 2)
+        assertEquals(2, deal.openingPlayerIndex)
+        assertEquals("bot-2", participants[deal.openingPlayerIndex].id)
     }
 
     @Test

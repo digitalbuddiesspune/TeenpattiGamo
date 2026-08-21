@@ -155,6 +155,7 @@ internal class RoundTableService(
             throw IllegalArgumentException("Round participants must be between 2 and ${config.playerCount}.")
         }
         val roundId = requestedRoundId ?: idGenerator.newId()
+        val openingPlayerIndex = resolveOpeningPlayerIndex(participants)
         val deal =
             Engine.createRoundDeal(
                 config,
@@ -162,8 +163,9 @@ internal class RoundTableService(
                 roundId,
                 ProvablyFairSupport.newServerSeed(),
                 collectProvablyFairPlayerSeeds(participants),
+                openingPlayerIndex,
             )
-        val openingPlayerIndex = deal.openingPlayerIndex
+        scheduleNextOpeningPlayer(participants, openingPlayerIndex)
         val now = clockProvider.nowIso()
         val countdownEndsAt = clockProvider.isoFromMillis(clockProvider.now().toEpochMilli() + ROUND_START_COUNTDOWN_MS)
         val openingPot = config.bootAmount * participants.size
@@ -231,6 +233,26 @@ internal class RoundTableService(
         persistState()
         emitState("round_starting")
         scheduleStartCountdown()
+    }
+
+    private fun resolveOpeningPlayerIndex(participants: List<RoundParticipant>): Int {
+        val nextOpeningPlayerId = state.nextOpeningPlayerId
+        if (nextOpeningPlayerId != null) {
+            val existingIndex = participants.indexOfFirst { it.id == nextOpeningPlayerId }
+            if (existingIndex >= 0) {
+                return existingIndex
+            }
+        }
+        return 0
+    }
+
+    private fun scheduleNextOpeningPlayer(participants: List<RoundParticipant>, currentOpeningIndex: Int) {
+        if (participants.isEmpty()) {
+            state.nextOpeningPlayerId = null
+            return
+        }
+        val nextIndex = (currentOpeningIndex + 1) % participants.size
+        state.nextOpeningPlayerId = participants[nextIndex].id
     }
 
     @Synchronized
@@ -386,6 +408,7 @@ internal class RoundTableService(
                 "Well played.",
             )
         next.playerBankrolls = mutableListOf()
+        next.nextOpeningPlayerId = null
         next.publicSeating = if (tableType == "public_table") PublicSeatingState() else null
         next.leaseOwner = if (tableType == "public_table") instanceId else null
         next.leaseExpiresAt = if (tableType == "public_table") extendLease(clockProvider.nowIso()) else null
@@ -1574,6 +1597,12 @@ internal class RoundTableService(
         }
         if (seat.seen) {
             val evaluation = Engine.evaluateSeatHand(seat, round, config)
+            if (config.variant.id.equals("ak47", ignoreCase = true) &&
+                evaluation.category in 1..3 &&
+                Engine.canShow(round)
+            ) {
+                return "show"
+            }
             if (evaluation.category <= 1 && randomSource.nextDouble() > 0.55) {
                 return "pack"
             }

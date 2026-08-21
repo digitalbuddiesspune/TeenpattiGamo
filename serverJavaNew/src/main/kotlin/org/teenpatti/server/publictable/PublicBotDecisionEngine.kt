@@ -319,7 +319,7 @@ internal class PublicBotDecisionEngine(
 
     /**
      * AK47 seen-hand policy:
-     * - Color / Pair / High Card → pack
+     * - Color / Pair / High Card → show heads-up when legal, otherwise pack
      * - Trail / Pure Sequence → 2x raise
      * - Sequence → chaal only
      */
@@ -356,10 +356,15 @@ internal class PublicBotDecisionEngine(
                     }
             }
 
-            // Color / Pair / High Card → pack
+            // Color / Pair / High Card → show heads-up when legal, otherwise pack
             3, 2, 1 -> {
-                context.chosenAction = firstLegal(context, "pack")
-                context.rationale = "AK47: $label is too weak to continue, so the bot packs."
+                context.chosenAction = firstLegal(context, "show", "pack")
+                context.rationale =
+                    if (context.chosenAction == "show") {
+                        "AK47: $label is weak, but heads-up show is available so the bot shows down."
+                    } else {
+                        "AK47: $label is too weak to continue, so the bot packs."
+                    }
             }
 
             else -> {

@@ -20,6 +20,7 @@ internal object ProvablyFairSupport {
         roundId: String,
         serverSeed: String,
         playerSeedInputs: List<ProvablyFairPlayerSeedInput>,
+        openingPlayerIndex: Int? = null,
     ): CreatedDeal {
         require(participants.size >= 2) { "At least two participants are required." }
         require(serverSeed.isNotBlank()) { "Server seed is required." }
@@ -29,18 +30,14 @@ internal object ProvablyFairSupport {
         val masterSeed = TokenSupport.hmacSha256(serverSeed.toByteArray(Charsets.UTF_8), canonicalInput)
         val random = DeterministicRandom(masterSeed)
 
-        val realPlayerIndices = participants.indices.filter { index -> !participants[index].isBot }
-        val openingPlayerIndex =
-            if (realPlayerIndices.size == 1) {
-                realPlayerIndices.first()
-            } else {
-                random.nextInt(participants.size)
-            }
+        val resolvedOpeningPlayerIndex =
+            openingPlayerIndex?.coerceIn(0, participants.size - 1)
+                ?: random.nextInt(participants.size)
         shuffleDeck(deck, random)
 
         val remainingDeck = deck.toMutableList()
         val result = CreatedDeal()
-        result.openingPlayerIndex = openingPlayerIndex
+        result.openingPlayerIndex = resolvedOpeningPlayerIndex
         repeat(participants.size) {
             result.hands.add(mutableListOf())
         }
@@ -125,7 +122,7 @@ internal object ProvablyFairSupport {
         state.serverSeedHash = TokenSupport.sha256Hex(serverSeed)
         state.serverSeed = serverSeed
         state.deckHash = TokenSupport.sha256Hex(deck.joinToString(",") { it.id })
-        state.openingPlayerIndex = openingPlayerIndex
+        state.openingPlayerIndex = resolvedOpeningPlayerIndex
         for (item in playerSeedInputs) {
             val copy = ProvablyFairPlayerSeedInput()
             copy.playerId = item.playerId

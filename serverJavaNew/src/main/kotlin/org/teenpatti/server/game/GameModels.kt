@@ -247,6 +247,7 @@ internal class TableState {
     var autoplay: AutoplaySession? = null
     var messages: MutableList<String> = mutableListOf()
     var playerBankrolls: MutableList<PlayerBankroll> = mutableListOf()
+    var nextOpeningPlayerId: String? = null
     var publicSeating: PublicSeatingState? = null
     var version: Long = 0L
     var leaseOwner: String? = null
