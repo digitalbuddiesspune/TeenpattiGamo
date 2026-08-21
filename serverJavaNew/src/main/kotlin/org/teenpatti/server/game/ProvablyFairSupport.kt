@@ -29,7 +29,13 @@ internal object ProvablyFairSupport {
         val masterSeed = TokenSupport.hmacSha256(serverSeed.toByteArray(Charsets.UTF_8), canonicalInput)
         val random = DeterministicRandom(masterSeed)
 
-        val openingPlayerIndex = random.nextInt(participants.size)
+        val realPlayerIndices = participants.indices.filter { index -> !participants[index].isBot }
+        val openingPlayerIndex =
+            if (realPlayerIndices.size == 1) {
+                realPlayerIndices.first()
+            } else {
+                random.nextInt(participants.size)
+            }
         shuffleDeck(deck, random)
 
         val remainingDeck = deck.toMutableList()

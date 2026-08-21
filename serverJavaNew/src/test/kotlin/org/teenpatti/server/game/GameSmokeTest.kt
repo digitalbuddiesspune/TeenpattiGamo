@@ -392,6 +392,46 @@ internal class GameSmokeTest {
     }
 
     @Test
+    fun singleRealPlayerAlwaysOpensRoundAgainstBots() {
+        val config = testGameConfig("classic")
+        val participants =
+            listOf(
+                participant("player-1", "Alpha"),
+                botParticipant("bot-1", "Bot One", "raj"),
+                botParticipant("bot-2", "Bot Two", "captain"),
+            )
+        val seeds = listOf(playerSeed("player-1", clientSeed("Alpha")))
+
+        repeat(20) { index ->
+            val deal = Engine.createRoundDeal(config, participants, "round-$index", "server-seed-$index", seeds)
+            assertEquals(0, deal.openingPlayerIndex)
+            assertEquals("player-1", participants[deal.openingPlayerIndex].id)
+        }
+    }
+
+    @Test
+    fun multiRealPlayerRoundStillUsesRandomOpeningPlayer() {
+        val config = testGameConfig("classic")
+        val participants =
+            listOf(
+                participant("player-1", "Alpha"),
+                participant("player-2", "Bravo"),
+                botParticipant("bot-1", "Bot One", "raj"),
+            )
+        val seeds =
+            listOf(
+                playerSeed("player-1", clientSeed("Alpha")),
+                playerSeed("player-2", clientSeed("Bravo")),
+            )
+
+        val openingIndexes = (0 until 30).map { index ->
+            Engine.createRoundDeal(config, participants, "round-$index", "server-seed-$index", seeds).openingPlayerIndex
+        }.toSet()
+
+        assertTrue(openingIndexes.size > 1)
+    }
+
+    @Test
     fun publicRoundProvablyFairStateHidesServerSeedUntilCompletion() {
         val config = testGameConfig("classic")
         val manager = publicManager(config = config)
