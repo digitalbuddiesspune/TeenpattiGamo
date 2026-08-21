@@ -173,6 +173,131 @@ internal class GameSmokeTest {
     }
 
     @Test
+    fun muflisSeenBotPacksWeakLowballHandsMultiway() {
+        listOf(
+            Triple(listOf(card("9", "hearts"), card("9", "clubs"), card("9", "diamonds")), "Trail", "pack"),
+            Triple(listOf(card("8", "hearts"), card("9", "hearts"), card("10", "hearts")), "Pure Sequence", "pack"),
+            Triple(listOf(card("8", "hearts"), card("9", "clubs"), card("10", "diamonds")), "Sequence", "pack"),
+            Triple(listOf(card("2", "hearts"), card("6", "hearts"), card("9", "hearts")), "Color", "pack"),
+            Triple(listOf(card("9", "hearts"), card("9", "clubs"), card("2", "spades")), "Pair", "pack"),
+            Triple(listOf(card("A", "spades"), card("6", "hearts"), card("9", "clubs")), "High Card", "pack"),
+            Triple(listOf(card("K", "spades"), card("6", "hearts"), card("9", "clubs")), "High Card", "pack"),
+            Triple(listOf(card("Q", "spades"), card("6", "hearts"), card("9", "clubs")), "High Card", "pack"),
+            Triple(listOf(card("J", "spades"), card("6", "hearts"), card("9", "clubs")), "High Card", "pack"),
+        ).forEach { (cards, expectedLabel, expectedAction) ->
+            val service = roundService(config = testGameConfig("muflis"))
+            service.startRound(
+                listOf(
+                    participant("player-1", "Alpha"),
+                    participant("player-2", "Bravo"),
+                    botParticipant("public-bot-1", "Guest_100001", "raj"),
+                ),
+            )
+            service.state.round!!.status = "active"
+            setActivePlayer(service, "public-bot-1")
+            val bot = seat(service, "public-bot-1")
+            bot.seen = true
+            seat(service, "player-1").seen = true
+            seat(service, "player-2").seen = true
+            setSeatCards(bot, *cards.toTypedArray())
+            setSeatCards(seat(service, "player-1"), card("3", "spades"), card("5", "diamonds"), card("7", "clubs"))
+            setSeatCards(seat(service, "player-2"), card("4", "spades"), card("8", "diamonds"), card("2", "clubs"))
+
+            val decision = invokeDecideBotDecision(service, bot)
+            val evaluation = org.teenpatti.server.game.Engine.evaluateSeatHand(bot, service.state.round!!, testGameConfig("muflis"))
+            assertEquals(expectedLabel, evaluation.label)
+            assertEquals(expectedAction, decision.chosenAction)
+        }
+    }
+
+    @Test
+    fun muflisSeenBotShowsWeakHandHeadsUpInsteadOfPacking() {
+        listOf(
+            Triple(listOf(card("9", "hearts"), card("9", "clubs"), card("2", "spades")), "Pair", "show"),
+            Triple(listOf(card("A", "spades"), card("6", "hearts"), card("9", "clubs")), "High Card", "show"),
+        ).forEach { (cards, expectedLabel, expectedAction) ->
+            val service = roundService(config = testGameConfig("muflis"))
+            service.startRound(listOf(participant("player-1", "Alpha"), botParticipant("public-bot-1", "Guest_100001", "raj")))
+            service.state.round!!.status = "active"
+            setActivePlayer(service, "public-bot-1")
+            val bot = seat(service, "public-bot-1")
+            bot.seen = true
+            seat(service, "player-1").seen = true
+            setSeatCards(bot, *cards.toTypedArray())
+            setSeatCards(seat(service, "player-1"), card("3", "spades"), card("5", "diamonds"), card("7", "clubs"))
+
+            val decision = invokeDecideBotDecision(service, bot)
+            val evaluation = org.teenpatti.server.game.Engine.evaluateSeatHand(bot, service.state.round!!, testGameConfig("muflis"))
+            assertEquals(expectedLabel, evaluation.label)
+            assertEquals(expectedAction, decision.chosenAction)
+        }
+    }
+
+    @Test
+    fun muflisSeenBotRequestsSideshowWithLowHighCard() {
+        val service = roundService(config = testGameConfig("muflis"))
+        service.startRound(
+            listOf(
+                participant("player-1", "Alpha"),
+                participant("player-2", "Bravo"),
+                botParticipant("public-bot-1", "Guest_100001", "raj"),
+            ),
+        )
+        service.state.round!!.status = "active"
+        // Bot acts after Bravo (previous active seat) so sideshow target is Bravo.
+        setActivePlayer(service, "public-bot-1")
+        val bot = seat(service, "public-bot-1")
+        bot.seen = true
+        seat(service, "player-1").seen = true
+        seat(service, "player-2").seen = true
+        setSeatCards(bot, card("9", "spades"), card("6", "hearts"), card("2", "clubs"))
+        setSeatCards(seat(service, "player-1"), card("A", "hearts"), card("K", "diamonds"), card("Q", "clubs"))
+        setSeatCards(seat(service, "player-2"), card("3", "spades"), card("5", "diamonds"), card("7", "clubs"))
+
+        val decision = invokeDecideBotDecision(service, bot)
+        val evaluation = org.teenpatti.server.game.Engine.evaluateSeatHand(bot, service.state.round!!, testGameConfig("muflis"))
+        assertEquals("High Card", evaluation.label)
+        assertEquals("sideshow", decision.chosenAction)
+    }
+
+    @Test
+    fun muflisSeenBotRaisesAfterWinningSideshowAndChaalsAfterDeny() {
+        val service = roundService(config = testGameConfig("muflis"))
+        service.startRound(
+            listOf(
+                participant("player-1", "Alpha"),
+                participant("player-2", "Bravo"),
+                botParticipant("public-bot-1", "Guest_100001", "raj"),
+            ),
+        )
+        service.state.round!!.status = "active"
+        setActivePlayer(service, "public-bot-1")
+        val bot = seat(service, "public-bot-1")
+        bot.seen = true
+        seat(service, "player-1").seen = true
+        seat(service, "player-2").seen = true
+        setSeatCards(bot, card("8", "spades"), card("5", "hearts"), card("3", "clubs"))
+        setSeatCards(seat(service, "player-1"), card("A", "hearts"), card("K", "diamonds"), card("Q", "clubs"))
+        setSeatCards(seat(service, "player-2"), card("4", "spades"), card("6", "diamonds"), card("9", "clubs"))
+
+        val wonResult = org.teenpatti.server.game.SideShowResult()
+        wonResult.winnerId = bot.id
+        wonResult.loserId = "player-2"
+        wonResult.requesterId = bot.id
+        wonResult.targetId = "player-2"
+        wonResult.status = "accepted"
+        service.state.round!!.recentSideShowResult = wonResult
+
+        val raiseDecision = invokeDecideBotDecision(service, bot)
+        assertEquals("raise", raiseDecision.chosenAction)
+
+        service.state.round!!.recentSideShowResult = null
+        bot.lastAction = org.teenpatti.server.game.LastAction("sideshow-denied", 0, "2026-01-01T00:00:00Z")
+        val chaalDecision = invokeDecideBotDecision(service, bot)
+        assertEquals("chaal", chaalDecision.chosenAction)
+    }
+
+    @Test
     fun botSeesAfterOpponentRaise() {
         val service = roundService()
         service.startRound(listOf(participant("player-1", "Alpha"), botParticipant("public-bot-1", "Guest_100001", "raj")))

@@ -98,7 +98,13 @@ internal class PublicBotDecisionEngine(
             val evaluation = evaluateOwnSeenHand(seat, context.visibleState)
             context.fallbackUsed = true
             context.chosenAction =
-                if (config.variant.autoAcceptSideshow) "sideshow_accept" else if (evaluation.category >= 2) "sideshow_accept" else "sideshow_deny"
+                when {
+                    config.variant.autoAcceptSideshow -> "sideshow_accept"
+                    isMuflisVariant() ->
+                        if (isMuflisStrongHighCard(evaluation)) "sideshow_accept" else "sideshow_deny"
+                    evaluation.category >= 2 -> "sideshow_accept"
+                    else -> "sideshow_deny"
+                }
             context.rationale = "Simulation timed out, so the bot fell back to a deterministic seen-hand response."
             return context
         }
@@ -174,6 +180,10 @@ internal class PublicBotDecisionEngine(
     private fun chooseSeenTurn(round: RoundState, seat: SeatState, actorIndex: Int, context: BotDecisionContext) {
         if (isAk47Variant()) {
             chooseAk47SeenTurn(round, seat, context)
+            return
+        }
+        if (isMuflisVariant()) {
+            chooseMuflisSeenTurn(round, seat, context)
             return
         }
 
@@ -283,6 +293,10 @@ internal class PublicBotDecisionEngine(
             chooseAk47SeenTurn(round, seat, context)
             return
         }
+        if (isMuflisVariant()) {
+            chooseMuflisSeenTurn(round, seat, context)
+            return
+        }
 
         val evaluation = evaluateOwnSeenHand(seat, context.visibleState)
         context.fallbackUsed = true
@@ -374,7 +388,92 @@ internal class PublicBotDecisionEngine(
         }
     }
 
+    /**
+     * Muflis (lowball) seen-hand policy:
+     * - Trail / Pure Sequence / Sequence / Color / Pair / High Card A-K-Q-J-10 → pack
+     *   (heads-up → show when legal)
+     * - High Card with top rank 9..2 → sideshow when legal
+     *   - after sideshow win → raise
+     *   - after sideshow deny → chaal
+     *   - heads-up → show
+     */
+    private fun chooseMuflisSeenTurn(round: RoundState, seat: SeatState, context: BotDecisionContext) {
+        val evaluation = evaluateOwnSeenHand(seat, context.visibleState)
+        context.winProbability = 0.0
+        val label = evaluation.label.ifBlank { "category-${evaluation.category}" }
+        val strongLowball = isMuflisStrongHighCard(evaluation)
+        val sideShowOutcome = lastMuflisSideShowOutcome(round, seat.id)
+
+        addScore(context, "pack", 0.0, 0.0, 0.0, "Muflis pack option.")
+        addScore(context, "chaal", 0.0, 0.0, 0.0, "Muflis chaal option.")
+        addScore(context, "raise", 0.0, 0.0, 0.0, "Muflis raise option.")
+        addScore(context, "show", 0.0, 0.0, 0.0, "Muflis show option.")
+        addScore(context, "sideshow", 0.0, 0.0, 0.0, "Muflis sideshow option.")
+
+        if (!strongLowball) {
+            context.chosenAction = firstLegal(context, "show", "pack")
+            context.rationale =
+                if (context.chosenAction == "show") {
+                    "Muflis: $label is weak in lowball, but heads-up show is available so the bot shows down."
+                } else {
+                    "Muflis: $label is weak in lowball (made hand or high card A/K/Q/J/10), so the bot packs."
+                }
+            return
+        }
+
+        when {
+            context.legalActions.contains("show") -> {
+                context.chosenAction = "show"
+                context.rationale = "Muflis: $label is strong in lowball and heads-up show is available."
+            }
+
+            sideShowOutcome == "won" && context.legalActions.contains("raise") -> {
+                context.chosenAction = "raise"
+                context.rationale = "Muflis: $label won a prior side show, so the bot raises."
+            }
+
+            sideShowOutcome == "denied" && context.legalActions.contains("chaal") -> {
+                context.chosenAction = "chaal"
+                context.rationale = "Muflis: $label had a side show denied, so the bot continues with chaal."
+            }
+
+            context.legalActions.contains("sideshow") -> {
+                context.chosenAction = "sideshow"
+                context.rationale = "Muflis: $label is a strong low high-card (9-2), so the bot requests a side show."
+            }
+
+            else -> {
+                context.chosenAction = firstLegal(context, "chaal", "raise", "pack")
+                context.rationale =
+                    "Muflis: $label is strong in lowball but side show is unavailable, so the bot continues."
+            }
+        }
+    }
+
     private fun isAk47Variant(): Boolean = config.variant.id.equals("ak47", ignoreCase = true)
+
+    private fun isMuflisVariant(): Boolean = config.variant.id.equals("muflis", ignoreCase = true)
+
+    /** High Card whose highest rank is 9 or lower (cards in 2..9) — strongest Muflis band. */
+    private fun isMuflisStrongHighCard(evaluation: EvaluatedHand): Boolean =
+        evaluation.category == 1 && evaluation.ranks.isNotEmpty() && evaluation.ranks.first() <= 9
+
+    /**
+     * Last sideshow outcome for this bot in the current round.
+     * - won: bot eliminated another player via accepted sideshow
+     * - denied: bot's sideshow request was denied
+     */
+    private fun lastMuflisSideShowOutcome(round: RoundState, botId: String): String? {
+        val recent = round.recentSideShowResult
+        if (recent != null && recent.winnerId == botId) {
+            return "won"
+        }
+        val seat = findSeat(round, botId) ?: return null
+        return when (seat.lastAction?.type) {
+            "sideshow-denied" -> "denied"
+            else -> null
+        }
+    }
 
     private fun firstLegal(context: BotDecisionContext, vararg actions: String): String {
         for (action in actions) {

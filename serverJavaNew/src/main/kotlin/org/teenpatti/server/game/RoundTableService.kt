@@ -1603,6 +1603,25 @@ internal class RoundTableService(
             ) {
                 return "show"
             }
+            if (config.variant.id.equals("muflis", ignoreCase = true)) {
+                val strongLowball = evaluation.category == 1 && evaluation.ranks.isNotEmpty() && evaluation.ranks.first() <= 9
+                if (!strongLowball) {
+                    return if (canBotChooseShow(round)) "show" else "pack"
+                }
+                if (canBotChooseShow(round)) {
+                    return "show"
+                }
+                if (seat.lastAction?.type == "sideshow-denied") {
+                    return "chaal"
+                }
+                if (round.recentSideShowResult?.winnerId == seat.id) {
+                    return "raise"
+                }
+                if (Engine.canRequestSideshow(round, seat, round.activePlayerIndex)) {
+                    return "sideshow"
+                }
+                return "chaal"
+            }
             if (evaluation.category <= 1 && randomSource.nextDouble() > 0.55) {
                 return "pack"
             }
