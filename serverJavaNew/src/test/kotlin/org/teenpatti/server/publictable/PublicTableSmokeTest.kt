@@ -196,8 +196,8 @@ internal class PublicTableSmokeTest {
     }
 
     @Test
-    fun publicTableRemovesBotsOnceTwoRealPlayersAreSeated() {
-        val config = testGameConfig("classic").apply { publicTableMaxBots = 1 }
+    fun publicTableKeepsBotsFillingSeatsWhenSecondRealPlayerJoins() {
+        val config = testGameConfig("classic").apply { publicTableMaxBots = 4 }
         val tableRepository = InMemoryTableRepository()
         val sessionRepository = InMemoryPublicSessionRepository()
         val clock = MutableClock()
@@ -209,15 +209,17 @@ internal class PublicTableSmokeTest {
 
         assertEquals("waiting_for_next_round", secondJoined["playerStatus"])
         assertEquals(1, tableRepository.state.size)
+        assertEquals(4L, table.service.state.round!!.seats.count { it.isBot }.toLong())
 
         table.service.state.round!!.status = "complete"
         table.service.state.round!!.settledAt = clock.nowIso()
         markPublicSessionReady(manager, firstJoined["playerId"] as String)
         invokeMaybeStartNextRound(manager, table)
 
-        assertEquals(2, table.service.state.round!!.seats.size)
+        // 2 reals → remaining seats stay filled with bots (5 - 2 = 3).
+        assertEquals(5, table.service.state.round!!.seats.size)
         assertEquals(2L, table.service.state.round!!.seats.count { !it.isBot }.toLong())
-        assertEquals(0L, table.service.state.round!!.seats.count { it.isBot }.toLong())
+        assertEquals(3L, table.service.state.round!!.seats.count { it.isBot }.toLong())
     }
 
     @Test
@@ -279,7 +281,7 @@ internal class PublicTableSmokeTest {
     }
 
     @Test
-    fun publicTablePromotesWaitingHumansAheadOfCreatingBots() {
+    fun publicTablePromotesWaitingHumansAndKeepsBotsFillingOpenSeats() {
         val config = testGameConfig("classic").apply { publicTableMaxBots = 3 }
         val tableRepository = InMemoryTableRepository()
         val sessionRepository = InMemoryPublicSessionRepository()
@@ -299,9 +301,10 @@ internal class PublicTableSmokeTest {
         markPublicSessionReady(manager, firstJoined["playerId"] as String)
         invokeMaybeStartNextRound(manager, table)
 
-        assertEquals(3, table.service.state.round!!.seats.size)
+        // 3 humans + bots filling remaining seats (maxBots=3 → 2 bots for a 5-seat table).
+        assertEquals(5, table.service.state.round!!.seats.size)
         assertEquals(3L, table.service.state.round!!.seats.count { !it.isBot }.toLong())
-        assertEquals(0L, table.service.state.round!!.seats.count { it.isBot }.toLong())
+        assertEquals(2L, table.service.state.round!!.seats.count { it.isBot }.toLong())
     }
 
     @Test
@@ -390,17 +393,22 @@ internal class PublicTableSmokeTest {
         val manager = publicManager(config, tableRepository, sessionRepository, InMemoryRoundHistoryRepository(), clock)
 
         val firstJoined = joinPublic(manager, "Alpha")
-        val secondJoined = joinPublic(manager, "Bravo")
+        val waitingJoins = listOf("Bravo", "Charlie", "Delta", "Echo").map { joinPublic(manager, it) }
         val table = managedTable(manager, firstJoined["tableId"] as String)
         val firstBotId = table.service.state.round!!.seats.first { it.isBot }.id
 
-        assertEquals("waiting_for_next_round", secondJoined["playerStatus"])
+        waitingJoins.forEach { joined ->
+            assertEquals("waiting_for_next_round", joined["playerStatus"])
+        }
 
         table.service.state.round!!.status = "complete"
         table.service.state.round!!.settledAt = clock.nowIso()
         markPublicSessionReady(manager, firstJoined["playerId"] as String)
         invokeMaybeStartNextRound(manager, table)
 
+        // 5 humans fill the table; bot seats leave but stored bot slots stay for reuse.
+        assertEquals(5, table.service.state.round!!.seats.size)
+        assertEquals(5L, table.service.state.round!!.seats.count { !it.isBot }.toLong())
         assertEquals(0L, table.service.state.round!!.seats.count { it.isBot }.toLong())
         assertEquals(1, table.service.state.publicSeating!!.botSlots.size)
         assertEquals(firstBotId, table.service.state.publicSeating!!.botSlots.first().id)

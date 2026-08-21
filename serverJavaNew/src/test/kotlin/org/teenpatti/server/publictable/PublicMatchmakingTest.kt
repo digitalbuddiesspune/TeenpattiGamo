@@ -84,9 +84,10 @@ internal class PublicMatchmakingTest {
             assertEquals(1, fixture.tableRepository.state.size)
             val table = fixture.tableRepository.state.values.single()
             val seats = table.round!!.seats
-            assertEquals(playerCount, seats.size)
+            val expectedBots = maxOf(0, 5 - playerCount)
+            assertEquals(5, seats.size)
             assertEquals(playerCount, seats.count { !it.isBot })
-            assertEquals(0, seats.count { it.isBot })
+            assertEquals(expectedBots, seats.count { it.isBot })
             assertTrue(fixture.sessionRepository.sessions.values.all { it.status == "active_at_table" })
         }
     }

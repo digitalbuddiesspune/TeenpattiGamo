@@ -411,7 +411,7 @@ internal class PublicTableManager(
                 "playerCount" to stillQueued.size,
                 "distinctPlayerCount" to distinctPlayerCount,
             )
-            stillQueued.forEach { session -> tryAssignMatchmakingTable(listOf(session), true) }
+            stillQueued.forEach { session -> tryAssignMatchmakingTable(listOf(session)) }
             return emptyList()
         }
         val groupSize = config.playerCount
@@ -430,7 +430,7 @@ internal class PublicTableManager(
             if (group.size == 1 && placeMatchmakingSessionOnExistingTable(group.first())) {
                 assignedIds.add(group.first().id)
             } else {
-                tryAssignMatchmakingTable(group, group.size == 1)
+                tryAssignMatchmakingTable(group)
                 assignedIds.addAll(group.map { it.id })
             }
         }
@@ -493,9 +493,9 @@ internal class PublicTableManager(
             ?.lowercase()
             ?: session.id
 
-    private fun tryAssignMatchmakingTable(sessions: List<PublicPlayerSessionState>, botFallback: Boolean) {
+    private fun tryAssignMatchmakingTable(sessions: List<PublicPlayerSessionState>) {
         try {
-            assignMatchmakingTable(sessions, botFallback)
+            assignMatchmakingTable(sessions)
         } catch (error: Exception) {
             sessions.forEach { session -> failMatchmakingSession(session, error) }
         }
@@ -519,11 +519,12 @@ internal class PublicTableManager(
         saveSession(current)
     }
 
-    private fun assignMatchmakingTable(sessions: List<PublicPlayerSessionState>, botFallback: Boolean) {
+    private fun assignMatchmakingTable(sessions: List<PublicPlayerSessionState>) {
         val table = createTable()
         val seating = seating(table)
         seating.seatedPlayerIds = sessions.map { it.id }.toMutableList()
-        val participants = buildParticipants(table, seating.seatedPlayerIds, if (botFallback) null else 0)
+        // Always fill remaining seats with bots (1 real + 4 bots, 2 reals + 3 bots, …).
+        val participants = buildParticipants(table, seating.seatedPlayerIds)
         val roundId = idGenerator.newId()
         try {
             debitBootsIfNeeded(table, participants, roundId)
@@ -1010,10 +1011,12 @@ internal class PublicTableManager(
     }
 
     private fun targetBotCount(realPlayerCount: Int): Int =
-        when {
-            realPlayerCount <= 0 -> 0
-            realPlayerCount >= 2 -> 0
-            else -> minOf(config.publicTableMaxBots, config.playerCount - realPlayerCount)
+        if (realPlayerCount <= 0) {
+            0
+        } else {
+            // Always fill remaining seats with bots so multi-human tables stay full
+            // (e.g. 1 real → 4 bots, 2 reals → 3 bots, … up to playerCount).
+            minOf(config.publicTableMaxBots, maxOf(0, config.playerCount - realPlayerCount))
         }
 
     private fun activeBotSlots(table: ManagedPublicTable, botCount: Int): MutableList<PublicBotSlot> {
