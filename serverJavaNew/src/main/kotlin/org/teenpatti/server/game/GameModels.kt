@@ -117,6 +117,7 @@ internal class SideShowSeatReveal {
     var playerId: String = ""
     var playerName: String = ""
     var cards: MutableList<Card> = mutableListOf()
+    var flipperCard: Card? = null
 }
 
 internal class SideShowResult {

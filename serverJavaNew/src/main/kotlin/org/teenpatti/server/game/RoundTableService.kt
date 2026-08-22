@@ -532,13 +532,14 @@ internal class RoundTableService(
             // During active play for opponents: send a hidden placeholder so the UI
             // knows a blue card slot exists without leaking its identity.
             if (config.variant.publicCardMode == "flipper_blue_card") {
-                val blueCard: Card? = when {
-                    seat.reserveCards.isNotEmpty() -> seat.reserveCards[0]
-                    seat.publicCards.isNotEmpty() -> seat.publicCards[0]
-                    else -> null
-                }
+                val blueCard: Card? = resolveFlipperCard(seat)
                 if (blueCard != null) {
-                    val revealBlue = isViewer || round.status == "complete" || seat.publicCards.isNotEmpty()
+                    val sideShowRevealedForSeat = privateReveal != null
+                    val revealBlue =
+                        isViewer ||
+                            round.status == "complete" ||
+                            seat.publicCards.isNotEmpty() ||
+                            sideShowRevealedForSeat
                     item["flipperCard"] = linkedMapOf<String, Any?>().also { c ->
                         c["id"] = if (revealBlue) blueCard.id else "hidden-flipper-${seat.id}"
                         c["rank"] = if (revealBlue) blueCard.rank else null
@@ -1334,10 +1335,12 @@ internal class RoundTableService(
         requesterReveal.playerId = requester.id
         requesterReveal.playerName = requester.name
         requesterReveal.cards = requester.cards.toMutableList()
+        requesterReveal.flipperCard = resolveFlipperCard(requester)
         val targetReveal = SideShowSeatReveal()
         targetReveal.playerId = target.id
         targetReveal.playerName = target.name
         targetReveal.cards = target.cards.toMutableList()
+        targetReveal.flipperCard = resolveFlipperCard(target)
         result.reveals = mutableListOf(requesterReveal, targetReveal)
         round.recentSideShowResult = result
         logAction(target.id, "sideshow-accepted", 0, "${target.name} accepted ${requester.name}'s side show. ${loser.name} packed.")
@@ -1705,9 +1708,21 @@ internal class RoundTableService(
         payload["resolvedAt"] = result.resolvedAt
         payload["reveals"] =
             result.reveals.map { reveal ->
-                mapOf("playerId" to reveal.playerId, "playerName" to reveal.playerName, "cards" to reveal.cards)
+                mapOf(
+                    "playerId" to reveal.playerId,
+                    "playerName" to reveal.playerName,
+                    "cards" to reveal.cards,
+                    "flipperCard" to reveal.flipperCard,
+                )
             }
         return payload
+    }
+
+    private fun resolveFlipperCard(seat: SeatState): Card? {
+        if (config.variant.publicCardMode != "flipper_blue_card") {
+            return null
+        }
+        return seat.reserveCards.firstOrNull() ?: seat.publicCards.firstOrNull()
     }
 
     private fun logAction(playerId: String, type: String, amount: Int, note: String) {

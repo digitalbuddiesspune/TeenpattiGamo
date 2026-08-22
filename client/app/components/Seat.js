@@ -302,7 +302,14 @@ export default function Seat({
     : [];
   // Flipper blue card — always shown as a separate card with blue accent.
   // During active play opponents get a hidden placeholder (server sends hidden:true).
-  const rawFlipperCard = isFlipperVariant ? seat.flipperCard ?? null : null;
+  // During a side show, the reveal payload includes the flipper card for both participants.
+  const sideShowReveal =
+    sideShowResult?.reveals?.find((reveal) => reveal.playerId === seat.id) || null;
+  const sideShowFlipperCard =
+    sideShowReveal?.flipperCard && !sideShowReveal.flipperCard.hidden
+      ? sideShowReveal.flipperCard
+      : null;
+  const rawFlipperCard = isFlipperVariant ? sideShowFlipperCard || seat.flipperCard || null : null;
   const flipperCardsToRender = rawFlipperCard && !isStarting && !isDealing
     ? [{
         ...rawFlipperCard,
