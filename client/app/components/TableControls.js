@@ -268,6 +268,7 @@ export default function TableControls({
   const pendingSideShow = round?.pendingSideShow || null;
   const sideShowViewerRole = pendingSideShow?.viewerRole || null;
   const hasPendingSideShow = Boolean(pendingSideShow);
+  const activePlayers = round?.remainingPlayers?.length || 0;
   const hasSeenCards = Boolean(userSeat?.seen);
   const canPack = isTurn && userSeat && !userSeat.packed;
   const canSee = isTurn && viewerLegalActions.has("see");
