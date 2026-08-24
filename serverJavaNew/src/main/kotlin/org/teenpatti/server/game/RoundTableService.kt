@@ -738,9 +738,6 @@ internal class RoundTableService(
         if (config.variant.showUnlockCycle > 0 && round.variantState?.showUnlocked != true) {
             return false
         }
-        if (config.variant.showRequiresAllSeen && !allActivePlayersSeen(round)) {
-            return false
-        }
         return Engine.canRequestSideshow(round, seat, actorIndex)
     }
 
@@ -826,6 +823,39 @@ internal class RoundTableService(
         variantState.forceBlindActive = variantState.cycleNumber < config.variant.forceBlindCycles
         variantState.showUnlocked = config.variant.showUnlockCycle == 0 || variantState.cycleNumber >= config.variant.showUnlockCycle
         syncVariantWildcardRanks(variantState)
+        refreshPendingAutoSee(round)
+    }
+
+    private fun refreshPendingAutoSee(round: RoundState) {
+        val variantState = round.variantState ?: return
+        if (!config.variant.showRequiresAllSeen || !variantState.showUnlocked) {
+            variantState.pendingAutoSeePlayerId = null
+            return
+        }
+        val unseenActivePlayers = Engine.getActiveSeats(round).filter { !it.seen }
+        variantState.pendingAutoSeePlayerId =
+            if (unseenActivePlayers.size == 1) {
+                unseenActivePlayers.first().id
+            } else {
+                null
+            }
+    }
+
+    private fun maybeAutoSeeAfterBlindTurn(round: RoundState, actorId: String) {
+        val variantState = round.variantState ?: return
+        val pendingPlayerId = variantState.pendingAutoSeePlayerId ?: return
+        if (actorId != pendingPlayerId) {
+            return
+        }
+        val seat = round.seats.firstOrNull { it.id == pendingPlayerId } ?: return
+        if (seat.seen || seat.packed || !seat.active) {
+            variantState.pendingAutoSeePlayerId = null
+            return
+        }
+        seat.seen = true
+        seat.lastAction = LastAction("see", 0, clockProvider.nowIso())
+        logAction(seat.id, "see", 0, "${seat.name} was auto-seen after the final blind turn.")
+        round.message = "${seat.name} has seen their cards."
         variantState.pendingAutoSeePlayerId = null
     }
 
@@ -886,6 +916,9 @@ internal class RoundTableService(
         }
         advanceTurn(actorIndex)
         updateVariantProgressAfterTurn(round, seat.id)
+        if (!seat.seen && seat.lastAction?.type == "blind") {
+            maybeAutoSeeAfterBlindTurn(round, seat.id)
+        }
     }
 
     private fun minStakeFloor(): Int = minOf(config.minStake, config.bootAmount)
@@ -945,6 +978,9 @@ internal class RoundTableService(
             amount,
             "${seat.name} paid $amount to request a side show against ${target.name}.",
         )
+        if (config.variant.autoAcceptSideshow) {
+            resolveAcceptedSideShow(round, indexOfSeat(round, target.id), request)
+        }
         if (isPotLimitReached(round)) {
             round.pendingSideShow = null
             finishRoundByPotLimit()

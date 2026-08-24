@@ -1,31 +1,6 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-function getPreviousActiveSeat(round, userSeat) {
-  if (!round || !userSeat) {
-    return null;
-  }
-
-  const actorIndex = round.seats.findIndex((seat) => seat.id === userSeat.id);
-
-  if (actorIndex < 0) {
-    return null;
-  }
-
-  let pointer = actorIndex;
-
-  for (let i = 0; i < round.seats.length - 1; i += 1) {
-    pointer = (pointer - 1 + round.seats.length) % round.seats.length;
-    const seat = round.seats[pointer];
-
-    if (seat.active && !seat.packed) {
-      return seat;
-    }
-  }
-
-  return null;
-}
-
 export function buildStakeControlState({
   round,
   userSeat,
@@ -293,9 +268,6 @@ export default function TableControls({
   const pendingSideShow = round?.pendingSideShow || null;
   const sideShowViewerRole = pendingSideShow?.viewerRole || null;
   const hasPendingSideShow = Boolean(pendingSideShow);
-  const activePlayers = round?.remainingPlayers?.length || 0;
-  const effectiveRound = seats ? { ...round, seats } : round;
-  const previousActiveSeat = getPreviousActiveSeat(effectiveRound, userSeat);
   const hasSeenCards = Boolean(userSeat?.seen);
   const canPack = isTurn && userSeat && !userSeat.packed;
   const canSee = isTurn && viewerLegalActions.has("see");
@@ -314,7 +286,7 @@ export default function TableControls({
     canAffordCall &&
     (viewerLegalActions.has("chaal") || viewerLegalActions.has("raise"));
   const canSideshow =
-    isTurn && viewerLegalActions.has("sideshow") && hasSeenCards && activePlayers > 2 && previousActiveSeat?.seen && !hasPendingSideShow;
+    isTurn && viewerLegalActions.has("sideshow") && !hasPendingSideShow;
   const canShow = isTurn && viewerLegalActions.has("show") && activePlayers === 2 && canAffordCall;
   const canUseSideAction = canShow || canSideshow;
   const actionBlocked = hasPendingSideShow || sideShowViewerRole === "target";

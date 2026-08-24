@@ -208,7 +208,6 @@ internal class PublicBotDecisionEngine(
         if (
             seat.seen &&
             (round.variantState?.showUnlocked != false) &&
-            (!(config.variant.showRequiresAllSeen) || Engine.getActiveSeats(round).all { it.seen }) &&
             Engine.canRequestSideshow(round, seat, actorIndex) &&
             canPay(round, seat, context.minCallAmount)
         ) {

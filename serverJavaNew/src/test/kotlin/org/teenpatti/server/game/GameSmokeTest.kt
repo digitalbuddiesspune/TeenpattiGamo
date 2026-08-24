@@ -1324,7 +1324,35 @@ internal class GameSmokeTest {
     }
 
     @Test
-    fun jhanduKeepsLastUnseenPlayerBlindUntilTheyChooseSee() {
+    fun jhanduLastUnseenPlayerCanStillChooseSee() {
+        val config = testGameConfig("jhandu")
+        val service = roundService(config = config)
+        service.startRound(
+            listOf(
+                participant("player-1", "Alpha"),
+                participant("player-2", "Bravo"),
+                participant("player-3", "Charlie"),
+            ),
+        )
+        service.state.round!!.status = "active"
+        val round = service.state.round!!
+        round.variantState!!.cycleNumber = 4
+        round.variantState!!.showUnlocked = true
+        round.variantState!!.forceBlindActive = false
+
+        val third = seat(service, "player-3")
+        seat(service, "player-1").seen = true
+        seat(service, "player-2").seen = true
+        third.seen = false
+        setActivePlayer(service, third.id)
+
+        service.performAction(third.id, "see", emptyMap())
+
+        assertTrue(third.seen)
+    }
+
+    @Test
+    fun jhanduAllowsSideshowWhenPreviousPlayerHasSeen() {
         val config = testGameConfig("jhandu")
         val service = roundService(config = config)
         service.startRound(
@@ -1343,27 +1371,52 @@ internal class GameSmokeTest {
         val first = seat(service, "player-1")
         val second = seat(service, "player-2")
         val third = seat(service, "player-3")
-        first.seen = true
+        first.seen = false
         second.seen = true
+        third.seen = true
+        setSeatCards(first, card("2", "spades"), card("3", "hearts"), card("5", "clubs"))
+        setSeatCards(second, card("9", "hearts"), card("9", "clubs"), card("2", "diamonds"))
+        setSeatCards(third, card("A", "spades"), card("A", "hearts"), card("K", "clubs"))
+        setActivePlayer(service, third.id)
+
+        @Suppress("UNCHECKED_CAST")
+        val roundView = service.getTableState(third.id)["round"] as Map<String, Any?>
+        assertTrue((roundView["viewerLegalActions"] as List<*>).contains("sideshow"))
+
+        service.performAction(third.id, "sideshow", emptyMap())
+
+        assertTrue(first.packed || second.packed || third.packed)
+        assertNotNull(round.recentSideShowResult)
+        assertNull(round.pendingSideShow)
+    }
+
+    @Test
+    fun jhanduAutoSeesLastBlindPlayerAfterExtraTurn() {
+        val config = testGameConfig("jhandu")
+        val service = roundService(config = config)
+        service.startRound(
+            listOf(
+                participant("player-1", "Alpha"),
+                participant("player-2", "Bravo"),
+                participant("player-3", "Charlie"),
+            ),
+        )
+        service.state.round!!.status = "active"
+        val round = service.state.round!!
+        round.variantState!!.cycleNumber = 4
+        round.variantState!!.showUnlocked = true
+        round.variantState!!.forceBlindActive = false
+
+        val third = seat(service, "player-3")
+        seat(service, "player-1").seen = true
+        seat(service, "player-2").seen = true
         third.seen = false
         setActivePlayer(service, third.id)
 
         service.performAction(third.id, "blind", emptyMap())
-        service.performAction(first.id, "chaal", emptyMap())
-        service.performAction(second.id, "chaal", emptyMap())
-        setActivePlayer(service, third.id)
-        service.performAction(third.id, "blind", emptyMap())
-        setActivePlayer(service, first.id)
-        service.performAction(first.id, "chaal", emptyMap())
-        service.performAction(second.id, "chaal", emptyMap())
-        setActivePlayer(service, third.id)
-        service.performAction(third.id, "blind", emptyMap())
 
-        assertFalse(third.seen)
-
-        setActivePlayer(service, third.id)
-        service.performAction(third.id, "see", emptyMap())
         assertTrue(third.seen)
+        assertNull(round.variantState!!.pendingAutoSeePlayerId)
     }
 
     @Test
