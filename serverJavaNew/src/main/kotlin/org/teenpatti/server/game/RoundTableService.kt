@@ -732,7 +732,12 @@ internal class RoundTableService(
         }
     }
 
-    private fun canSee(round: RoundState): Boolean = !(round.variantState?.forceBlindActive == true)
+    private fun canSee(round: RoundState): Boolean {
+        if (config.variant.id.equals("jhandu", ignoreCase = true)) {
+            return true
+        }
+        return !(round.variantState?.forceBlindActive == true)
+    }
 
     private fun canRequestSideshow(round: RoundState, seat: SeatState, actorIndex: Int): Boolean {
         if (config.variant.showUnlockCycle > 0 && round.variantState?.showUnlocked != true) {

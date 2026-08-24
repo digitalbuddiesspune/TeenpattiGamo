@@ -26,7 +26,7 @@ internal class PublicBotDecisionEngine(
             MuflisBotPolicy(config),
             ClassicBotPolicy(config),
             FlipperBotPolicy(config),
-            JhanduBotPolicy(simulationAdvisor),
+            JhanduBotPolicy(config),
         )
 
     private fun activeVariantPolicy(): BotVariantPolicy? =
@@ -195,7 +195,7 @@ internal class PublicBotDecisionEngine(
 
     private fun determineLegalTurnActions(round: RoundState, seat: SeatState, actorIndex: Int, context: BotDecisionContext): MutableList<String> {
         val legal = mutableListOf<String>()
-        if (!seat.seen && round.variantState?.forceBlindActive != true) {
+        if (!seat.seen && (config.variant.id.equals("jhandu", ignoreCase = true) || round.variantState?.forceBlindActive != true)) {
             legal.add("see")
         }
         if (canPay(round, seat, context.minCallAmount)) {

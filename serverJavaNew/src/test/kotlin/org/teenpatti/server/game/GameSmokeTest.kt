@@ -1238,7 +1238,98 @@ internal class GameSmokeTest {
     }
 
     @Test
-    fun jhanduUnlocksSeeingAfterFirstCycleAndRevealsFirstSharedJoker() {
+    fun jhanduBotSeesOnFirstTurnDuringCycleOne() {
+        val config = testGameConfig("jhandu")
+        val service = roundService(config = config)
+        service.startRound(listOf(participant("player-1", "Alpha"), botParticipant("public-bot-1", "Guest_100001", "raj")))
+        service.state.round!!.status = "active"
+        setActivePlayer(service, "public-bot-1")
+        val bot = seat(service, "public-bot-1")
+        assertFalse(bot.seen)
+        assertTrue(service.state.round!!.variantState!!.forceBlindActive)
+
+        val decision = invokeDecideBotDecision(service, bot)
+
+        assertEquals("see", decision.chosenAction)
+    }
+
+    @Test
+    fun jhanduSeenBotPacksWeakHighCardMultiwayAndShowsHeadsUp() {
+        val multiway = roundService(config = testGameConfig("jhandu"))
+        multiway.startRound(
+            listOf(
+                participant("player-1", "Alpha"),
+                participant("player-2", "Bravo"),
+                botParticipant("public-bot-1", "Guest_100001", "raj"),
+            ),
+        )
+        multiway.state.round!!.status = "active"
+        multiway.state.round!!.variantState!!.cycleNumber = 4
+        multiway.state.round!!.variantState!!.showUnlocked = true
+        multiway.state.round!!.variantState!!.forceBlindActive = false
+        setActivePlayer(multiway, "public-bot-1")
+        val multiwayBot = seat(multiway, "public-bot-1")
+        multiwayBot.seen = true
+        seat(multiway, "player-1").seen = true
+        seat(multiway, "player-2").seen = true
+        setSeatCards(multiwayBot, card("K", "spades"), card("6", "hearts"), card("9", "clubs"))
+
+        assertEquals("pack", invokeDecideBotDecision(multiway, multiwayBot).chosenAction)
+
+        val headsUp = roundService(config = testGameConfig("jhandu"))
+        headsUp.startRound(listOf(participant("player-1", "Alpha"), botParticipant("public-bot-1", "Guest_100001", "raj")))
+        headsUp.state.round!!.status = "active"
+        headsUp.state.round!!.variantState!!.cycleNumber = 4
+        headsUp.state.round!!.variantState!!.showUnlocked = true
+        headsUp.state.round!!.variantState!!.forceBlindActive = false
+        setActivePlayer(headsUp, "public-bot-1")
+        val headsUpBot = seat(headsUp, "public-bot-1")
+        headsUpBot.seen = true
+        seat(headsUp, "player-1").seen = true
+        setSeatCards(headsUpBot, card("K", "spades"), card("6", "hearts"), card("9", "clubs"))
+
+        assertEquals("show", invokeDecideBotDecision(headsUp, headsUpBot).chosenAction)
+    }
+
+    @Test
+    fun jhanduSeenBotPairAndMadeHandPolicies() {
+        listOf(
+            Triple(listOf(card("9", "hearts"), card("9", "clubs"), card("2", "spades")), "Pair", "sideshow"),
+            Triple(listOf(card("8", "hearts"), card("9", "clubs"), card("10", "diamonds")), "Sequence", "chaal"),
+            Triple(listOf(card("2", "hearts"), card("6", "hearts"), card("9", "hearts")), "Color", "chaal"),
+            Triple(listOf(card("8", "hearts"), card("9", "hearts"), card("10", "hearts")), "Pure Sequence", "raise"),
+            Triple(listOf(card("9", "hearts"), card("9", "clubs"), card("9", "diamonds")), "Trail", "raise"),
+        ).forEach { (cards, expectedLabel, expectedAction) ->
+            val service = roundService(config = testGameConfig("jhandu"))
+            service.startRound(
+                listOf(
+                    participant("player-1", "Alpha"),
+                    participant("player-2", "Bravo"),
+                    botParticipant("public-bot-1", "Guest_100001", "raj"),
+                ),
+            )
+            service.state.round!!.status = "active"
+            service.state.round!!.variantState!!.cycleNumber = 4
+            service.state.round!!.variantState!!.showUnlocked = true
+            service.state.round!!.variantState!!.forceBlindActive = false
+            setActivePlayer(service, "public-bot-1")
+            val bot = seat(service, "public-bot-1")
+            bot.seen = true
+            seat(service, "player-1").seen = true
+            seat(service, "player-2").seen = true
+            setSeatCards(bot, *cards.toTypedArray())
+            setSeatCards(seat(service, "player-1"), card("3", "spades"), card("5", "diamonds"), card("7", "clubs"))
+            setSeatCards(seat(service, "player-2"), card("4", "spades"), card("6", "diamonds"), card("8", "clubs"))
+
+            val decision = invokeDecideBotDecision(service, bot)
+            val evaluation = org.teenpatti.server.game.Engine.evaluateSeatHand(bot, service.state.round!!, testGameConfig("jhandu"))
+            assertEquals(expectedLabel, evaluation.label)
+            assertEquals(expectedAction, decision.chosenAction)
+        }
+    }
+
+    @Test
+    fun jhanduAllowsSeeDuringFirstCycleAndRevealsFirstSharedJoker() {
         val config = testGameConfig("jhandu")
         val service = roundService(config = config)
         service.startRound(
@@ -1251,21 +1342,17 @@ internal class GameSmokeTest {
         service.state.round!!.status = "active"
         setActivePlayer(service, "player-1")
 
-        val lockedError = assertThrows(IllegalStateException::class.java) {
-            service.performAction("player-1", "see", emptyMap())
-        }
-        assertEquals("See is not allowed yet in this variant.", lockedError.message)
+        service.performAction("player-1", "see", emptyMap())
+        assertTrue(seat(service, "player-1").seen)
+        assertTrue(service.state.round!!.variantState!!.forceBlindActive)
 
-        service.performAction("player-1", "blind", emptyMap())
         service.performAction("player-2", "blind", emptyMap())
         service.performAction("player-3", "blind", emptyMap())
+        service.performAction("player-1", "chaal", emptyMap())
 
         assertEquals(1, service.state.round!!.variantState!!.cycleNumber)
         assertEquals(1, service.state.round!!.variantState!!.revealedSharedJokerCount)
         assertFalse(service.state.round!!.variantState!!.forceBlindActive)
-
-        service.performAction("player-1", "see", emptyMap())
-        assertTrue(seat(service, "player-1").seen)
     }
 
     @Test

@@ -20,8 +20,7 @@ internal data class BotSimulationOutcome(
 )
 
 /**
- * Expert simulation policy used by variants that do not have fixed rule tables yet
- * (Flipper, Jhandu, and any future fallback variant).
+ * Expert simulation policy used as a fallback for variants without a rule table.
  */
 internal class BotSimulationAdvisor(
     private val config: GameConfig,
