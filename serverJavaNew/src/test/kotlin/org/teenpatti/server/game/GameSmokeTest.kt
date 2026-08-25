@@ -1238,7 +1238,7 @@ internal class GameSmokeTest {
     }
 
     @Test
-    fun jhanduBotSeesOnFirstTurnDuringCycleOne() {
+    fun jhanduBotStaysBlindUntilTwoJokersAreRevealedThenSees() {
         val config = testGameConfig("jhandu")
         val service = roundService(config = config)
         service.startRound(listOf(participant("player-1", "Alpha"), botParticipant("public-bot-1", "Guest_100001", "raj")))
@@ -1246,15 +1246,19 @@ internal class GameSmokeTest {
         setActivePlayer(service, "public-bot-1")
         val bot = seat(service, "public-bot-1")
         assertFalse(bot.seen)
-        assertTrue(service.state.round!!.variantState!!.forceBlindActive)
 
-        val decision = invokeDecideBotDecision(service, bot)
+        service.state.round!!.variantState!!.revealedSharedJokerCount = 0
+        assertEquals("blind", invokeDecideBotDecision(service, bot).chosenAction)
 
-        assertEquals("see", decision.chosenAction)
+        service.state.round!!.variantState!!.revealedSharedJokerCount = 1
+        assertEquals("blind", invokeDecideBotDecision(service, bot).chosenAction)
+
+        service.state.round!!.variantState!!.revealedSharedJokerCount = 2
+        assertEquals("see", invokeDecideBotDecision(service, bot).chosenAction)
     }
 
     @Test
-    fun jhanduSeenBotPacksWeakHighCardMultiwayAndShowsHeadsUp() {
+    fun jhanduSeenBotPacksHighCardAfterTwoJokers() {
         val multiway = roundService(config = testGameConfig("jhandu"))
         multiway.startRound(
             listOf(
@@ -1266,6 +1270,7 @@ internal class GameSmokeTest {
         multiway.state.round!!.status = "active"
         multiway.state.round!!.variantState!!.cycleNumber = 4
         multiway.state.round!!.variantState!!.showUnlocked = true
+        multiway.state.round!!.variantState!!.revealedSharedJokerCount = 2
         multiway.state.round!!.variantState!!.forceBlindActive = false
         setActivePlayer(multiway, "public-bot-1")
         val multiwayBot = seat(multiway, "public-bot-1")
@@ -1281,6 +1286,7 @@ internal class GameSmokeTest {
         headsUp.state.round!!.status = "active"
         headsUp.state.round!!.variantState!!.cycleNumber = 4
         headsUp.state.round!!.variantState!!.showUnlocked = true
+        headsUp.state.round!!.variantState!!.revealedSharedJokerCount = 2
         headsUp.state.round!!.variantState!!.forceBlindActive = false
         setActivePlayer(headsUp, "public-bot-1")
         val headsUpBot = seat(headsUp, "public-bot-1")
@@ -1292,11 +1298,11 @@ internal class GameSmokeTest {
     }
 
     @Test
-    fun jhanduSeenBotPairAndMadeHandPolicies() {
+    fun jhanduSeenBotPairColorSequenceSideShowAndStrongHandsRaise() {
         listOf(
             Triple(listOf(card("9", "hearts"), card("9", "clubs"), card("2", "spades")), "Pair", "sideshow"),
-            Triple(listOf(card("8", "hearts"), card("9", "clubs"), card("10", "diamonds")), "Sequence", "chaal"),
-            Triple(listOf(card("2", "hearts"), card("6", "hearts"), card("9", "hearts")), "Color", "chaal"),
+            Triple(listOf(card("2", "hearts"), card("6", "hearts"), card("9", "hearts")), "Color", "sideshow"),
+            Triple(listOf(card("8", "hearts"), card("9", "clubs"), card("10", "diamonds")), "Sequence", "sideshow"),
             Triple(listOf(card("8", "hearts"), card("9", "hearts"), card("10", "hearts")), "Pure Sequence", "raise"),
             Triple(listOf(card("9", "hearts"), card("9", "clubs"), card("9", "diamonds")), "Trail", "raise"),
         ).forEach { (cards, expectedLabel, expectedAction) ->
@@ -1311,6 +1317,7 @@ internal class GameSmokeTest {
             service.state.round!!.status = "active"
             service.state.round!!.variantState!!.cycleNumber = 4
             service.state.round!!.variantState!!.showUnlocked = true
+            service.state.round!!.variantState!!.revealedSharedJokerCount = 2
             service.state.round!!.variantState!!.forceBlindActive = false
             setActivePlayer(service, "public-bot-1")
             val bot = seat(service, "public-bot-1")
@@ -1326,6 +1333,54 @@ internal class GameSmokeTest {
             assertEquals(expectedLabel, evaluation.label)
             assertEquals(expectedAction, decision.chosenAction)
         }
+    }
+
+    @Test
+    fun jhanduSeenBotRetriesSideShowAfterWinThenShowsHeadsUp() {
+        val service = roundService(config = testGameConfig("jhandu"))
+        service.startRound(
+            listOf(
+                participant("player-1", "Alpha"),
+                participant("player-2", "Bravo"),
+                botParticipant("public-bot-1", "Guest_100001", "raj"),
+            ),
+        )
+        service.state.round!!.status = "active"
+        service.state.round!!.variantState!!.cycleNumber = 4
+        service.state.round!!.variantState!!.showUnlocked = true
+        service.state.round!!.variantState!!.revealedSharedJokerCount = 2
+        service.state.round!!.variantState!!.forceBlindActive = false
+        setActivePlayer(service, "public-bot-1")
+        val bot = seat(service, "public-bot-1")
+        bot.seen = true
+        seat(service, "player-1").seen = true
+        seat(service, "player-2").seen = true
+        setSeatCards(bot, card("9", "hearts"), card("9", "clubs"), card("2", "spades"))
+
+        val wonResult = org.teenpatti.server.game.SideShowResult()
+        wonResult.winnerId = bot.id
+        wonResult.loserId = "player-2"
+        wonResult.requesterId = bot.id
+        wonResult.targetId = "player-2"
+        wonResult.status = "accepted"
+        service.state.round!!.recentSideShowResult = wonResult
+
+        assertEquals("sideshow", invokeDecideBotDecision(service, bot).chosenAction)
+
+        val headsUp = roundService(config = testGameConfig("jhandu"))
+        headsUp.startRound(listOf(participant("player-1", "Alpha"), botParticipant("public-bot-1", "Guest_100001", "raj")))
+        headsUp.state.round!!.status = "active"
+        headsUp.state.round!!.variantState!!.cycleNumber = 4
+        headsUp.state.round!!.variantState!!.showUnlocked = true
+        headsUp.state.round!!.variantState!!.revealedSharedJokerCount = 2
+        headsUp.state.round!!.variantState!!.forceBlindActive = false
+        setActivePlayer(headsUp, "public-bot-1")
+        val headsUpBot = seat(headsUp, "public-bot-1")
+        headsUpBot.seen = true
+        seat(headsUp, "player-1").seen = true
+        setSeatCards(headsUpBot, card("9", "hearts"), card("9", "clubs"), card("2", "spades"))
+
+        assertEquals("show", invokeDecideBotDecision(headsUp, headsUpBot).chosenAction)
     }
 
     @Test
@@ -1346,9 +1401,9 @@ internal class GameSmokeTest {
         assertTrue(seat(service, "player-1").seen)
         assertTrue(service.state.round!!.variantState!!.forceBlindActive)
 
+        service.performAction("player-1", "chaal", emptyMap())
         service.performAction("player-2", "blind", emptyMap())
         service.performAction("player-3", "blind", emptyMap())
-        service.performAction("player-1", "chaal", emptyMap())
 
         assertEquals(1, service.state.round!!.variantState!!.cycleNumber)
         assertEquals(1, service.state.round!!.variantState!!.revealedSharedJokerCount)
