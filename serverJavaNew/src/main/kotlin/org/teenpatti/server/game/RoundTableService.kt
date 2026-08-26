@@ -1257,6 +1257,12 @@ internal class RoundTableService(
         entry.payout = round.result?.payout ?: 0
         entry.reason = reason
         entry.actionLog = round.actionLog.toMutableList()
+        val variantState = round.variantState
+        if (variantState != null) {
+            entry.sharedJokerCards = variantState.sharedJokerCards.map(::copyHistoryCard).toMutableList()
+            entry.wildcardRanks = variantState.wildcardRanks.toMutableList()
+            entry.revealedSharedJokerCount = variantState.revealedSharedJokerCount
+        }
         entry.startedAt = round.createdAt
         entry.settledAt = round.settledAt
         entry.createdAt = clockProvider.nowIso()

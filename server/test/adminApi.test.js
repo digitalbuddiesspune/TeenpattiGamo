@@ -1,9 +1,11 @@
-const assert = require("node:assert/strict");
-const test = require("node:test");
-process.env.MONGODB_URI ||= "mongodb://127.0.0.1:27017/teen_patti_test";
-
-const { parseListFilters } = require("../src/services/adminProfitLossService");
-const { login, getSession, logout } = require("../src/services/adminAuthService");
+import "./setup-env.js";
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  buildSearchClause,
+  parseListFilters,
+} from "../src/services/adminProfitLossService.js";
+import { login, getSession, logout } from "../src/services/adminAuthService.js";
 
 test("admin list filters accept Teen Patti variants", () => {
   const filters = parseListFilters({
@@ -21,6 +23,21 @@ test("admin list filters accept Teen Patti variants", () => {
   assert.equal(filters.operatorId, "op-1");
   assert.equal(filters.dateFrom, "2026-08-01T00:00:00.000Z");
   assert.equal(filters.dateTo, "2026-08-10T23:59:59.999Z");
+  assert.equal(filters.search, "");
+  assert.equal(filters.searchBy, "all");
+});
+
+test("admin list filters accept search by player and ids", () => {
+  const filters = parseListFilters({
+    search: "Naveen",
+    searchBy: "playerName",
+  });
+
+  assert.equal(filters.search, "Naveen");
+  assert.equal(filters.searchBy, "playerName");
+
+  const clause = buildSearchClause("abc-123", "roundId");
+  assert.ok(clause.$or.some((item) => item._id === "abc-123"));
 });
 
 test("admin auth login and session round-trip", () => {

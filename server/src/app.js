@@ -1,12 +1,12 @@
-const cors = require("cors");
-const express = require("express");
-const config = require("./config/env");
-const { connectMongo, getMongoClient } = require("./config/mongo");
-const teenPattiRoundsRouter = require("./routes/teenPattiRounds");
-const teenPattiRoundDetailRouter = require("./routes/teenPattiRoundDetail");
-const teenPattiEarningsSummaryRouter = require("./routes/teenPattiEarningsSummary");
-const adminAuthRouter = require("./routes/adminAuth");
-const adminProfitLossRouter = require("./routes/adminProfitLoss");
+import cors from "cors";
+import express from "express";
+import config from "./config/env.js";
+import { connectMongo, getMongoClient } from "./config/mongo.js";
+import teenPattiRoundsRouter from "./routes/teenPattiRounds.js";
+import teenPattiRoundDetailRouter from "./routes/teenPattiRoundDetail.js";
+import teenPattiEarningsSummaryRouter from "./routes/teenPattiEarningsSummary.js";
+import adminAuthRouter from "./routes/adminAuth.js";
+import adminProfitLossRouter from "./routes/adminProfitLoss.js";
 
 const app = express();
 
@@ -59,4 +59,4 @@ app.use((error, _request, response, _next) => {
   });
 });
 
-module.exports = app;
+export default app;

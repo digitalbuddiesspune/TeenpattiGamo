@@ -1,5 +1,5 @@
-const crypto = require("crypto");
-const config = require("../config/env");
+import crypto from "node:crypto";
+import config from "../config/env.js";
 
 const sessions = new Map();
 
@@ -85,11 +85,4 @@ function getSession(token) {
   return { admin: session.admin };
 }
 
-module.exports = {
-  requireAdmin,
-  optionalAdmin,
-  login,
-  logout,
-  getSession,
-  getBearerToken,
-};
+export { requireAdmin, optionalAdmin, login, logout, getSession, getBearerToken };

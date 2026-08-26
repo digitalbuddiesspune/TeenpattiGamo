@@ -1,8 +1,8 @@
-const express = require("express");
-const { findLatestRound } = require("../services/roundDetailService");
-const { renderError, renderRoundDetail } = require("../views/roundDetailHtml");
+import express from "express";
+import { findLatestRound } from "../services/roundDetailService.js";
+import { renderError, renderRoundDetail } from "../views/roundDetailHtml.js";
 
-function createRoundDetailRouter(options = {}) {
+export function createRoundDetailRouter(options = {}) {
   const router = express.Router();
   const lookup = options.findLatestRound || findLatestRound;
 
@@ -28,5 +28,4 @@ function createRoundDetailRouter(options = {}) {
   return router;
 }
 
-module.exports = createRoundDetailRouter();
-module.exports.createRoundDetailRouter = createRoundDetailRouter;
+export default createRoundDetailRouter();

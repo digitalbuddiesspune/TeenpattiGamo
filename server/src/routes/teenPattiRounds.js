@@ -1,5 +1,5 @@
-const express = require("express");
-const { listTeenPattiRounds } = require("../services/roundHistoryService");
+import express from "express";
+import { listTeenPattiRounds } from "../services/roundHistoryService.js";
 
 const router = express.Router();
 
@@ -12,4 +12,4 @@ router.get("/rounds", async (request, response, next) => {
   }
 });
 
-module.exports = router;
+export default router;

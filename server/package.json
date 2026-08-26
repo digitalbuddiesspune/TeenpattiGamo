@@ -2,11 +2,12 @@
   "name": "teen-patti-round-history-api",
   "version": "1.0.0",
   "description": "Node admin + round history API for Teen Patti (separate from the game backend).",
+  "type": "module",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test"
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

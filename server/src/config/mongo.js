@@ -1,5 +1,5 @@
-const { MongoClient } = require("mongodb");
-const config = require("./env");
+import { MongoClient } from "mongodb";
+import config from "./env.js";
 
 let client;
 let database;
@@ -27,8 +27,4 @@ async function closeMongo() {
   }
 }
 
-module.exports = {
-  closeMongo,
-  connectMongo,
-  getMongoClient,
-};
+export { closeMongo, connectMongo, getMongoClient };

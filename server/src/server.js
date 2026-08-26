@@ -1,6 +1,6 @@
-const app = require("./app");
-const config = require("./config/env");
-const { closeMongo, connectMongo } = require("./config/mongo");
+import app from "./app.js";
+import config from "./config/env.js";
+import { closeMongo, connectMongo } from "./config/mongo.js";
 
 let server;
 

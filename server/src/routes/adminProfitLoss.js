@@ -1,12 +1,12 @@
-const express = require("express");
-const {
+import express from "express";
+import {
   listGames,
   getGameById,
   deleteGame,
   getSummary,
   listUsers,
-} = require("../services/adminProfitLossService");
-const { requireAdmin } = require("../services/adminAuthService");
+} from "../services/adminProfitLossService.js";
+import { requireAdmin } from "../services/adminAuthService.js";
 
 const router = express.Router();
 
@@ -52,4 +52,4 @@ router.get("/users", async (request, response, next) => {
   }
 });
 
-module.exports = router;
+export default router;

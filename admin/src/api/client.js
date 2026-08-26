@@ -70,7 +70,7 @@ async function authRequest(path, options = {}) {
   return response.json();
 }
 
-function withFilters(params, variant, operatorId, dateFrom, dateTo) {
+function withFilters(params, variant, operatorId, dateFrom, dateTo, search = "", searchBy = "all") {
   const next = { ...params };
 
   if (variant && variant !== "all") {
@@ -89,6 +89,13 @@ function withFilters(params, variant, operatorId, dateFrom, dateTo) {
     next.dateTo = dateTo;
   }
 
+  if (search) {
+    next.search = search;
+    if (searchBy && searchBy !== "all") {
+      next.searchBy = searchBy;
+    }
+  }
+
   return next;
 }
 
@@ -97,8 +104,10 @@ export function fetchSummary(
   operatorId = "all",
   dateFrom = "",
   dateTo = "",
+  search = "",
+  searchBy = "all",
 ) {
-  return request("/summary", withFilters({}, variant, operatorId, dateFrom, dateTo));
+  return request("/summary", withFilters({}, variant, operatorId, dateFrom, dateTo, search, searchBy));
 }
 
 export function fetchGames(
@@ -108,8 +117,13 @@ export function fetchGames(
   operatorId = "all",
   dateFrom = "",
   dateTo = "",
+  search = "",
+  searchBy = "all",
 ) {
-  return request("/games", withFilters({ page, limit }, variant, operatorId, dateFrom, dateTo));
+  return request(
+    "/games",
+    withFilters({ page, limit }, variant, operatorId, dateFrom, dateTo, search, searchBy),
+  );
 }
 
 export function deleteGame(roundId) {
@@ -123,8 +137,13 @@ export function fetchUsers(
   operatorId = "all",
   dateFrom = "",
   dateTo = "",
+  search = "",
+  searchBy = "all",
 ) {
-  return request("/users", withFilters({ page, limit }, variant, operatorId, dateFrom, dateTo));
+  return request(
+    "/users",
+    withFilters({ page, limit }, variant, operatorId, dateFrom, dateTo, search, searchBy),
+  );
 }
 
 export async function loginAdmin({ email, password }) {

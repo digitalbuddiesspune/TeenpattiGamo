@@ -1,7 +1,7 @@
-const express = require("express");
-const { getTeenPattiEarningsSummary } = require("../services/earningsSummaryService");
+import express from "express";
+import { getTeenPattiEarningsSummary } from "../services/earningsSummaryService.js";
 
-function createEarningsSummaryRouter(dependencies = {}) {
+export function createEarningsSummaryRouter(dependencies = {}) {
   const router = express.Router();
   const getSummary = dependencies.getTeenPattiEarningsSummary || getTeenPattiEarningsSummary;
 
@@ -17,5 +17,4 @@ function createEarningsSummaryRouter(dependencies = {}) {
   return router;
 }
 
-module.exports = createEarningsSummaryRouter();
-module.exports.createEarningsSummaryRouter = createEarningsSummaryRouter;
+export default createEarningsSummaryRouter();

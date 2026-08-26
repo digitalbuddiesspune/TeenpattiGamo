@@ -1,5 +1,9 @@
-const dotenv = require("dotenv");
-const path = require("path");
+import dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 if (!process.env.MONGODB_URI) {
@@ -33,4 +37,4 @@ if (!config.mongoUri) {
   throw new Error("MONGODB_URI is required.");
 }
 
-module.exports = config;
+export default config;

@@ -23,6 +23,8 @@ function App() {
   const [operatorFilter, setOperatorFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchBy, setSearchBy] = useState("all");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [summary, setSummary] = useState(null);
   const [dashboardSummary, setDashboardSummary] = useState(null);
@@ -33,6 +35,7 @@ function App() {
   const [usersPagination, setUsersPagination] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [tableLoading, setTableLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
@@ -51,11 +54,13 @@ function App() {
     operatorId = "all",
     from = "",
     to = "",
+    search = "",
+    field = "all",
   ) => {
     const [summaryData, gamesData, usersData] = await Promise.all([
-      fetchSummary(filter, operatorId, from, to),
-      fetchGames(page, 20, filter, operatorId, from, to),
-      fetchUsers(1, 20, filter, operatorId, from, to),
+      fetchSummary(filter, operatorId, from, to, search, field),
+      fetchGames(page, 20, filter, operatorId, from, to, search, field),
+      fetchUsers(1, 20, filter, operatorId, from, to, search, field),
     ]);
     setSummary(summaryData);
     setGames(gamesData.data);
@@ -65,16 +70,58 @@ function App() {
   }, []);
 
   const loadGames = useCallback(async (page = 1) => {
-    const result = await fetchGames(page, 20, playerFilter, operatorFilter, dateFrom, dateTo);
-    setGames(result.data);
-    setGamesPagination(result.pagination);
-  }, [playerFilter, operatorFilter, dateFrom, dateTo]);
+    setTableLoading(true);
+    setError("");
+    try {
+      const result = await fetchGames(
+        page,
+        20,
+        playerFilter,
+        operatorFilter,
+        dateFrom,
+        dateTo,
+        searchQuery,
+        searchBy,
+      );
+      setGames(result.data);
+      setGamesPagination(result.pagination);
+    } catch (loadError) {
+      if (loadError.status === 401) {
+        setAdmin(null);
+        return;
+      }
+      setError(loadError.message || "Failed to load games.");
+    } finally {
+      setTableLoading(false);
+    }
+  }, [playerFilter, operatorFilter, dateFrom, dateTo, searchQuery, searchBy]);
 
   const loadUsers = useCallback(async (page = 1) => {
-    const result = await fetchUsers(page, 20, playerFilter, operatorFilter, dateFrom, dateTo);
-    setUsers(result.data);
-    setUsersPagination(result.pagination);
-  }, [playerFilter, operatorFilter, dateFrom, dateTo]);
+    setTableLoading(true);
+    setError("");
+    try {
+      const result = await fetchUsers(
+        page,
+        20,
+        playerFilter,
+        operatorFilter,
+        dateFrom,
+        dateTo,
+        searchQuery,
+        searchBy,
+      );
+      setUsers(result.data);
+      setUsersPagination(result.pagination);
+    } catch (loadError) {
+      if (loadError.status === 401) {
+        setAdmin(null);
+        return;
+      }
+      setError(loadError.message || "Failed to load users.");
+    } finally {
+      setTableLoading(false);
+    }
+  }, [playerFilter, operatorFilter, dateFrom, dateTo, searchQuery, searchBy]);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,12 +189,54 @@ function App() {
     nextOperatorFilter,
     nextDateFrom = dateFrom,
     nextDateTo = dateTo,
+    nextSearch = searchQuery,
+    nextSearchBy = searchBy,
+    { tableOnly = false } = {},
   ) => {
-    setLoading(true);
+    setTableLoading(true);
     setError("");
 
     try {
-      await loadProfitLossData(1, nextPlayerFilter, nextOperatorFilter, nextDateFrom, nextDateTo);
+      if (tableOnly) {
+        const section = profitLossSection;
+        if (section === "users") {
+          const usersData = await fetchUsers(
+            1,
+            20,
+            nextPlayerFilter,
+            nextOperatorFilter,
+            nextDateFrom,
+            nextDateTo,
+            nextSearch,
+            nextSearchBy,
+          );
+          setUsers(usersData.data);
+          setUsersPagination(usersData.pagination);
+        } else {
+          const gamesData = await fetchGames(
+            1,
+            20,
+            nextPlayerFilter,
+            nextOperatorFilter,
+            nextDateFrom,
+            nextDateTo,
+            nextSearch,
+            nextSearchBy,
+          );
+          setGames(gamesData.data);
+          setGamesPagination(gamesData.pagination);
+        }
+      } else {
+        await loadProfitLossData(
+          1,
+          nextPlayerFilter,
+          nextOperatorFilter,
+          nextDateFrom,
+          nextDateTo,
+          nextSearch,
+          nextSearchBy,
+        );
+      }
     } catch (loadError) {
       if (loadError.status === 401) {
         setAdmin(null);
@@ -155,31 +244,59 @@ function App() {
       }
       setError(loadError.message || "Failed to filter profit & loss data.");
     } finally {
-      setLoading(false);
+      setTableLoading(false);
     }
   };
 
   const handlePlayerFilterChange = async (nextFilter) => {
     setPlayerFilter(nextFilter);
-    await reloadFilteredProfitLoss(nextFilter, operatorFilter, dateFrom, dateTo);
+    await reloadFilteredProfitLoss(nextFilter, operatorFilter, dateFrom, dateTo, searchQuery, searchBy);
   };
 
   const handleOperatorFilterChange = async (nextOperator) => {
     setOperatorFilter(nextOperator);
-    await reloadFilteredProfitLoss(playerFilter, nextOperator, dateFrom, dateTo);
+    await reloadFilteredProfitLoss(playerFilter, nextOperator, dateFrom, dateTo, searchQuery, searchBy);
   };
 
   const handleDateFilterChange = async (nextDateFrom, nextDateTo) => {
     setDateFrom(nextDateFrom);
     setDateTo(nextDateTo);
-    await reloadFilteredProfitLoss(playerFilter, operatorFilter, nextDateFrom, nextDateTo);
+    await reloadFilteredProfitLoss(
+      playerFilter,
+      operatorFilter,
+      nextDateFrom,
+      nextDateTo,
+      searchQuery,
+      searchBy,
+    );
+  };
+
+  const handleSearchFilterChange = async (nextSearch, nextSearchBy = searchBy) => {
+    setSearchQuery(nextSearch);
+    setSearchBy(nextSearchBy);
+    await reloadFilteredProfitLoss(
+      playerFilter,
+      operatorFilter,
+      dateFrom,
+      dateTo,
+      nextSearch,
+      nextSearchBy,
+      { tableOnly: true },
+    );
   };
 
   const openProfitLossForOperator = async (operatorId = "all") => {
     setActivePage("profit-loss");
     setProfitLossSection("games");
     setOperatorFilter(operatorId);
-    await reloadFilteredProfitLoss(playerFilter, operatorId);
+    await reloadFilteredProfitLoss(
+      playerFilter,
+      operatorId,
+      dateFrom,
+      dateTo,
+      searchQuery,
+      searchBy,
+    );
   };
 
   const handleLogin = async ({ email, password }) => {
@@ -208,6 +325,8 @@ function App() {
             operatorFilter,
             dateFrom,
             dateTo,
+            searchQuery,
+            searchBy,
           );
           break;
         default:
@@ -231,6 +350,8 @@ function App() {
     operatorFilter,
     dateFrom,
     dateTo,
+    searchQuery,
+    searchBy,
   ]);
 
   const handleRefreshActivePage = () => refreshPage(activePage);
@@ -375,7 +496,7 @@ function App() {
             />
           ) : null}
 
-          {!loading && !error && activePage === "profit-loss" ? (
+          {!loading && activePage === "profit-loss" ? (
             <ProfitLossPage
               section={profitLossSection}
               onSectionChange={setProfitLossSection}
@@ -386,6 +507,9 @@ function App() {
               dateFrom={dateFrom}
               dateTo={dateTo}
               onDateFilterChange={handleDateFilterChange}
+              searchQuery={searchQuery}
+              searchBy={searchBy}
+              onSearchFilterChange={handleSearchFilterChange}
               operators={operators}
               summary={summary}
               games={games}
@@ -395,6 +519,7 @@ function App() {
               usersPagination={usersPagination}
               onUsersPageChange={loadUsers}
               onSelectGame={setSelectedGame}
+              tableLoading={tableLoading}
             />
           ) : null}
         </main>

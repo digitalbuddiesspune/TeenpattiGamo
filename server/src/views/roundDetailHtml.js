@@ -159,8 +159,4 @@ function renderError(statusCode, message) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Teen Patti Error</title><style>body{margin:0;background:#eef2f5;font:16px system-ui;color:#233548}.box{max-width:680px;margin:12vh auto;background:#fff;padding:30px;border-radius:16px;box-shadow:0 8px 30px #0001}h1{margin-top:0}</style></head><body><main class="box"><h1>Teen Patti request failed</h1><p>${escapeHtml(message)}</p><small>HTTP ${Number(statusCode)}</small></main></body></html>`;
 }
 
-module.exports = {
-  escapeHtml,
-  renderError,
-  renderRoundDetail,
-};
+export { escapeHtml, renderError, renderRoundDetail };

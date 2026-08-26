@@ -1,4 +1,4 @@
-const { connectMongo } = require("../config/mongo");
+import { connectMongo } from "../config/mongo.js";
 
 const COLLECTION_NAME = "round_history";
 const GAME_NAME = "teen-patti";
@@ -110,7 +110,4 @@ async function listTeenPattiRounds(query) {
   return payload;
 }
 
-module.exports = {
-  listTeenPattiRounds,
-  parsePagination,
-};
+export { listTeenPattiRounds, parsePagination };

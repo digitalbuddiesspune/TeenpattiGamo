@@ -102,6 +102,8 @@ export function TeenPattiRoundPreview({ game }) {
   const players = game.players || [];
   const actions = Array.isArray(game.actionLog) ? game.actionLog.slice(-12) : [];
   const nameById = new Map(players.map((player) => [player.userId, player.displayName]));
+  const sharedJokers = Array.isArray(game.sharedJokers) ? game.sharedJokers.filter(Boolean) : [];
+  const wildcardRanks = Array.isArray(game.wildcardRanks) ? game.wildcardRanks : [];
 
   return (
     <div className="border-t border-[var(--color-line)] px-6 py-5">
@@ -119,6 +121,37 @@ export function TeenPattiRoundPreview({ game }) {
           </ul>
         ) : null}
       </div>
+
+      {sharedJokers.length > 0 || wildcardRanks.length > 0 ? (
+        <div className="mt-5 rounded-xl border border-[#48d7d1]/35 bg-[linear-gradient(180deg,#f3fffd,#e8fbf8)] px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0f766e]">
+              Shared Jokers
+            </h4>
+            {wildcardRanks.length > 0 ? (
+              <p className="text-xs text-[var(--color-muted)]">
+                Wild ranks:{" "}
+                <span className="font-semibold text-[var(--color-ink)]">{wildcardRanks.join(", ")}</span>
+              </p>
+            ) : null}
+          </div>
+          {sharedJokers.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {sharedJokers.map((card, index) => (
+                <CardFace
+                  key={card.id || `shared-joker-${index}`}
+                  card={card}
+                  label={`Joker ${index + 1}`}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-[var(--color-muted)]">
+              Shared joker ranks active for this round.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         {players.map((player) => {

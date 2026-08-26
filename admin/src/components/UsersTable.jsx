@@ -40,10 +40,16 @@ function initials(name) {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
-export function UsersTable({ users, pagination, onPageChange, currency = "INR" }) {
+export function UsersTable({ users, pagination, onPageChange, currency = "INR", loading = false }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-card)]">
-      <div className="overflow-x-auto">
+    <div className="relative overflow-hidden rounded-2xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-card)]">
+      {loading ? (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-white/75 backdrop-blur-[1px]">
+          <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--color-line)] border-t-[var(--accent)]" />
+          <p className="text-xs font-semibold text-[var(--color-muted)]">Updating results…</p>
+        </div>
+      ) : null}
+      <div className={`overflow-x-auto ${loading ? "pointer-events-none opacity-60" : ""}`}>
         <table className="min-w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--color-line)] bg-[#f4f7f5]">

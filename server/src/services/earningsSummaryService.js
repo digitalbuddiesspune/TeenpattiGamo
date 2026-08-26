@@ -1,4 +1,4 @@
-const { connectMongo } = require("../config/mongo");
+import { connectMongo } from "../config/mongo.js";
 
 const ROUND_COLLECTION = "round_history";
 const WALLET_COLLECTION = "wallet_transactions";
@@ -147,7 +147,4 @@ async function getTeenPattiEarningsSummary(query, database) {
   };
 }
 
-module.exports = {
-  getTeenPattiEarningsSummary,
-  normalizeParams,
-};
+export { getTeenPattiEarningsSummary, normalizeParams };

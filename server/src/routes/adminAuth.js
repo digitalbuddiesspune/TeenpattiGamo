@@ -1,11 +1,11 @@
-const express = require("express");
-const {
+import express from "express";
+import {
   login,
   logout,
   getSession,
   getBearerToken,
   requireAdmin,
-} = require("../services/adminAuthService");
+} from "../services/adminAuthService.js";
 
 const router = express.Router();
 
@@ -33,4 +33,4 @@ router.get("/me", (request, response) => {
   return response.json(session);
 });
 
-module.exports = router;
+export default router;

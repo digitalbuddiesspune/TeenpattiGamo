@@ -1,4 +1,4 @@
-const { connectMongo } = require("../config/mongo");
+import { connectMongo } from "../config/mongo.js";
 
 const ROUND_COLLECTION = "round_history";
 const WALLET_COLLECTION = "wallet_transactions";
@@ -63,7 +63,4 @@ async function findLatestRound(query, database) {
   };
 }
 
-module.exports = {
-  findLatestRound,
-  normalizeParams,
-};
+export { findLatestRound, normalizeParams };

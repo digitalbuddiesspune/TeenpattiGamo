@@ -1,4 +1,4 @@
-const { connectMongo } = require("../config/mongo");
+import { connectMongo } from "../config/mongo.js";
 
 const ROUND_COLLECTION = "round_history";
 const WALLET_COLLECTION = "wallet_transactions";
@@ -45,6 +45,12 @@ function parseDateParam(value, paramName, endOfDay) {
   return date.toISOString();
 }
 
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const SEARCH_BY_OPTIONS = new Set(["all", "playerName", "playerId", "gameId", "roundId"]);
+
 function parseListFilters(query = {}) {
   const page = integerParam(query.page, 1);
   const limit = integerParam(query.limit ?? query.pageSize, 20);
@@ -52,6 +58,9 @@ function parseListFilters(query = {}) {
   const variant = String(query.variant || query.players || "").trim().toLowerCase();
   const dateFrom = parseDateParam(query.dateFrom || query.from, "dateFrom", false);
   const dateTo = parseDateParam(query.dateTo || query.to, "dateTo", true);
+  const search = String(query.search || query.q || "").trim();
+  const searchByRaw = String(query.searchBy || query.searchField || "all").trim();
+  const searchBy = SEARCH_BY_OPTIONS.has(searchByRaw) ? searchByRaw : "all";
 
   if (!Number.isInteger(page) || page < 1) {
     badRequest("page must be an integer greater than or equal to 1.");
@@ -66,7 +75,44 @@ function parseListFilters(query = {}) {
   const knownVariants = new Set(["classic", "ak47", "muflis", "flipper", "jhandu", "public", "private"]);
   const variantFilter = knownVariants.has(variant) ? variant : null;
 
-  return { page, limit, operatorId, variantFilter, dateFrom, dateTo };
+  return {
+    page,
+    limit,
+    operatorId,
+    variantFilter,
+    dateFrom,
+    dateTo,
+    search,
+    searchBy,
+  };
+}
+
+function buildSearchClause(search, searchBy = "all") {
+  const q = String(search || "").trim();
+  if (!q) {
+    return null;
+  }
+
+  const rx = { $regex: escapeRegex(q), $options: "i" };
+  const byField = {
+    playerName: [{ "participants.name": rx }, { "winner.name": rx }],
+    playerId: [{ "participants.id": rx }, { "winner.id": rx }],
+    gameId: [{ aggregateId: rx }, { tableId: rx }],
+    roundId: [{ _id: q }, { id: q }, { _id: rx }, { id: rx }],
+  };
+
+  if (searchBy && searchBy !== "all" && byField[searchBy]) {
+    return { $or: byField[searchBy] };
+  }
+
+  return {
+    $or: [
+      ...byField.playerName,
+      ...byField.playerId,
+      ...byField.gameId,
+      ...byField.roundId,
+    ],
+  };
 }
 
 function operatorLabel(operatorId) {
@@ -194,6 +240,17 @@ function buildRoundMatch(filters, operatorRoundIds) {
     }
   }
 
+  const searchClause = buildSearchClause(filters.search, filters.searchBy);
+  if (searchClause) {
+    if (match._id) {
+      const idConstraint = { _id: match._id };
+      delete match._id;
+      match.$and = [idConstraint, searchClause];
+    } else {
+      Object.assign(match, searchClause);
+    }
+  }
+
   return match;
 }
 
@@ -273,12 +330,31 @@ function mapGame(document, roundOperators, playerOperators) {
         }
       : null,
     players: participants.map((participant) => mapPlayer(participant, document, playerOperators)),
+    sharedJokers: mapSharedJokers(document),
+    wildcardRanks: Array.isArray(document.wildcardRanks) ? document.wildcardRanks : [],
+    revealedSharedJokerCount: Number(document.revealedSharedJokerCount || 0),
     actionLog: Array.isArray(document.actionLog) ? document.actionLog : [],
     actualBootCommission: Number(document.actualBootCommission || 0),
     actualWinCommission: Number(document.actualWinCommission || 0),
     dealerTip: Number(document.dealerTip || 0),
     reason: document.reason || null,
   };
+}
+
+function mapSharedJokers(document) {
+  const cards = Array.isArray(document.sharedJokerCards)
+    ? document.sharedJokerCards
+    : Array.isArray(document.sharedJokers)
+      ? document.sharedJokers
+      : [];
+  return cards
+    .filter((card) => card && (card.rank || card.suit) && !card.hidden)
+    .map((card) => ({
+      id: card.id || null,
+      rank: card.rank || null,
+      suit: card.suit || null,
+      value: card.value ?? null,
+    }));
 }
 
 function paginationMeta(page, limit, totalItems) {
@@ -557,7 +633,27 @@ async function listUsers(query) {
     }
   }
 
-  const allUsers = Array.from(users.values()).sort((a, b) => b.gamesPlayed - a.gamesPlayed);
+  const allUsers = Array.from(users.values())
+    .filter((user) => {
+      const q = String(filters.search || "").trim().toLowerCase();
+      if (!q) {
+        return true;
+      }
+      if (filters.searchBy === "gameId" || filters.searchBy === "roundId") {
+        // Already constrained by round match; keep users from matching rounds.
+        return true;
+      }
+      const name = String(user.displayName || "").toLowerCase();
+      const id = String(user.userId || "").toLowerCase();
+      if (filters.searchBy === "playerName") {
+        return name.includes(q);
+      }
+      if (filters.searchBy === "playerId") {
+        return id.includes(q);
+      }
+      return name.includes(q) || id.includes(q);
+    })
+    .sort((a, b) => b.gamesPlayed - a.gamesPlayed);
   const totalItems = allUsers.length;
   const start = (filters.page - 1) * filters.limit;
   const data = allUsers.slice(start, start + filters.limit);
@@ -568,11 +664,4 @@ async function listUsers(query) {
   };
 }
 
-module.exports = {
-  listGames,
-  getGameById,
-  deleteGame,
-  getSummary,
-  listUsers,
-  parseListFilters,
-};
+export { listGames, getGameById, deleteGame, getSummary, listUsers, parseListFilters, buildSearchClause };

@@ -286,6 +286,9 @@ internal class RoundHistoryEntry {
     var variantId: String = ""
     var participants: MutableList<RoundHistoryParticipant> = mutableListOf()
     var winner: RoundHistoryWinner? = null
+    var sharedJokerCards: MutableList<Card> = mutableListOf()
+    var wildcardRanks: MutableList<String> = mutableListOf()
+    var revealedSharedJokerCount: Int = 0
     var bootContributionTotal: Int = 0
     var potAmount: Int = 0
     var realPlayerContributionTotal: Int = 0

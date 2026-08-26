@@ -1,13 +1,13 @@
-const assert = require("node:assert/strict");
-const http = require("node:http");
-const test = require("node:test");
-const express = require("express");
-process.env.MONGODB_URI ||= "mongodb://127.0.0.1:27017/teen_patti_test";
-const {
+import "./setup-env.js";
+import assert from "node:assert/strict";
+import http from "node:http";
+import test from "node:test";
+import express from "express";
+import {
   getTeenPattiEarningsSummary,
   normalizeParams,
-} = require("../src/services/earningsSummaryService");
-const { createEarningsSummaryRouter } = require("../src/routes/teenPattiEarningsSummary");
+} from "../src/services/earningsSummaryService.js";
+import { createEarningsSummaryRouter } from "../src/routes/teenPattiEarningsSummary.js";
 
 const rounds = [
   {
