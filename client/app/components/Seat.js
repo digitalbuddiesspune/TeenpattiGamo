@@ -202,6 +202,53 @@ function getHandLabelTone(handLabel) {
   };
 }
 
+/** Arc fan like a held hand. `centered` places cards from a 0-width anchor so the fan stays mid. */
+function getFanCardStyles(count, { compact = false, centered = false } = {}) {
+  const n = Math.max(1, count);
+  const maxAngle = compact
+    ? n >= 5
+      ? 12
+      : n === 4
+        ? 10
+        : n === 3
+          ? 8
+          : 5
+    : n >= 5
+      ? 22
+      : n === 4
+        ? 20
+        : n === 3
+          ? 16
+          : 10;
+  const lift = compact ? 3 : 10;
+  // Distance between card centers when using absolute centered fan.
+  const spacingPx = compact ? 14 : n >= 4 ? 28 : 30;
+
+  return Array.from({ length: n }, (_, index) => {
+    const t = n === 1 ? 0.5 : index / (n - 1);
+    const angle = -maxAngle + t * (maxAngle * 2);
+    const arc = Math.abs(angle) / Math.max(maxAngle, 1);
+    const y = Math.round(arc * lift);
+    const style = {
+      transform: `rotate(${angle.toFixed(2)}deg) translateY(${y}px)`,
+      transformOrigin: "50% 100%",
+      zIndex: index + 1,
+    };
+
+    if (centered) {
+      const originX = -((n - 1) * spacingPx) / 2;
+      style.left = `${originX + index * spacingPx}px`;
+      style.bottom = "0px";
+      style.position = "absolute";
+      // Center each card on its anchor point.
+      style.marginLeft = "0";
+      style.transform = `translateX(-50%) rotate(${angle.toFixed(2)}deg) translateY(${y}px)`;
+    }
+
+    return style;
+  });
+}
+
 function TurnClock({ turnClock, isUser, className }) {
   const progress = Math.max(0, Math.min(100, turnClock?.progress ?? 0));
   const ringBackground = `conic-gradient(${turnClock?.isCritical ? "#ff7c70" : "#ffdf86"} ${progress}%, rgba(255,255,255,0.14) ${progress}% 100%)`;
@@ -241,29 +288,6 @@ export default function Seat({
   const hasVisibleCards = Boolean(shouldRevealCards && seat.cards?.some((card) => !card.hidden));
   const cardsRevealed = hasVisibleCards;
   const isSideSeat = !isUser && seat.seatIndex >= 1 && seat.seatIndex <= 4;
-  const revealedCardStyles = isUser
-    ? [
-        { transform: "rotate(-6deg) translateY(2px)", zIndex: 1 },
-        { transform: "rotate(-2deg) translateY(0)", zIndex: 2 },
-        { transform: "rotate(2deg) translateY(0)", zIndex: 3 },
-        { transform: "rotate(6deg) translateY(2px)", zIndex: 4 },
-      ]
-    : [
-        { transform: "rotate(-3deg)", zIndex: 1 },
-        { transform: "rotate(-1deg)", zIndex: 2 },
-        { transform: "rotate(1deg)", zIndex: 3 },
-        { transform: "rotate(3deg)", zIndex: 4 },
-      ];
-  const cardsRowClass = cardsRevealed
-    ? isUser
-      ? "flex items-end justify-center gap-1.5 sm:gap-2"
-      : "table-seat__cards-row table-seat__cards-row--opponent-revealed flex items-end justify-center"
-    : layout.cardsRow;
-  const cardsWrapClass = cardsRevealed && isSideSeat
-    ? seat.seatIndex <= 2
-      ? "left-[calc(100%-2px)] top-1/2 -translate-y-1/2"
-      : "right-[calc(100%-2px)] top-1/2 -translate-y-1/2"
-    : layout.cardsWrap;
   const publicCards = Array.isArray(seat.publicCards) ? seat.publicCards.filter(Boolean) : [];
   const isFlipperVariant = publicCardMode === "flipper_blue_card";
   const showPublicCards = publicCardMode === "third_card_rank_joker" && publicCards.length > 0 && !isStarting && !isDealing;
@@ -323,6 +347,24 @@ export default function Seat({
     ...publicCardsToRender,
     ...flipperCardsToRender,
   ];
+  const revealedCardStyles = getFanCardStyles(cardsToRender.length || 3, {
+    compact: !isUser,
+    centered: isUser && cardsRevealed,
+  });
+  // Opponents keep original left-to-right reveal beside the seat; user gets centered bottom fan.
+  const cardsRowClass = cardsRevealed
+    ? isUser
+      ? "table-seat__cards-row table-seat__cards-row--fan table-seat__cards-row--user-fan"
+      : "table-seat__cards-row table-seat__cards-row--fan table-seat__cards-row--opponent-ltr flex items-end justify-center"
+    : layout.cardsRow;
+  const cardsWrapClass =
+    cardsRevealed && isSideSeat
+      ? seat.seatIndex <= 2
+        ? "table-seat__cards--opponent-ltr left-[calc(100%-2px)] top-1/2 -translate-y-1/2"
+        : "table-seat__cards--opponent-ltr right-[calc(100%-2px)] top-1/2 -translate-y-1/2"
+      : cardsRevealed && isUser
+        ? "table-seat__cards--user-fan"
+        : layout.cardsWrap;
   const seatState = seat.packed ? "PACK" : seat.seen ? "SEEN" : "BLIND";
   const sideShowStatus = sideShowResult
     ? sideShowResult.winnerId === seat.id
@@ -381,12 +423,43 @@ export default function Seat({
           data-card-count={cardsToRender.length}
         >
           <div className={cardsRowClass}>
-            {cardsToRender.map((card, index) => (
+            {cardsToRender.map((card, index) => {
+              const fanStyle = cardsRevealed
+                ? revealedCardStyles[Math.min(index, revealedCardStyles.length - 1)]
+                : null;
+              const cardStyle = card.hidden
+                ? layout.hiddenCardStyles?.[index] ?? layout.hiddenCardStyles?.[layout.hiddenCardStyles.length - 1]
+                : cardsRevealed
+                  ? fanStyle
+                  : hasVisibleCards
+                    ? layout.visibleCardStyles?.[index] ?? layout.visibleCardStyles?.[layout.visibleCardStyles.length - 1]
+                    : card.displayType === "public" || card.displayType === "flipper"
+                      ? revealedCardStyles[Math.min(index, revealedCardStyles.length - 1)]
+                      : undefined;
+
+              return (
               <div
                 key={card.renderKey || `${seat.id}-${index}`}
                 className={`table-seat__dealt-card ${
-                  cardsRevealed || index === 0 ? "" : layout.overlap
-                } ${card.cardAccent === "flipper" ? "ml-1.5 sm:ml-2" : ""}`}
+                  cardsRevealed
+                    ? isUser
+                      ? "table-seat__dealt-card--fan table-seat__dealt-card--user-fan"
+                      : "table-seat__dealt-card--fan table-seat__dealt-card--opponent-ltr"
+                    : index === 0
+                      ? ""
+                      : layout.overlap
+                } ${card.cardAccent === "flipper" && !cardsRevealed ? "ml-1.5 sm:ml-2" : ""}`}
+                style={
+                  cardsRevealed && isUser && fanStyle
+                    ? {
+                        left: fanStyle.left,
+                        bottom: fanStyle.bottom,
+                        zIndex: fanStyle.zIndex,
+                      }
+                    : cardsRevealed
+                      ? { zIndex: fanStyle?.zIndex }
+                      : undefined
+                }
               >
                 <PlayingCard
                   card={card}
@@ -396,7 +469,7 @@ export default function Seat({
                     card.hidden
                       ? layout.hiddenCardClass
                       : card.cardAccent === "flipper"
-                        ? "ring-2 ring-[#5ac8fa]/90 shadow-[0_0_10px_rgba(90,200,250,0.55)]"
+                        ? "ring-2 ring-[#4db8ff]/95 shadow-[0_0_12px_rgba(20,90,160,0.55)]"
                         : card.cardAccent === "joker"
                           ? "ring-1 ring-[#7ef6eb]/80"
                           : card.cardAccent === "reserve"
@@ -404,19 +477,18 @@ export default function Seat({
                             : ""
                   }
                   style={
-                    card.hidden
-                      ? layout.hiddenCardStyles?.[index] ?? layout.hiddenCardStyles?.[layout.hiddenCardStyles.length - 1]
-                      : cardsRevealed
-                        ? revealedCardStyles[Math.min(index, revealedCardStyles.length - 1)]
-                      : hasVisibleCards
-                        ? layout.visibleCardStyles?.[index] ?? layout.visibleCardStyles?.[layout.visibleCardStyles.length - 1]
-                        : card.displayType === "public" || card.displayType === "flipper"
-                          ? revealedCardStyles[Math.min(index, revealedCardStyles.length - 1)]
-                          : undefined
+                    cardStyle
+                      ? {
+                          transform: cardStyle.transform,
+                          transformOrigin: cardStyle.transformOrigin,
+                          zIndex: cardStyle.zIndex,
+                        }
+                      : undefined
                   }
                 />
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

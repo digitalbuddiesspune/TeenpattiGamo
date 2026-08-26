@@ -57,15 +57,18 @@ function getClockwiseSeatOrder(seats = []) {
   return [...seats].sort((left, right) => left.seatIndex - right.seatIndex);
 }
 
-function ActionPillButton({ children, tone = "dark", disabled, onClick }) {
+function ActionPillButton({ children, tone = "dark", disabled, onClick, compact = false }) {
   const toneClass = tone === "green"
     ? "border-[#3be7de]/34 bg-[linear-gradient(180deg,#0d7576_0%,#083a3d_100%)] text-white"
     : "border-[#ffffff14] bg-[linear-gradient(180deg,rgba(15,74,78,0.9),rgba(7,30,33,0.95))] text-white";
+  const sizeClass = compact
+    ? "rounded-[10px] px-2.5 py-1 text-[9px] tracking-[0.12em] shadow-[0_8px_14px_rgba(0,0,0,0.2)]"
+    : "rounded-full px-4 py-2 text-[12px] tracking-[0.14em] shadow-[0_14px_26px_rgba(0,0,0,0.24)]";
 
   return (
     <button
       type="button"
-      className={`casino-table-scene__action-pill rounded-full border px-4 py-2 text-[12px] font-black uppercase tracking-[0.14em] shadow-[0_14px_26px_rgba(0,0,0,0.24)] transition ${toneClass} ${
+      className={`casino-table-scene__action-pill border font-black uppercase transition ${sizeClass} ${toneClass} ${
         disabled ? "cursor-not-allowed opacity-45" : "cursor-pointer active:translate-y-[1px]"
       }`}
       disabled={disabled}
@@ -122,17 +125,19 @@ function SharedJokersTray({ sharedJokers = [] }) {
   }
 
   return (
-    <div className="absolute left-1/2 top-[18%] z-[30] flex -translate-x-1/2 flex-col items-center gap-2 rounded-[18px] border border-[#ffffff14] bg-[linear-gradient(180deg,rgba(7,49,54,0.92),rgba(4,23,27,0.96))] px-4 py-3 shadow-[0_18px_34px_rgba(0,0,0,0.28)] backdrop-blur-md">
-      <span className="text-[9px] font-black uppercase tracking-[0.18em] text-white/72">
+    <div className="shared-jokers-tray absolute left-1/2 top-[18%] z-[30] flex -translate-x-1/2 flex-col items-center gap-1 rounded-[10px] border border-[#ffffff14] bg-[linear-gradient(180deg,rgba(7,49,54,0.92),rgba(4,23,27,0.96))] px-2 py-1.5 shadow-[0_10px_18px_rgba(0,0,0,0.28)] backdrop-blur-md">
+      <span className="text-[6px] font-black uppercase tracking-[0.14em] text-white/72">
         Shared Jokers
       </span>
-      <div className="flex gap-2">
+      <div className="flex gap-1">
         {sharedJokers.map((card, index) => (
           <PlayingCard
             key={card.id || `shared-${index}`}
             card={card}
             revealed={!card.hidden}
             compact
+            centerSuitOnly
+            className="shared-jokers-tray__card"
           />
         ))}
       </div>
@@ -1443,19 +1448,19 @@ export default function CasinoTable({
 
         {pendingSideShow ? (
           <div className="casino-table-scene__side-show fixed inset-x-0 top-[154px] z-[32] flex justify-center px-4 sm:top-[164px]">
-            <div className="w-[min(calc(100vw-24px),21rem)] rounded-[18px] border border-[#ffffff12] bg-[linear-gradient(180deg,rgba(8,52,57,0.95),rgba(4,19,22,0.98))] px-4 py-3 shadow-[0_18px_34px_rgba(0,0,0,0.28)] backdrop-blur-md">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <span className="rounded-full border border-[#43d8cc]/22 bg-[#081c1f]/72 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#abfff5]">
+            <div className="w-[min(calc(100vw-32px),15.5rem)] rounded-[14px] border border-[#ffffff12] bg-[linear-gradient(180deg,rgba(8,52,57,0.95),rgba(4,19,22,0.98))] px-3 py-2 shadow-[0_12px_22px_rgba(0,0,0,0.28)] backdrop-blur-md">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="rounded-full border border-[#43d8cc]/22 bg-[#081c1f]/72 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.14em] text-[#abfff5]">
                   Side Show
                 </span>
                 {isRequesterWaiting ? (
-                  <div className="rounded-full border border-white/12 bg-black/28 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/78">
+                  <div className="rounded-full border border-white/12 bg-black/28 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-white/78">
                     {pendingSideShowSeconds}s
                   </div>
                 ) : null}
               </div>
-              <div className="flex flex-col gap-3">
-                <span className="text-sm font-semibold text-white/82">
+              <div className="flex flex-col gap-2">
+                <span className="text-[11px] font-semibold leading-snug text-white/82">
                   {isTargetPrompt
                     ? `${pendingSideShow.requesterName} requested a side show. ${autoAcceptSideshow ? "Accept" : "Accept or deny"} in ${pendingSideShowSeconds}s.`
                     : isRequesterWaiting
@@ -1463,12 +1468,12 @@ export default function CasinoTable({
                       : `${pendingSideShow.requesterName} requested a side show with ${pendingSideShow.targetName}.`}
                 </span>
                 {isTargetPrompt ? (
-                  <div className="flex gap-2">
-                    <ActionPillButton tone="green" disabled={acting} onClick={() => onAction("sideshow_accept")}>
+                  <div className="flex gap-1.5">
+                    <ActionPillButton compact tone="green" disabled={acting} onClick={() => onAction("sideshow_accept")}>
                       Accept
                     </ActionPillButton>
                     {autoAcceptSideshow ? null : (
-                      <ActionPillButton disabled={acting} onClick={() => onAction("sideshow_deny")}>
+                      <ActionPillButton compact disabled={acting} onClick={() => onAction("sideshow_deny")}>
                         Deny
                       </ActionPillButton>
                     )}
@@ -1479,12 +1484,12 @@ export default function CasinoTable({
           </div>
         ) : visibleSideShowResult && !showRoundCompleteOverlay ? (
           <div className="casino-table-scene__side-show-result fixed inset-x-0 top-[154px] z-[32] flex justify-center px-4 sm:top-[164px]">
-            <div className="flex w-[min(calc(100vw-24px),21rem)] items-center justify-between gap-3 rounded-[18px] border border-[#ffffff12] bg-[linear-gradient(180deg,rgba(8,52,57,0.95),rgba(4,19,22,0.98))] px-4 py-3 shadow-[0_18px_34px_rgba(0,0,0,0.28)] backdrop-blur-md">
+            <div className="flex w-[min(calc(100vw-32px),15.5rem)] items-center justify-between gap-2 rounded-[14px] border border-[#ffffff12] bg-[linear-gradient(180deg,rgba(8,52,57,0.95),rgba(4,19,22,0.98))] px-3 py-2 shadow-[0_12px_22px_rgba(0,0,0,0.28)] backdrop-blur-md">
               <div className="min-w-0">
-                <span className="mb-1 block rounded-full border border-[#43d8cc]/22 bg-[#081c1f]/72 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#abfff5] w-fit">
+                <span className="mb-0.5 block w-fit rounded-full border border-[#43d8cc]/22 bg-[#081c1f]/72 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.14em] text-[#abfff5]">
                   Side Show
                 </span>
-                <span className="block text-sm font-semibold text-white/82">
+                <span className="block text-[11px] font-semibold leading-snug text-white/82">
                 {(visibleSideShowResult.winnerId === visibleSideShowResult.requesterId
                   ? visibleSideShowResult.requesterName
                   : visibleSideShowResult.targetName)} won the side show
@@ -1492,7 +1497,7 @@ export default function CasinoTable({
               </div>
               <button
                 type="button"
-                className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-sm font-bold text-white/70"
+                className="rounded-full border border-white/10 bg-white/8 px-2 py-0.5 text-xs font-bold text-white/70"
                 aria-label="Close side show result"
                 onClick={() => setDismissedSideShowResultAt(visibleSideShowResult.resolvedAt)}
               >

@@ -1691,6 +1691,51 @@ body.app-body-portrait-blocked {
   max-width: none;
 }
 
+/* Jhandu shared jokers: compact tray (~half original, cards +25% from that). */
+.shared-jokers-tray .shared-jokers-tray__card.playing-card.compact,
+.shared-jokers-tray .shared-jokers-tray__card.hidden-playing-card {
+  width: 23px !important;
+  height: 33px !important;
+  border-radius: 4px !important;
+  padding: 1px !important;
+}
+
+.shared-jokers-tray .shared-jokers-tray__card.playing-card.compact span,
+.shared-jokers-tray .shared-jokers-tray__card.playing-card.compact div {
+  font-size: 6px !important;
+  line-height: 1 !important;
+}
+
+.shared-jokers-tray .shared-jokers-tray__card.playing-card.compact .absolute.inset-0 {
+  font-size: 11px !important;
+}
+
+@media (min-width: 640px) {
+  .shared-jokers-tray .shared-jokers-tray__card.playing-card.compact,
+  .shared-jokers-tray .shared-jokers-tray__card.hidden-playing-card {
+    width: 26px !important;
+    height: 38px !important;
+    border-radius: 4px !important;
+  }
+
+  .shared-jokers-tray .shared-jokers-tray__card.playing-card.compact span,
+  .shared-jokers-tray .shared-jokers-tray__card.playing-card.compact div {
+    font-size: 7px !important;
+  }
+
+  .shared-jokers-tray .shared-jokers-tray__card.playing-card.compact .absolute.inset-0 {
+    font-size: 14px !important;
+  }
+}
+
+@media (max-width: 639px) {
+  .table-controls__button {
+    font-size: 9px !important;
+    letter-spacing: 0.03em !important;
+    min-height: 40px;
+  }
+}
+
 /* ---------------------------------------------------------------------------
  * Desktop landscape board.
  *
@@ -3717,32 +3762,130 @@ body.app-body-portrait-blocked {
 }
 
 .table-seat__cards.is-revealed .table-seat__dealt-card {
-  margin: 0 !important;
   flex-shrink: 0;
 }
 
-/* Keep a tight but readable gap between revealed opponent cards. */
-.table-seat__cards-row--opponent-revealed {
-  gap: 3px;
+/* Held-hand arc fan for the viewer; opponents keep side LTR with a light fan tilt. */
+.table-seat__cards-row--fan {
+  gap: 0;
+  align-items: flex-end;
 }
 
-.table-seat--opponent .table-seat__cards.is-revealed .playing-card.compact {
-  width: 38px;
-  height: 56px;
-  padding: 3px;
-  border-radius: 6px;
+.table-seat__dealt-card--fan > * {
+  transform-origin: 50% 100%;
+  box-shadow:
+    0 10px 18px rgba(0, 0, 0, 0.28),
+    0 2px 0 rgba(255, 255, 255, 0.18) inset;
+}
+
+/* User fan: zero-width anchor at seat center so cards stay mid. */
+.table-seat--user .table-seat__cards--user-fan {
+  left: 50%;
+  bottom: -5.6rem;
+  width: 0;
+  height: 0;
+  transform: none;
+  z-index: 22;
+}
+
+.table-seat--user .table-seat__cards-row--user-fan {
+  position: relative;
+  width: 0;
+  height: 0;
+}
+
+.table-seat--user .table-seat__dealt-card--user-fan {
+  position: absolute;
+  width: max-content;
 }
 
 @media (min-width: 640px) {
-  .table-seat__cards-row--opponent-revealed {
-    gap: 4px;
+  .table-seat--user .table-seat__cards--user-fan {
+    bottom: -7rem;
+  }
+}
+
+/* Opponents: original left-to-right beside the seat, with fan overlap. */
+.table-seat--opponent .table-seat__cards--opponent-ltr {
+  z-index: 21;
+}
+
+.table-seat--opponent .table-seat__cards-row--opponent-ltr {
+  gap: 0;
+}
+
+.table-seat--opponent .table-seat__dealt-card--opponent-ltr {
+  margin-left: -0.78rem;
+}
+
+.table-seat--opponent .table-seat__dealt-card--opponent-ltr:first-child {
+  margin-left: 0;
+}
+
+.table-seat--opponent .table-seat__cards.is-revealed[data-card-count="4"] .table-seat__dealt-card--opponent-ltr,
+.table-seat--opponent .table-seat__cards.is-revealed[data-card-count="5"] .table-seat__dealt-card--opponent-ltr,
+.table-seat--opponent .table-seat__cards.is-revealed[data-card-count="6"] .table-seat__dealt-card--opponent-ltr,
+.table-seat--opponent .table-seat__cards.is-revealed[data-card-count="7"] .table-seat__dealt-card--opponent-ltr {
+  margin-left: -0.9rem;
+}
+
+.table-seat--opponent .table-seat__cards.is-revealed[data-card-count="4"] .table-seat__dealt-card--opponent-ltr:first-child,
+.table-seat--opponent .table-seat__cards.is-revealed[data-card-count="5"] .table-seat__dealt-card--opponent-ltr:first-child,
+.table-seat--opponent .table-seat__cards.is-revealed[data-card-count="6"] .table-seat__dealt-card--opponent-ltr:first-child,
+.table-seat--opponent .table-seat__cards.is-revealed[data-card-count="7"] .table-seat__dealt-card--opponent-ltr:first-child {
+  margin-left: 0;
+}
+
+.table-seat--opponent .table-seat__cards .playing-card.compact,
+.table-seat--opponent .table-seat__cards .hidden-playing-card {
+  width: 36px;
+  height: 52px;
+  border-radius: 6px;
+}
+
+/* Unseen (face-down) opponent hands stay smaller than revealed. */
+.table-seat--opponent .table-seat__cards:not(.is-revealed) .hidden-playing-card {
+  width: 28px !important;
+  height: 40px !important;
+  border-radius: 5px !important;
+}
+
+.table-seat--opponent .table-seat__cards.is-revealed .playing-card.compact,
+.table-seat--opponent .table-seat__cards.is-revealed .table-seat__dealt-card > div {
+  width: 32px !important;
+  height: 46px !important;
+  padding: 3px !important;
+  border-radius: 6px !important;
+}
+
+@media (min-width: 640px) {
+  .table-seat--opponent .table-seat__cards .playing-card.compact,
+  .table-seat--opponent .table-seat__cards .hidden-playing-card {
+    width: 42px;
+    height: 60px;
+    border-radius: 7px;
   }
 
-  .table-seat--opponent .table-seat__cards.is-revealed .playing-card.compact {
-    width: 46px;
-    height: 68px;
-    padding: 4px;
-    border-radius: 7px;
+  .table-seat--opponent .table-seat__cards:not(.is-revealed) .hidden-playing-card {
+    width: 32px !important;
+    height: 46px !important;
+    border-radius: 6px !important;
+  }
+
+  .table-seat--opponent .table-seat__cards.is-revealed .playing-card.compact,
+  .table-seat--opponent .table-seat__cards.is-revealed .table-seat__dealt-card > div {
+    width: 36px !important;
+    height: 52px !important;
+    padding: 3px !important;
+    border-radius: 7px !important;
+  }
+
+  .table-seat--opponent .table-seat__dealt-card--opponent-ltr {
+    margin-left: -0.95rem;
+  }
+
+  .table-seat--opponent .table-seat__dealt-card--opponent-ltr:first-child {
+    margin-left: 0;
   }
 }
 
@@ -3905,11 +4048,39 @@ body.app-body-portrait-blocked {
   box-shadow: 0 10px 18px rgba(0, 0, 0, 0.26);
 }
 
+.playing-card.playing-card--flipper {
+  border-color: #4db8ff !important;
+  color: #ffffff !important;
+  background: linear-gradient(180deg, #1a5fa8 0%, #0a2f5c 48%, #041828 100%) !important;
+}
+
+.playing-card.playing-card--flipper * {
+  color: #ffffff !important;
+}
+
+.playing-card.playing-card--joker {
+  border-color: #42d8d1;
+  color: #053436;
+  background: linear-gradient(180deg, #d9fffb 0%, #90eee5 100%);
+}
+
+.playing-card.playing-card--reserve {
+  border-color: #ffb663;
+  color: #4b2700;
+  background: linear-gradient(180deg, #fff1cf 0%, #f3be67 100%);
+}
+
 .playing-card.compact {
   width: 52px;
   height: 76px;
   padding: 5px;
   border-radius: 8px;
+}
+
+.playing-card.compact.playing-card--flipper {
+  border-color: #4db8ff !important;
+  color: #ffffff !important;
+  background: linear-gradient(180deg, #1a5fa8 0%, #0a2f5c 48%, #041828 100%) !important;
 }
 
 .seat-opponent .seat-cards.is-revealed .playing-card.compact {
@@ -4819,8 +4990,8 @@ body.app-body-portrait-blocked {
   }
 
   .app-shell.is-mobile-landscape .table-seat__cards .playing-card.compact {
-    width: 34px;
-    height: 50px;
+    width: 40px;
+    height: 58px;
     padding: 4px;
     border-radius: 7px;
   }
@@ -4923,8 +5094,14 @@ body.app-body-portrait-blocked {
   .app-shell.is-mobile-landscape .casino-table-scene__side-show,
   .app-shell.is-mobile-landscape .casino-table-scene__side-show-result {
     bottom: calc(max(env(safe-area-inset-bottom), 8px) + 76px);
-    width: min(calc(100vw - 32px), 31rem);
-    padding: 10px 12px;
+    width: min(calc(100vw - 32px), 16rem);
+    padding: 0;
+  }
+
+  .app-shell.is-mobile-landscape .casino-table-scene__side-show .casino-table-scene__action-pill {
+    padding: 4px 10px;
+    font-size: 9px;
+    border-radius: 10px;
   }
 
   .app-shell.is-mobile-landscape .casino-table-scene__spectator {
@@ -4964,10 +5141,10 @@ body.app-body-portrait-blocked {
 
   .app-shell.is-mobile-landscape .table-controls__button {
     min-width: 0;
-    min-height: 32px;
-    padding: 0 6px;
-    font-size: 9px;
-    letter-spacing: 0.1em;
+    min-height: 30px;
+    padding: 0 4px;
+    font-size: 8.5px;
+    letter-spacing: 0.06em;
     border-radius: 10px;
   }
 
@@ -5089,8 +5266,8 @@ body.app-body-portrait-blocked {
   }
 
   .app-shell.is-mobile-landscape .table-seat__cards .playing-card.compact {
-    width: 30px;
-    height: 44px;
+    width: 36px;
+    height: 52px;
     padding: 3px;
   }
 
@@ -5166,8 +5343,8 @@ body.app-body-portrait-blocked {
   }
 
   .app-shell.is-mobile-landscape .table-controls__button {
-    min-height: 30px;
-    padding: 0 4px;
+    min-height: 28px;
+    padding: 0 3px;
     font-size: 8px;
   }
 
