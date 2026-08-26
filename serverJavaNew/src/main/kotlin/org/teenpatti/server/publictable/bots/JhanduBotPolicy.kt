@@ -7,13 +7,13 @@ import org.teenpatti.server.publictable.BotDecisionContext
 
 /**
  * Jhandu bot gameplay:
- * - Stay blind until 2 shared jokers are revealed
- * - After 2 jokers are revealed → see
+ * - Stay blind until all 3 shared jokers are revealed
+ * - After 3 jokers are revealed → see
  * - High Card → pack (heads-up → show)
  * - Pair / Color / Sequence → side show; after a win → side show again; heads-up → show
  * - Pure Sequence / Trail → raise; heads-up → show
  *
- * Hand strength includes revealed shared joker ranks. Side show is auto-accepted
+ * Hand strength includes all revealed shared joker ranks. Side show is auto-accepted
  * by the variant.
  */
 internal class JhanduBotPolicy(
@@ -33,7 +33,7 @@ internal class JhanduBotPolicy(
             context.chosenAction = BotDecisionSupport.firstLegal(context, "blind", "pack")
             context.rationale =
                 if (context.chosenAction == "blind") {
-                    "Jhandu: only $revealedJokers joker(s) revealed, so the bot stays blind until 2 are revealed."
+                    "Jhandu: only $revealedJokers joker(s) revealed, so the bot stays blind until all 3 are revealed."
                 } else {
                     "Jhandu: only $revealedJokers joker(s) revealed and blind is unavailable, so the bot packs."
                 }
@@ -42,12 +42,12 @@ internal class JhanduBotPolicy(
 
         if (context.legalActions.contains("see")) {
             context.chosenAction = "see"
-            context.rationale = "Jhandu: 2 jokers are revealed, so the bot sees its cards."
+            context.rationale = "Jhandu: all 3 jokers are revealed, so the bot sees its cards."
             return true
         }
 
         context.chosenAction = BotDecisionSupport.firstLegal(context, "blind", "pack")
-        context.rationale = "Jhandu: 2 jokers are revealed but see is unavailable, so the bot continues blind."
+        context.rationale = "Jhandu: all 3 jokers are revealed but see is unavailable, so the bot continues blind."
         return true
     }
 
@@ -82,7 +82,7 @@ internal class JhanduBotPolicy(
                 context.rationale =
                     when (context.chosenAction) {
                         "show" -> "Jhandu: $label is heads-up, so the bot shows down."
-                        "raise" -> "Jhandu: $label plays a raise after 2 jokers are revealed."
+                        "raise" -> "Jhandu: $label plays a raise after all 3 jokers are revealed."
                         else -> "Jhandu: $label wanted a raise, so the bot used the strongest legal continue."
                     }
             }
@@ -103,7 +103,7 @@ internal class JhanduBotPolicy(
                             if (sideShowWon) {
                                 "Jhandu: $label won a prior side show, so the bot requests side show again."
                             } else {
-                                "Jhandu: $label requests a side show after 2 jokers are revealed."
+                                "Jhandu: $label requests a side show after all 3 jokers are revealed."
                             }
                         else -> "Jhandu: $label cannot side show right now, so the bot continues at chaal."
                     }
@@ -116,7 +116,7 @@ internal class JhanduBotPolicy(
                     if (context.chosenAction == "show") {
                         "Jhandu: High card is heads-up, so the bot shows down."
                     } else {
-                        "Jhandu: High card after 2 jokers is too weak, so the bot packs."
+                        "Jhandu: High card after all 3 jokers is too weak, so the bot packs."
                     }
             }
 
@@ -129,6 +129,6 @@ internal class JhanduBotPolicy(
     }
 
     companion object {
-        private const val SEE_AFTER_JOKER_COUNT = 2
+        private const val SEE_AFTER_JOKER_COUNT = 3
     }
 }
