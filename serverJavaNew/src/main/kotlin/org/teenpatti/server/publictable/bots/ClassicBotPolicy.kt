@@ -8,7 +8,8 @@ import org.teenpatti.server.publictable.BotDecisionContext
 /**
  * Classic seen-hand policy:
  * - High Card without Ace → pack (heads-up → show)
- * - High Card with Ace → side show; after a win → side show again; heads-up → show
+ * - High Card with Ace → side show; after a win → side show again; heads-up → show;
+ *   if no side show → chaal
  * - Pair → side show when available; after a win → keep requesting side show;
  *   if denied → chaal next turn, then side show again; heads-up → show
  * - Sequence / Color → chaal only
@@ -96,7 +97,7 @@ internal class ClassicBotPolicy(
                             canShow -> "show"
                             sideShowWon && canSideShow -> "sideshow"
                             canSideShow -> "sideshow"
-                            else -> BotDecisionSupport.firstLegal(context, "pack", "chaal")
+                            else -> BotDecisionSupport.firstLegal(context, "chaal", "pack")
                         }
                     context.rationale =
                         when (context.chosenAction) {
@@ -107,7 +108,8 @@ internal class ClassicBotPolicy(
                                 } else {
                                     "Classic: Ace high card requests a side show."
                                 }
-                            else -> "Classic: Ace high card has no side show available, so the bot packs."
+                            "chaal" -> "Classic: Ace high card has no side show available, so the bot chaals."
+                            else -> "Classic: Ace high card has no legal continue action, so the bot packs."
                         }
                 } else {
                     context.chosenAction = BotDecisionSupport.firstLegal(context, "show", "pack")
