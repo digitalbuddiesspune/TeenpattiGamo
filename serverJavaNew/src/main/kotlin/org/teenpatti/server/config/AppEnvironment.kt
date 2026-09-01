@@ -41,6 +41,7 @@ internal class AppEnvironment {
     var platformPubKey: String = ""
     var platformSecret: String = ""
     var platformGameId: Int = 0
+    var platformGameName: String = ""
 
     /** Supports a single origin or a comma-separated list in CLIENT_ORIGIN. */
     fun clientOrigins(): Array<String> {

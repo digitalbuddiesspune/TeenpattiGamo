@@ -306,8 +306,8 @@ internal class PlatformIntegrationSmokeTest {
                 assertEquals("application/json", exchange.requestHeaders.getFirst("Content-Type"))
                 """{"status":true,"msg":"OK"}"""
             }
-            server.respondJson("/service/operator/user/credit/v2") { exchange ->
-                assertEquals("platform-token", exchange.requestHeaders.getFirst("token"))
+            server.respondJson("/api/wallet/credit/user") { exchange ->
+                assertEquals("Bearer platform-token", exchange.requestHeaders.getFirst("Authorization"))
                 assertEquals("application/json", exchange.requestHeaders.getFirst("Content-Type"))
                 """{"status":true,"msg":"OK"}"""
             }
@@ -327,14 +327,12 @@ internal class PlatformIntegrationSmokeTest {
             val debitBody = server.requestBodies("/service/operator/user/balance/v2").single()
             assertEquals(true, debitBody.contains(""""txn_type":0"""))
             assertEquals(true, debitBody.contains(""""operator_id":"operator-1""""))
-            assertEquals(1, server.requestCount("/service/operator/user/credit/v2"))
-            val creditBody = server.requestBodies("/service/operator/user/credit/v2").single()
-            assertEquals(true, creditBody.contains(""""txn_type":1"""))
-            assertEquals(true, creditBody.contains(""""txn_id":"round-1:player-1:payout""""))
-            assertEquals(true, creditBody.contains(""""txn_ref_id":"round-1:player-1:boot""""))
+            assertEquals(1, server.requestCount("/api/wallet/credit/user"))
+            val creditBody = server.requestBodies("/api/wallet/credit/user").single()
+            assertEquals(true, creditBody.contains(""""userId":"platform-user""""))
+            assertEquals(true, creditBody.contains(""""gameName":"teen-patti""""))
             assertEquals(true, creditBody.contains(""""amount":2000"""))
-            assertEquals(true, creditBody.contains(""""game_id":789"""))
-            assertEquals(true, creditBody.contains(""""user_id":"platform-user""""))
+            assertEquals(true, creditBody.contains(""""description":"Payout""""))
             assertEquals(0, server.requestCount("/operator/user/balance"))
         }
     }
@@ -351,7 +349,7 @@ internal class PlatformIntegrationSmokeTest {
             wallet.credit(guest, "round-1", "round-1:player-1:payout", 2000, "Payout")
 
             assertEquals(0, server.requestCount("/service/operator/user/balance/v2"))
-            assertEquals(0, server.requestCount("/service/operator/user/credit/v2"))
+            assertEquals(0, server.requestCount("/api/wallet/credit/user"))
             assertNull(repository.loadByOperationKey("round-1:player-1:boot"))
         }
     }
@@ -375,7 +373,7 @@ internal class PlatformIntegrationSmokeTest {
     @Test
     fun walletCreditMarksTransactionAppliedAfterPost() {
         withPlatformServer { server ->
-            server.respondJson("/service/operator/user/credit/v2") { """{"status":true,"msg":"OK"}""" }
+            server.respondJson("/api/wallet/credit/user") { """{"status":true,"msg":"OK"}""" }
             val repository = InMemoryWalletTransactionRepository()
             val wallet = PlatformWalletService(platformEnv(server.baseUrl()), repository, InMemoryRoundHistoryRepository(), FixedClock())
             val player = PlatformPlayerRef("player-1", "platform-user", "platform-token", 789, "operator-1", "127.0.0.1", false)
@@ -396,9 +394,11 @@ internal class PlatformIntegrationSmokeTest {
 
             wallet.credit(player, "round-1", "round-1:player-1:payout", 2000, "Payout")
 
-            assertEquals(1, server.requestCount("/service/operator/user/credit/v2"))
-            val creditBody = server.requestBodies("/service/operator/user/credit/v2").single()
-            assertEquals(true, creditBody.contains(""""txn_ref_id":"round-1:player-1:boot""""))
+            assertEquals(1, server.requestCount("/api/wallet/credit/user"))
+            val creditBody = server.requestBodies("/api/wallet/credit/user").single()
+            assertEquals(true, creditBody.contains(""""userId":"platform-user""""))
+            assertEquals(true, creditBody.contains(""""gameName":"teen-patti""""))
+            assertEquals(true, creditBody.contains(""""amount":2000"""))
             assertEquals("applied", repository.loadByOperationKey("round-1:player-1:payout")!!.status)
         }
     }
@@ -465,12 +465,13 @@ internal class PlatformIntegrationSmokeTest {
             it.appOperatorBaseUrl = baseUrl
             it.appOperatorUserDetailPath = "/service/user/detail"
             it.appOperatorBalancePath = "/service/operator/user/balance/v2"
-            it.appOperatorCreditPath = "/service/operator/user/credit/v2"
+            it.appOperatorCreditPath = "/api/wallet/credit/user"
             it.appOperatorLoginPath = "/operator/user/login"
             it.platformUserDetailUrl = "$baseUrl/service/user/detail"
             it.platformDebitUrl = "$baseUrl/service/operator/user/balance/v2"
-            it.platformCreditUrl = "$baseUrl/service/operator/user/credit/v2"
+            it.platformCreditUrl = "$baseUrl/api/wallet/credit/user"
             it.platformLoginUrl = "$baseUrl/operator/user/login"
+            it.platformGameName = "teen-patti"
         }
 
     private fun platformController(

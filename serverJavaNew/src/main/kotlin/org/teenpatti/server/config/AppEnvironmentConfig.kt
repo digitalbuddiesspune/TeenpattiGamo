@@ -52,6 +52,7 @@ internal class AppEnvironmentConfig {
         env.platformPubKey = text(environment, "PLATFORM_PUB_KEY", "")
         env.platformSecret = text(environment, "PLATFORM_SECRET", "")
         env.platformGameId = number(environment, "PLATFORM_GAME_ID", 0)
+        env.platformGameName = text(environment, "PLATFORM_GAME_NAME", "teen-patti")
         validatePublicTableBotConfig(env)
         validatePlatformConfig(env)
         return env
@@ -93,6 +94,7 @@ internal class AppEnvironmentConfig {
             "PLATFORM_AMQP_ROUTING_KEY or PLATFORM_AMQP_QUEUE_NAME is required when PLATFORM_ENABLED=true."
         }
         check(env.platformGameId > 0) { "PLATFORM_GAME_ID is required when PLATFORM_ENABLED=true." }
+        check(env.platformGameName.isNotBlank()) { "PLATFORM_GAME_NAME is required when PLATFORM_ENABLED=true." }
     }
 
     private fun joinUrl(baseUrl: String, path: String): String {

@@ -105,7 +105,7 @@ internal class ConfigSmokeTest {
         assertEquals("games_cashout", result.platformAmqpRoutingKey)
         assertEquals("https://platform.example/service/user/detail", result.platformUserDetailUrl)
         assertEquals("https://platform.example/service/operator/user/balance/v2", result.platformDebitUrl)
-        assertEquals("https://platform.example/service/operator/user/credit/v2", result.platformCreditUrl)
+        assertEquals("https://platform.example/api/wallet/credit/user", result.platformCreditUrl)
         assertEquals("https://platform.example/operator/user/login", result.platformLoginUrl)
     }
 
@@ -115,8 +115,9 @@ internal class ConfigSmokeTest {
             it.setProperty("APP_OPERATOR_BASE_URL", "https://platform.example")
             it.setProperty("APP_OPERATOR_USER_DETAIL_PATH", "/service/user/detail")
             it.setProperty("APP_OPERATOR_BALANCE_PATH", "/service/operator/user/balance/v2")
-            it.setProperty("APP_OPERATOR_CREDIT_PATH", "/service/operator/user/credit/v2")
+            it.setProperty("APP_OPERATOR_CREDIT_PATH", "/api/wallet/credit/user")
             it.setProperty("APP_OPERATOR_LOGIN_PATH", "/operator/user/login")
+            it.setProperty("PLATFORM_GAME_NAME", "teen-patti")
             it.setProperty("PLATFORM_AMQP_URL", "amqp://guest:guest@localhost:5672/")
             it.setProperty("PLATFORM_AMQP_EXCHANGE", "/games/admin")
             it.setProperty("PLATFORM_AMQP_ROUTING_KEY", "games_cashout")

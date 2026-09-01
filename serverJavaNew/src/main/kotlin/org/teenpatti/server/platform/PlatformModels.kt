@@ -42,6 +42,13 @@ internal class PlatformBalanceRequest {
     var operator_id: String = ""
 }
 
+internal class PlatformCreditRequest {
+    var userId: String = ""
+    var gameName: String = ""
+    var amount: Int = 0
+    var description: String = ""
+}
+
 /**
  * Cashout payload published to RabbitMQ — field names/types match the operator integration guide
  * (and Ludo). Amount and game_id are strings (e.g. "700.00", "2"); txn_type 1 = credit.

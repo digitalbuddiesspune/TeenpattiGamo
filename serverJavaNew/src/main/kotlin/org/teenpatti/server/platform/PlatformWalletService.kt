@@ -125,9 +125,9 @@ internal class PlatformWalletService(
             return
         }
         val platformUserId = requirePlatformUserId(player)
-        val platformGameId = requirePlatformGameId(player)
         val platformToken = requirePlatformToken(player)
         val operatorId = requirePlatformOperatorId(player)
+        val gameName = requirePlatformGameName()
         val resolvedTxnRefId =
             txnRefId?.takeIf { it.isNotBlank() }
                 ?: transactionRepository.loadMostRecentDebit(player.playerId, roundId)?.txnId
@@ -137,20 +137,9 @@ internal class PlatformWalletService(
             return
         }
         if (transaction.status != "succeeded") {
-            val request =
-                balanceRequest(
-                    transaction.txnId,
-                    amount,
-                    description,
-                    platformUserId,
-                    platformGameId,
-                    player.ip,
-                    resolvedTxnRefId,
-                    1,
-                    operatorId,
-                )
+            val request = creditRequest(platformUserId, gameName, amount, description)
             GameEventLog.info("wallet_credit_sent", "playerId" to player.playerId, "roundId" to roundId, "transactionId" to transaction.txnId, "amount" to amount)
-            transaction.requestPayload = requestToPayload(request)
+            transaction.requestPayload = creditRequestToPayload(request)
             transaction.status = "sent"
             transaction.updatedAt = clockProvider.nowIso()
             transactionRepository.save(transaction)
@@ -291,13 +280,51 @@ internal class PlatformWalletService(
         return request
     }
 
+    private fun creditRequest(
+        userId: String,
+        gameName: String,
+        amount: Int,
+        description: String,
+    ): PlatformCreditRequest {
+        val request = PlatformCreditRequest()
+        request.userId = userId
+        request.gameName = gameName
+        request.amount = amount
+        request.description = description
+        return request
+    }
+
     private fun postDebit(request: PlatformBalanceRequest, token: String) {
         postBalance(env.platformDebitUrl.trim(), debitClient, request, token, "Platform debit URL is not configured.", "Platform debit failed.")
     }
 
-    private fun postCredit(request: PlatformBalanceRequest, token: String) {
-        postBalance(env.platformCreditUrl.trim(), creditClient, request, token, "Platform credit URL is not configured.", "Platform credit failed.")
+    private fun postCredit(request: PlatformCreditRequest, token: String) {
+        try {
+            val response =
+                (creditClient ?: throw AppException.badRequest("platform_balance_url_missing", "Platform credit URL is not configured."))
+                    .post()
+                    .uri(env.platformCreditUrl.trim())
+                    .header("Authorization", bearerToken(token))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .body(PlatformEnvelope::class.java)
+            if (response != null && !response.status) {
+                throw AppException.badRequest("platform_balance_failed", response.msg ?: "Platform credit failed.")
+            }
+        } catch (error: AppException) {
+            throw error
+        } catch (error: Exception) {
+            throw AppException.badRequest("platform_balance_failed", error.message ?: "Platform credit failed.")
+        }
     }
+
+    private fun bearerToken(token: String): String =
+        if (token.startsWith("Bearer ", ignoreCase = true)) {
+            token
+        } else {
+            "Bearer $token"
+        }
 
     private fun postBalance(
         url: String,
@@ -356,6 +383,18 @@ internal class PlatformWalletService(
     private fun requirePlatformOperatorId(player: PlatformPlayerRef): String =
         player.platformOperatorId?.takeIf { it.isNotBlank() }
             ?: throw AppException.badRequest("platform_operator_id_required", "Platform operatorId is required for wallet play.")
+
+    private fun creditRequestToPayload(request: PlatformCreditRequest): MutableMap<String, Any?> =
+        linkedMapOf(
+            "userId" to request.userId,
+            "gameName" to request.gameName,
+            "amount" to request.amount,
+            "description" to request.description,
+        )
+
+    private fun requirePlatformGameName(): String =
+        env.platformGameName.trim().takeIf { it.isNotBlank() }
+            ?: throw AppException.badRequest("platform_game_name_required", "Platform game name is required for wallet play.")
 
     private fun WalletTransaction.description(): String? =
         (responsePayload["description"] as? String)?.takeIf { it.isNotBlank() }
