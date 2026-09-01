@@ -260,7 +260,7 @@ internal class PlatformIntegrationSmokeTest {
                 ),
             )
         }
-        val wallet = PlatformWalletService(platformEnv("http://unused"), RecordingPlatformWalletPublisher(), repository, InMemoryRoundHistoryRepository(), FixedClock())
+        val wallet = PlatformWalletService(platformEnv("http://unused"), repository, InMemoryRoundHistoryRepository(), FixedClock())
 
         val firstPage = wallet.listTransactionHistory("platform-user", "debit", 0, 20)
         val secondPage = wallet.listTransactionHistory("platform-user", "debit", 20, 20)
@@ -299,18 +299,21 @@ internal class PlatformIntegrationSmokeTest {
     }
 
     @Test
-    fun walletDebitPostsToDebitEndpointAndCreditPublishesQueuePayload() {
+    fun walletDebitPostsToDebitEndpointAndCreditPostsToCreditEndpoint() {
         withPlatformServer { server ->
             server.respondJson("/service/operator/user/balance/v2") { exchange ->
                 assertEquals("platform-token", exchange.requestHeaders.getFirst("token"))
                 assertEquals("application/json", exchange.requestHeaders.getFirst("Content-Type"))
                 """{"status":true,"msg":"OK"}"""
             }
-            val publisher = RecordingPlatformWalletPublisher()
+            server.respondJson("/service/operator/user/credit/v2") { exchange ->
+                assertEquals("platform-token", exchange.requestHeaders.getFirst("token"))
+                assertEquals("application/json", exchange.requestHeaders.getFirst("Content-Type"))
+                """{"status":true,"msg":"OK"}"""
+            }
             val wallet =
                 PlatformWalletService(
                     platformEnv(server.baseUrl()),
-                    publisher,
                     InMemoryWalletTransactionRepository(),
                     InMemoryRoundHistoryRepository(),
                     FixedClock(),
@@ -324,15 +327,14 @@ internal class PlatformIntegrationSmokeTest {
             val debitBody = server.requestBodies("/service/operator/user/balance/v2").single()
             assertEquals(true, debitBody.contains(""""txn_type":0"""))
             assertEquals(true, debitBody.contains(""""operator_id":"operator-1""""))
-            assertEquals(1, publisher.messages.size)
-            assertEquals("round-1:player-1:payout", publisher.messages[0].txn_id)
-            assertEquals("round-1:player-1:boot", publisher.messages[0].txn_ref_id)
-            assertEquals(1, publisher.messages[0].txn_type)
-            assertEquals("2000.00", publisher.messages[0].amount)
-            assertEquals("789", publisher.messages[0].game_id)
-            assertEquals("platform-user", publisher.messages[0].user_id)
-            assertEquals("operator-1", publisher.messages[0].operatorId)
-            assertEquals("platform-token", publisher.messages[0].token)
+            assertEquals(1, server.requestCount("/service/operator/user/credit/v2"))
+            val creditBody = server.requestBodies("/service/operator/user/credit/v2").single()
+            assertEquals(true, creditBody.contains(""""txn_type":1"""))
+            assertEquals(true, creditBody.contains(""""txn_id":"round-1:player-1:payout""""))
+            assertEquals(true, creditBody.contains(""""txn_ref_id":"round-1:player-1:boot""""))
+            assertEquals(true, creditBody.contains(""""amount":2000"""))
+            assertEquals(true, creditBody.contains(""""game_id":789"""))
+            assertEquals(true, creditBody.contains(""""user_id":"platform-user""""))
             assertEquals(0, server.requestCount("/operator/user/balance"))
         }
     }
@@ -341,16 +343,15 @@ internal class PlatformIntegrationSmokeTest {
     fun walletSkipsGuestPlayersWithoutPlatformLinkage() {
         withPlatformServer { server ->
             server.respondJson("/service/operator/user/balance/v2") { """{"status":true,"msg":"OK"}""" }
-            val publisher = RecordingPlatformWalletPublisher()
             val repository = InMemoryWalletTransactionRepository()
-            val wallet = PlatformWalletService(platformEnv(server.baseUrl()), publisher, repository, InMemoryRoundHistoryRepository(), FixedClock())
+            val wallet = PlatformWalletService(platformEnv(server.baseUrl()), repository, InMemoryRoundHistoryRepository(), FixedClock())
             val guest = PlatformPlayerRef("player-1", null, null, null, null, "127.0.0.1", false)
 
             wallet.debit(guest, "round-1", "round-1:player-1:boot", 1000, "Boot")
             wallet.credit(guest, "round-1", "round-1:player-1:payout", 2000, "Payout")
 
             assertEquals(0, server.requestCount("/service/operator/user/balance/v2"))
-            assertEquals(0, publisher.messages.size)
+            assertEquals(0, server.requestCount("/service/operator/user/credit/v2"))
             assertNull(repository.loadByOperationKey("round-1:player-1:boot"))
         }
     }
@@ -359,55 +360,55 @@ internal class PlatformIntegrationSmokeTest {
     fun walletDebitIsIdempotentForSucceededTransactions() {
         withPlatformServer { server ->
             server.respondJson("/service/operator/user/balance/v2") { """{"status":true,"msg":"OK"}""" }
-            val publisher = RecordingPlatformWalletPublisher()
             val repository = InMemoryWalletTransactionRepository()
-            val wallet = PlatformWalletService(platformEnv(server.baseUrl()), publisher, repository, InMemoryRoundHistoryRepository(), FixedClock())
+            val wallet = PlatformWalletService(platformEnv(server.baseUrl()), repository, InMemoryRoundHistoryRepository(), FixedClock())
             val player = PlatformPlayerRef("player-1", "platform-user", "platform-token", 789, "operator-1", "127.0.0.1", false)
 
             wallet.debit(player, "round-1", "round-1:player-1:boot", 1000, "Boot")
             wallet.debit(player, "round-1", "round-1:player-1:boot", 1000, "Boot")
 
             assertEquals(1, server.requestCount("/service/operator/user/balance/v2"))
-            assertEquals(0, publisher.messages.size)
             assertEquals("succeeded", repository.loadByOperationKey("round-1:player-1:boot")!!.status)
         }
     }
 
     @Test
-    fun walletCreditMarksTransactionAppliedAfterPublish() {
-        val publisher = RecordingPlatformWalletPublisher()
-        val repository = InMemoryWalletTransactionRepository()
-        val wallet = PlatformWalletService(platformEnv("http://unused"), publisher, repository, InMemoryRoundHistoryRepository(), FixedClock())
-        val player = PlatformPlayerRef("player-1", "platform-user", "platform-token", 789, "operator-1", "127.0.0.1", false)
+    fun walletCreditMarksTransactionAppliedAfterPost() {
+        withPlatformServer { server ->
+            server.respondJson("/service/operator/user/credit/v2") { """{"status":true,"msg":"OK"}""" }
+            val repository = InMemoryWalletTransactionRepository()
+            val wallet = PlatformWalletService(platformEnv(server.baseUrl()), repository, InMemoryRoundHistoryRepository(), FixedClock())
+            val player = PlatformPlayerRef("player-1", "platform-user", "platform-token", 789, "operator-1", "127.0.0.1", false)
 
-        repository.save(WalletTransaction().also {
-            it.id = "round-1:player-1:boot"
-            it.txnId = "round-1:player-1:boot"
-            it.operationKey = "round-1:player-1:boot"
-            it.playerId = "player-1"
-            it.platformUserId = "platform-user"
-            it.roundId = "round-1"
-            it.txnType = "debit"
-            it.amount = 1000
-            it.status = "succeeded"
-            it.createdAt = "2026-01-01T00:00:00Z"
-            it.updatedAt = "2026-01-01T00:00:00Z"
-        })
+            repository.save(WalletTransaction().also {
+                it.id = "round-1:player-1:boot"
+                it.txnId = "round-1:player-1:boot"
+                it.operationKey = "round-1:player-1:boot"
+                it.playerId = "player-1"
+                it.platformUserId = "platform-user"
+                it.roundId = "round-1"
+                it.txnType = "debit"
+                it.amount = 1000
+                it.status = "succeeded"
+                it.createdAt = "2026-01-01T00:00:00Z"
+                it.updatedAt = "2026-01-01T00:00:00Z"
+            })
 
-        wallet.credit(player, "round-1", "round-1:player-1:payout", 2000, "Payout")
+            wallet.credit(player, "round-1", "round-1:player-1:payout", 2000, "Payout")
 
-        assertEquals(1, publisher.messages.size)
-        assertEquals("round-1:player-1:boot", publisher.messages[0].txn_ref_id)
-        assertEquals("applied", repository.loadByOperationKey("round-1:player-1:payout")!!.status)
+            assertEquals(1, server.requestCount("/service/operator/user/credit/v2"))
+            val creditBody = server.requestBodies("/service/operator/user/credit/v2").single()
+            assertEquals(true, creditBody.contains(""""txn_ref_id":"round-1:player-1:boot""""))
+            assertEquals("applied", repository.loadByOperationKey("round-1:player-1:payout")!!.status)
+        }
     }
 
     @Test
-    fun walletDebitMarksTransactionFailedWhenPublishFails() {
+    fun walletDebitMarksTransactionFailedWhenPostFails() {
         val repository = InMemoryWalletTransactionRepository()
         val wallet =
             PlatformWalletService(
                 platformEnv("http://unused"),
-                FailingPlatformWalletPublisher(),
                 repository,
                 InMemoryRoundHistoryRepository(),
                 FixedClock(),
@@ -429,7 +430,6 @@ internal class PlatformIntegrationSmokeTest {
         val wallet =
             PlatformWalletService(
                 platformEnv("http://unused"),
-                FailingPlatformWalletPublisher(),
                 repository,
                 InMemoryRoundHistoryRepository(),
                 FixedClock(),
@@ -465,9 +465,11 @@ internal class PlatformIntegrationSmokeTest {
             it.appOperatorBaseUrl = baseUrl
             it.appOperatorUserDetailPath = "/service/user/detail"
             it.appOperatorBalancePath = "/service/operator/user/balance/v2"
+            it.appOperatorCreditPath = "/service/operator/user/credit/v2"
             it.appOperatorLoginPath = "/operator/user/login"
             it.platformUserDetailUrl = "$baseUrl/service/user/detail"
             it.platformDebitUrl = "$baseUrl/service/operator/user/balance/v2"
+            it.platformCreditUrl = "$baseUrl/service/operator/user/credit/v2"
             it.platformLoginUrl = "$baseUrl/operator/user/login"
         }
 
@@ -485,7 +487,7 @@ internal class PlatformIntegrationSmokeTest {
             env,
             publicManagers,
             privateRoomManager(InMemoryPrivateRoomRepository(), roundHistoryRepository, FixedClock(), ManualScheduler()),
-            PlatformWalletService(env, RecordingPlatformWalletPublisher(), walletTransactionRepository, roundHistoryRepository, FixedClock()),
+            PlatformWalletService(env, walletTransactionRepository, roundHistoryRepository, FixedClock()),
         )
     }
 
@@ -498,34 +500,6 @@ internal class PlatformIntegrationSmokeTest {
         }
     }
 }
-
-private class RecordingPlatformWalletPublisher : PlatformWalletPublisher {
-    val messages = mutableListOf<PlatformCreditQueueMessage>()
-
-    override fun publish(message: PlatformCreditQueueMessage) {
-        messages.add(message.copy())
-    }
-}
-
-private class FailingPlatformWalletPublisher : PlatformWalletPublisher {
-    override fun publish(message: PlatformCreditQueueMessage) {
-        throw AppException.badRequest("platform_balance_failed", "Publish failed.")
-    }
-}
-
-private fun PlatformCreditQueueMessage.copy(): PlatformCreditQueueMessage =
-    PlatformCreditQueueMessage().also {
-        it.txn_id = txn_id
-        it.txn_ref_id = txn_ref_id
-        it.txn_type = txn_type
-        it.amount = amount
-        it.user_id = user_id
-        it.game_id = game_id
-        it.description = description
-        it.ip = ip
-        it.operatorId = operatorId
-        it.token = token
-    }
 
 private class RecordingHttpServer : AutoCloseable {
     private val responses = linkedMapOf<String, (HttpExchange) -> String>()

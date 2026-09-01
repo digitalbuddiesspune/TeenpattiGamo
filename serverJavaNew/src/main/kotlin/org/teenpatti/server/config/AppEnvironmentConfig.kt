@@ -39,9 +39,11 @@ internal class AppEnvironmentConfig {
         env.appOperatorBaseUrl = text(environment, "APP_OPERATOR_BASE_URL", "")
         env.appOperatorUserDetailPath = text(environment, "APP_OPERATOR_USER_DETAIL_PATH", "")
         env.appOperatorBalancePath = text(environment, "APP_OPERATOR_BALANCE_PATH", "")
+        env.appOperatorCreditPath = text(environment, "APP_OPERATOR_CREDIT_PATH", "")
         env.appOperatorLoginPath = text(environment, "APP_OPERATOR_LOGIN_PATH", "")
         env.platformUserDetailUrl = joinUrl(env.appOperatorBaseUrl, env.appOperatorUserDetailPath)
         env.platformDebitUrl = joinUrl(env.appOperatorBaseUrl, env.appOperatorBalancePath)
+        env.platformCreditUrl = joinUrl(env.appOperatorBaseUrl, env.appOperatorCreditPath)
         env.platformLoginUrl = joinUrl(env.appOperatorBaseUrl, env.appOperatorLoginPath)
         env.platformAmqpUrl = text(environment, "PLATFORM_AMQP_URL", "")
         env.platformAmqpExchange = text(environment, "PLATFORM_AMQP_EXCHANGE", "")
@@ -78,6 +80,9 @@ internal class AppEnvironmentConfig {
         }
         check(env.appOperatorBalancePath.isNotBlank()) {
             "APP_OPERATOR_BALANCE_PATH is required when PLATFORM_ENABLED=true."
+        }
+        check(env.appOperatorCreditPath.isNotBlank()) {
+            "APP_OPERATOR_CREDIT_PATH is required when PLATFORM_ENABLED=true."
         }
         check(env.appOperatorLoginPath.isNotBlank()) {
             "APP_OPERATOR_LOGIN_PATH is required when PLATFORM_ENABLED=true."

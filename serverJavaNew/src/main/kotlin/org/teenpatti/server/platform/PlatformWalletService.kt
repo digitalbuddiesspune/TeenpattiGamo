@@ -15,7 +15,6 @@ import org.teenpatti.server.infrastructure.persistence.RoundHistoryRepository
 @Component
 internal class PlatformWalletService(
     private val env: AppEnvironment,
-    private val walletPublisher: PlatformWalletPublisher,
     private val transactionRepository: WalletTransactionRepository,
     private val roundHistoryRepository: RoundHistoryRepository,
     private val clockProvider: ClockProvider,
@@ -67,6 +66,9 @@ internal class PlatformWalletService(
 
     private val debitClient: RestClient? =
         env.platformDebitUrl.trim().takeIf { it.isNotBlank() }?.let { RestClient.builder().build() }
+
+    private val creditClient: RestClient? =
+        env.platformCreditUrl.trim().takeIf { it.isNotBlank() }?.let { RestClient.builder().build() }
 
     fun enabled(): Boolean = env.platformEnabled
 
@@ -136,7 +138,7 @@ internal class PlatformWalletService(
         }
         if (transaction.status != "succeeded") {
             val request =
-                creditQueueMessage(
+                balanceRequest(
                     transaction.txnId,
                     amount,
                     description,
@@ -144,21 +146,21 @@ internal class PlatformWalletService(
                     platformGameId,
                     player.ip,
                     resolvedTxnRefId,
+                    1,
                     operatorId,
-                    platformToken,
                 )
             GameEventLog.info("wallet_credit_sent", "playerId" to player.playerId, "roundId" to roundId, "transactionId" to transaction.txnId, "amount" to amount)
-            transaction.requestPayload = creditRequestToPayload(request)
+            transaction.requestPayload = requestToPayload(request)
             transaction.status = "sent"
             transaction.updatedAt = clockProvider.nowIso()
             transactionRepository.save(transaction)
             try {
-                walletPublisher.publish(request)
-                transaction.responsePayload = mutableMapOf("published" to true)
+                postCredit(request, platformToken)
+                transaction.responsePayload = mutableMapOf("posted" to true)
                 transaction.status = "succeeded"
                 transaction.updatedAt = clockProvider.nowIso()
                 transactionRepository.save(transaction)
-                GameEventLog.info("wallet_credit_published", "playerId" to player.playerId, "roundId" to roundId, "transactionId" to transaction.txnId, "amount" to amount)
+                GameEventLog.info("wallet_credit_succeeded", "playerId" to player.playerId, "roundId" to roundId, "transactionId" to transaction.txnId, "amount" to amount)
             } catch (error: Exception) {
                 transaction.status = "failed"
                 transaction.responsePayload = mutableMapOf("error" to (error.message ?: "Platform credit failed."))
@@ -289,33 +291,41 @@ internal class PlatformWalletService(
         return request
     }
 
-    private fun creditQueueMessage(
-        txnId: String,
-        amount: Int,
-        description: String,
-        platformUserId: String,
-        platformGameId: Int,
-        ip: String?,
-        txnRefId: String,
-        operatorId: String,
-        token: String,
-    ): PlatformCreditQueueMessage {
-        val request = PlatformCreditQueueMessage()
-        request.txn_id = txnId
-        request.txn_ref_id = txnRefId
-        request.txn_type = 1
-        request.amount = amount.toExternalAmount()
-        request.user_id = platformUserId
-        request.game_id = platformGameId.toString()
-        request.description = description
-        request.ip = ip?.takeIf { it.isNotBlank() } ?: "0.0.0.0"
-        request.operatorId = operatorId
-        request.token = token
-        return request
+    private fun postDebit(request: PlatformBalanceRequest, token: String) {
+        postBalance(env.platformDebitUrl.trim(), debitClient, request, token, "Platform debit URL is not configured.", "Platform debit failed.")
     }
 
-    private fun Int.toExternalAmount(): String =
-        java.math.BigDecimal.valueOf(toLong()).setScale(2).toPlainString()
+    private fun postCredit(request: PlatformBalanceRequest, token: String) {
+        postBalance(env.platformCreditUrl.trim(), creditClient, request, token, "Platform credit URL is not configured.", "Platform credit failed.")
+    }
+
+    private fun postBalance(
+        url: String,
+        client: RestClient?,
+        request: PlatformBalanceRequest,
+        token: String,
+        missingUrlMessage: String,
+        failureMessage: String,
+    ) {
+        try {
+            val response =
+                (client ?: throw AppException.badRequest("platform_balance_url_missing", missingUrlMessage))
+                    .post()
+                    .uri(url)
+                    .header("token", token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .body(PlatformEnvelope::class.java)
+            if (response != null && !response.status) {
+                throw AppException.badRequest("platform_balance_failed", response.msg ?: failureMessage)
+            }
+        } catch (error: AppException) {
+            throw error
+        } catch (error: Exception) {
+            throw AppException.badRequest("platform_balance_failed", error.message ?: failureMessage)
+        }
+    }
 
     private fun requestToPayload(request: PlatformBalanceRequest): MutableMap<String, Any?> =
         linkedMapOf(
@@ -329,41 +339,6 @@ internal class PlatformWalletService(
             "txn_ref_id" to request.txn_ref_id,
             "operator_id" to request.operator_id,
         )
-
-    private fun creditRequestToPayload(request: PlatformCreditQueueMessage): MutableMap<String, Any?> =
-        linkedMapOf(
-            "txn_id" to request.txn_id,
-            "txn_ref_id" to request.txn_ref_id,
-            "txn_type" to request.txn_type,
-            "amount" to request.amount,
-            "user_id" to request.user_id,
-            "game_id" to request.game_id,
-            "description" to request.description,
-            "ip" to request.ip,
-            "operatorId" to request.operatorId,
-            "token" to request.token,
-        )
-
-    private fun postDebit(request: PlatformBalanceRequest, token: String) {
-        try {
-            val response =
-                (debitClient ?: throw AppException.badRequest("platform_debit_url_missing", "Platform debit URL is not configured."))
-                    .post()
-                    .uri(env.platformDebitUrl.trim())
-                    .header("token", token)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(request)
-                    .retrieve()
-                    .body(PlatformEnvelope::class.java)
-            if (response != null && !response.status) {
-                throw AppException.badRequest("platform_balance_failed", response.msg ?: "Platform debit failed.")
-            }
-        } catch (error: AppException) {
-            throw error
-        } catch (error: Exception) {
-            throw AppException.badRequest("platform_balance_failed", error.message ?: "Platform debit failed.")
-        }
-    }
 
     private fun requirePlatformUserId(player: PlatformPlayerRef): String =
         player.platformUserId?.takeIf { it.isNotBlank() }

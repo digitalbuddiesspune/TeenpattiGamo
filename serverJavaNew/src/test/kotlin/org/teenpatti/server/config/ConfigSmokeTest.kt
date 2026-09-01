@@ -58,6 +58,15 @@ internal class ConfigSmokeTest {
     }
 
     @Test
+    fun appEnvironmentRequiresOperatorCreditPathWhenPlatformEnabled() {
+        val appConfig = AppEnvironmentConfig()
+        val environment = platformEnvWithout("APP_OPERATOR_CREDIT_PATH")
+
+        val error = assertThrows(IllegalStateException::class.java) { appConfig.appEnvironment(environment) }
+        assertEquals("APP_OPERATOR_CREDIT_PATH is required when PLATFORM_ENABLED=true.", error.message)
+    }
+
+    @Test
     fun appEnvironmentRequiresOperatorLoginPathWhenPlatformEnabled() {
         val appConfig = AppEnvironmentConfig()
         val environment = platformEnvWithout("APP_OPERATOR_LOGIN_PATH")
@@ -96,6 +105,7 @@ internal class ConfigSmokeTest {
         assertEquals("games_cashout", result.platformAmqpRoutingKey)
         assertEquals("https://platform.example/service/user/detail", result.platformUserDetailUrl)
         assertEquals("https://platform.example/service/operator/user/balance/v2", result.platformDebitUrl)
+        assertEquals("https://platform.example/service/operator/user/credit/v2", result.platformCreditUrl)
         assertEquals("https://platform.example/operator/user/login", result.platformLoginUrl)
     }
 
@@ -105,6 +115,7 @@ internal class ConfigSmokeTest {
             it.setProperty("APP_OPERATOR_BASE_URL", "https://platform.example")
             it.setProperty("APP_OPERATOR_USER_DETAIL_PATH", "/service/user/detail")
             it.setProperty("APP_OPERATOR_BALANCE_PATH", "/service/operator/user/balance/v2")
+            it.setProperty("APP_OPERATOR_CREDIT_PATH", "/service/operator/user/credit/v2")
             it.setProperty("APP_OPERATOR_LOGIN_PATH", "/operator/user/login")
             it.setProperty("PLATFORM_AMQP_URL", "amqp://guest:guest@localhost:5672/")
             it.setProperty("PLATFORM_AMQP_EXCHANGE", "/games/admin")
