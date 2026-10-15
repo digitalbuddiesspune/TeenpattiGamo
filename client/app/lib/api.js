@@ -75,6 +75,88 @@ export function getPublicTableWebSocketUrl() {
   return socketBase.toString();
 }
 
+export function getPrivateRoomWebSocketUrl() {
+  const socketBase = new URL(getSocketBase());
+  socketBase.protocol = socketBase.protocol === "https:" ? "wss:" : "ws:";
+  socketBase.pathname = "/ws/private-rooms";
+  socketBase.search = "";
+  socketBase.hash = "";
+  return socketBase.toString();
+}
+
+export function createPrivateRoom(roomName, playerName, clientSeed, variant, bootAmount) {
+  return request("/private-rooms", {
+    method: "POST",
+    body: JSON.stringify({
+      roomName,
+      playerName,
+      clientSeed,
+      variant,
+      bootAmount
+    })
+  }, null);
+}
+
+export function joinPrivateRoom(roomCode, playerName, clientSeed) {
+  return request("/private-rooms/join", {
+    method: "POST",
+    body: JSON.stringify({
+      roomCode,
+      playerName,
+      clientSeed
+    })
+  }, null);
+}
+
+export function createPlatformPrivateRoom(token, gameId, roomName, clientSeed, variant, bootAmount) {
+  return request("/platform/private-rooms", {
+    method: "POST",
+    body: JSON.stringify({
+      token,
+      gameId,
+      roomName,
+      clientSeed,
+      variant,
+      bootAmount
+    })
+  }, null);
+}
+
+export function joinPlatformPrivateRoom(token, gameId, roomCode, clientSeed) {
+  return request("/platform/private-rooms/join", {
+    method: "POST",
+    body: JSON.stringify({
+      token,
+      gameId,
+      roomCode,
+      clientSeed
+    })
+  }, null);
+}
+
+export function fetchPrivateRoomSession(roomCode, playerId, playerToken) {
+  const url = new URL(buildApiUrl(`/private-rooms/${encodeURIComponent(roomCode)}/session`, null));
+  url.searchParams.set("playerId", playerId);
+  url.searchParams.set("playerToken", playerToken);
+
+  return fetchJson(url.toString(), {
+    headers: {
+      "Content-Type": "application/json"
+    }
+  });
+}
+
+export function leavePrivateRoom(roomCode, playerId, playerToken) {
+  return request(`/private-rooms/${encodeURIComponent(roomCode)}/leave`, {
+    method: "POST",
+    body: JSON.stringify({
+      playerId,
+      playerToken
+    })
+  }, null);
+}
+
+
 export function fetchTable(variant) {
   return request("/table", {}, variant);
 }

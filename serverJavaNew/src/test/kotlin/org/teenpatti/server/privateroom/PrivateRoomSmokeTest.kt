@@ -532,4 +532,93 @@ internal class PrivateRoomSmokeTest {
         assertEquals("active", room.status)
         assertTrue(room.acceptedNextRoundPlayerIds.isEmpty())
     }
+
+    @Test
+    fun privateRoomNeverSpawnsBotsAndOnlyAdmitsValidCodePlayers() {
+        val repository = InMemoryPrivateRoomRepository()
+        val manager = privateRoomManager(repository, InMemoryRoundHistoryRepository(), FixedClock(), ManualScheduler())
+        manager.initialize()
+
+        val created = createPrivateRoom(manager, "ExclusiveRoom", "HostPlayer")
+        val roomCode = created["roomCode"] as String
+        val hostId = created["playerId"] as String
+        val hostToken = created["playerToken"] as String
+
+        // 1. Attempting to join with an invalid or non-existent room code is rejected
+        val badCodeError = assertThrows(AppException::class.java) {
+            joinPrivateRoom(manager, "WRONG1", "Hacker")
+        }
+        assertEquals("private_room_unavailable", badCodeError.code)
+
+        val emptyCodeError = assertThrows(AppException::class.java) {
+            joinPrivateRoom(manager, "", "Hacker")
+        }
+        assertEquals("private_room_code_required", emptyCodeError.code)
+
+        // 2. Only user with exact valid code can join
+        val guest = joinPrivateRoom(manager, roomCode, "InvitedPlayer")
+        val guestId = guest["playerId"] as String
+        val guestToken = guest["playerToken"] as String
+
+        var room = repository.loadRoom(roomCode)!!
+        assertEquals(2, room.players.size)
+        // Ensure no bots in player list
+        assertEquals(listOf(hostId, guestId), room.players.map { it.id })
+
+        // 3. Start Round 1 - verify seats have NO bots
+        manager.startRound(roomCode, hostId, hostToken)
+        room = repository.loadRoom(roomCode)!!
+        assertNotNull(room.round)
+        assertEquals(2, room.round!!.seats.size)
+        for (seat in room.round!!.seats) {
+            assertFalse(seat.isBot, "Seat ${seat.name} must NOT be a bot")
+            assertTrue(seat.id == hostId || seat.id == guestId, "Only invited players can be in round")
+        }
+
+        // 4. Complete Round 1
+        room.round!!.status = "active"
+        room.round!!.activePlayerIndex = 0
+        manager.performAction(roomCode, hostId, hostToken, "pack", emptyMap())
+        manager.performAction(roomCode, guestId, guestToken, "dealer_tip", mapOf("amount" to 0))
+
+        // 5. Accept and start Round 2
+        manager.acceptNextRound(roomCode, hostId, hostToken)
+        manager.acceptNextRound(roomCode, guestId, guestToken)
+        manager.nextRound(roomCode, hostId, hostToken)
+
+        // 6. Verify Round 2 still has zero bots and only selected players
+        room = repository.loadRoom(roomCode)!!
+        assertEquals("active", room.status)
+        assertNotNull(room.round)
+        assertEquals(2, room.round!!.seats.size)
+        for (seat in room.round!!.seats) {
+            assertFalse(seat.isBot, "Seat ${seat.name} in round 2 must NOT be a bot")
+            assertTrue(seat.id == hostId || seat.id == guestId, "Only invited players can be in round 2")
+        }
+    }
+
+    @Test
+    fun privateRoomCanBeCreatedAndJoinedWithoutPlayerNameRoomNameOrBootAmount() {
+        val repository = InMemoryPrivateRoomRepository()
+        val manager = privateRoomManager(repository, InMemoryRoundHistoryRepository(), FixedClock(), ManualScheduler())
+        manager.initialize()
+
+        // Create with null roomName, null playerName, and null bootAmount
+        val created = manager.createRoom(null, null, "seed-host", "classic", null)
+        val roomCode = created["roomCode"] as String
+        val roomState = privateRoomState(created)
+        val config = roomState["config"] as Map<String, Any?>
+
+        // Verified room name defaults and global bootAmount is used (1000 from default test config)
+        assertNotNull(roomState["roomName"])
+        assertEquals(1000, config["bootAmount"])
+
+        // Join with null playerName
+        val joined = manager.joinRoom(roomCode, null, "seed-guest")
+        val joinedState = privateRoomState(joined)
+        val players = joinedState["players"] as List<Map<String, Any?>>
+        assertEquals(2, players.size)
+        assertEquals("Player", players[1]["name"])
+    }
 }
+

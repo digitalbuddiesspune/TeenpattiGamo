@@ -195,10 +195,9 @@ internal class PrivateRoom(
         if (state.players.size >= MAX_ROOM_PLAYERS) {
             throw AppException.badRequest("private_room_full", "Private room is full.")
         }
-        val normalizedPlayerName = playerName?.trim().orEmpty()
-        if (normalizedPlayerName.isBlank()) {
-            throw AppException.badRequest("private_room_player_name_required", "Player name is required.")
-        }
+        val normalizedPlayerName = playerName?.trim().takeIf { !it.isNullOrBlank() }
+            ?: platformSession?.user?.username?.takeIf { it.isNotBlank() }
+            ?: "Player"
         val rawToken = idGenerator.newId()
         val player = PrivateRoomPlayer()
         player.id = idGenerator.newId()
@@ -913,14 +912,11 @@ internal class PrivateRoomManager(
         platformSession: PlatformSession?,
         ip: String?,
     ): Map<String, Any?> {
-        val normalizedRoomName = roomName?.trim().orEmpty()
-        val normalizedPlayerName = playerName?.trim().orEmpty()
-        if (normalizedRoomName.isBlank()) {
-            throw AppException.badRequest("private_room_name_required", "Room name is required.")
-        }
-        if (normalizedPlayerName.isBlank()) {
-            throw AppException.badRequest("private_room_player_name_required", "Player name is required.")
-        }
+        val normalizedPlayerName = playerName?.trim().takeIf { !it.isNullOrBlank() }
+            ?: platformSession?.user?.username?.takeIf { it.isNotBlank() }
+            ?: "Host"
+        val normalizedRoomName = roomName?.trim().takeIf { !it.isNullOrBlank() }
+            ?: "$normalizedPlayerName's Room"
         var roomCode = createRoomCode()
         while (store.loadRoom(roomCode) != null) {
             roomCode = createRoomCode()

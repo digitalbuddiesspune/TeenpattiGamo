@@ -106,7 +106,6 @@ export function useAudioUnlocked() {
 
   useEffect(() => {
     if (unlocked) {
-      setValue(true);
       return undefined;
     }
 

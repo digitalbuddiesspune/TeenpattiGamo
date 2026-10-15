@@ -7,7 +7,9 @@ import CasinoTable from "./CasinoTable";
 import GameplaySoundController from "./GameplaySoundController";
 import HomeIntroSound from "./HomeIntroSound";
 import TableControls, { buildStakeControlState } from "./TableControls";
+import CustomRoomModal from "./CustomRoomModal";
 import { clearStoredPublicSession, useTeenPattiGame } from "../hooks/useTeenPattiGame";
+import { clearStoredPrivateSession, readStoredPrivateSession, usePrivateRoom } from "../hooks/usePrivateRoom";
 import { fetchPlatformProfile, fetchPublicLobbyConfig } from "../lib/api";
 import {
   getPlatformLaunchContext,
@@ -170,6 +172,11 @@ function TableGameplayShellBackdrop() {
 }
 
 const LOBBY_MENU_OPTIONS = [
+  {
+    id: "custom_room",
+    label: "Custom Room",
+    hint: "Create or join with code",
+  },
   {
     id: "history",
     label: "Transaction History",
@@ -375,7 +382,6 @@ function useElapsedMatchmakingSeconds() {
 
   useEffect(() => {
     const startedAt = Date.now();
-    setElapsedSeconds(0);
     const timer = window.setInterval(() => {
       setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
     }, 250);
@@ -587,6 +593,7 @@ function VariantCard({ title, summary, onClick }) {
 export default function GameClient({
   view,
   variant = DEFAULT_VARIANT_ID,
+  initialRoomCode = "",
 }) {
   const router = useRouter();
   const [turnNow, setTurnNow] = useState(() => Date.now());
@@ -616,6 +623,7 @@ export default function GameClient({
     return getPlatformLaunchContext();
   });
   const [lobbyInitialBalance, setLobbyInitialBalance] = useState(null);
+  const [globalBootAmount, setGlobalBootAmount] = useState(null);
   const publicDecisionHandledRef = useRef(false);
   const publicDecisionPendingExitRef = useRef(false);
   const platformProfileRequestIdRef = useRef(0);
@@ -624,9 +632,18 @@ export default function GameClient({
     playDealCard() {},
   });
 
-  const isPublicMenuView = view === "public-menu";
-  const isPublicTableView = view === "public-table";
-  const activeMenuItem = "public";
+  const [activePrivateRoomCode, setActivePrivateRoomCode] = useState(() => (initialRoomCode || "").trim().toUpperCase());
+  const [customRoomModalOpen, setCustomRoomModalOpen] = useState(() => Boolean(initialRoomCode && typeof window !== "undefined" && !readStoredPrivateSession(initialRoomCode)));
+  const [customRoomInitialMode, setCustomRoomInitialMode] = useState(() => initialRoomCode ? "join" : "create");
+  const [customRoomBusy, setCustomRoomBusy] = useState(false);
+  const [customRoomError, setCustomRoomError] = useState("");
+  const [roomCodeCopied, setRoomCodeCopied] = useState(false);
+
+  const isPrivateRoomView = view === "private-room" || Boolean(activePrivateRoomCode);
+  const isPublicTableView = view === "public-table" && !isPrivateRoomView;
+  const isPublicMenuView = !isPrivateRoomView && !isPublicTableView;
+  const activeMenuItem = isPrivateRoomView ? "custom" : "public";
+
   const game = useTeenPattiGame(variant, isPublicTableView);
   const {
     tableState: publicTableState,
@@ -637,14 +654,58 @@ export default function GameClient({
     readyNextRound: publicReadyNextRound,
     leaveTable: leavePublicTable,
   } = game;
-  const screen = isPublicTableView ? "table" : "menu";
-  const isPublicWaiting = publicTableState?.playerStatus === "waiting_for_next_round";
-  const waitingForSeat = isPublicWaiting;
 
-  const round = publicTableState?.round;
-  const isPublicLobbyWaiting =
-    publicTableState?.playerStatus === "active_at_table" && !round;
-  const canonicalSeats = round?.seats || [];
+  const privateRoom = usePrivateRoom(activePrivateRoomCode, isPrivateRoomView);
+  const {
+    roomCode: currentPrivateRoomCode,
+    roomState: privateRoomState,
+    loading: privateLoading,
+    acting: privateActing,
+    error: privateError,
+    createRoom: createPrivateRoomAction,
+    joinRoom: joinPrivateRoomAction,
+    runAction: privateRunAction,
+    startRound: privateStartRound,
+    readyNextRound: privateReadyNextRound,
+    startNextRound: privateStartNextRound,
+    leaveRoom: leavePrivateRoomAction,
+  } = privateRoom;
+
+  const screen = (isPublicTableView || isPrivateRoomView) ? "table" : "menu";
+  const activeTableState = isPrivateRoomView ? privateRoomState : publicTableState;
+  const isHost = Boolean(isPrivateRoomView && privateRoomState?.isHost);
+
+  const isPublicWaiting = publicTableState?.playerStatus === "waiting_for_next_round";
+  const isPrivateWaiting = Boolean(isPrivateRoomView && privateRoomState?.viewerPlayerStatus === "waiting_for_next_round");
+  const waitingForSeat = isPrivateRoomView ? isPrivateWaiting : isPublicWaiting;
+
+  const round = activeTableState?.round || null;
+  const isPrivateLobby = Boolean(isPrivateRoomView && (!round || privateRoomState?.status === "lobby"));
+  const isPublicLobbyWaiting = !isPrivateRoomView && publicTableState?.playerStatus === "active_at_table" && !round;
+  const privateRoomVariantLabel = (
+    typeof privateRoomState?.config?.variant === "object"
+      ? (privateRoomState.config.variant?.label || privateRoomState.config.variant?.id)
+      : (typeof privateRoomState?.config?.variant === "string" ? privateRoomState.config.variant : null)
+  ) || (typeof variant === "string" ? variant : "Classic");
+
+  const rawSeats = round?.seats || (isPrivateRoomView && privateRoomState?.players ? privateRoomState.players.map((p, idx) => ({
+    id: p.id,
+    name: p.name,
+    avatar: p.avatar || "you",
+    connected: p.connected !== false,
+    status: p.status,
+    isHost: p.isHost,
+    isUser: p.isViewer || p.id === privateRoomState?.viewerPlayerId,
+    seatIndex: idx,
+    balance: typeof p.balance === "number" ? p.balance : (privateRoomState?.config?.bootAmount ? privateRoomState.config.bootAmount * 10 : 10000),
+    cards: [],
+    packed: false,
+    seen: false,
+    currentStake: 0,
+    totalContributed: 0
+  })) : []);
+
+  const canonicalSeats = rawSeats;
   const { seats: namedSeats, nameById } = withDisplayNames(canonicalSeats);
   const displaySeats = rotateSeatsForViewer(namedSeats);
   const resolveMappedName = (playerId, fallback) =>
@@ -690,12 +751,22 @@ export default function GameClient({
   const publicLobbySecondsRemaining = activePublicLobbyDeadline
     ? Math.max(0, Math.ceil((new Date(activePublicLobbyDeadline).getTime() - turnNow) / 1000))
     : 0;
-  const nextRoundState = publicTableState?.nextRound || (publicTableState ? {
-      viewerAccepted: Boolean(publicTableState.nextRoundReady || publicTableState.viewerNextRoundReady),
-      waitingForAcceptances: round?.status === "complete",
-      acceptedPlayerIds: [],
-      pendingPlayerIds: [],
-    } : null);
+  const nextRoundState = isPrivateRoomView
+    ? privateRoomState?.nextRound
+    : (publicTableState?.nextRound || (publicTableState ? {
+        viewerAccepted: Boolean(publicTableState.nextRoundReady || publicTableState.viewerNextRoundReady),
+        waitingForAcceptances: round?.status === "complete",
+        acceptedPlayerIds: [],
+        pendingPlayerIds: [],
+      } : null));
+
+  const canStartNextRound = isPrivateRoomView
+    ? Boolean(
+        isHost &&
+        (privateRoomState?.nextRound?.acceptedPlayerIds?.length || 0) >= 2 &&
+        (!privateRoomState?.nextRound?.pendingPlayerIds || privateRoomState.nextRound.pendingPlayerIds.length === 0)
+      )
+    : true;
   const platformLaunchToken = platformLaunchContext?.token || "";
   const platformLaunchGameId = platformLaunchContext?.gameId || 0;
   const isPlatformLaunch = Boolean(platformLaunchToken && platformLaunchGameId > 0);
@@ -736,10 +807,15 @@ export default function GameClient({
     let cancelled = false;
     fetchPublicLobbyConfig()
       .then((config) => {
-        if (cancelled || typeof config?.initialBalance !== "number") {
+        if (cancelled) {
           return;
         }
-        setLobbyInitialBalance(config.initialBalance);
+        if (typeof config?.initialBalance === "number") {
+          setLobbyInitialBalance(config.initialBalance);
+        }
+        if (typeof config?.bootAmount === "number") {
+          setGlobalBootAmount(config.bootAmount);
+        }
       })
       .catch(() => {});
 
@@ -824,8 +900,13 @@ export default function GameClient({
   }, [platformLaunchGameId, platformLaunchToken, syncPlatformProfile]);
 
   const handleGameplayAction = useCallback((actionType, payload) => (
-    refreshPlatformProfileAfterAction(() => publicRunAction(actionType, payload))
-  ), [publicRunAction, refreshPlatformProfileAfterAction]);
+    refreshPlatformProfileAfterAction(() => {
+      if (isPrivateRoomView) {
+        return privateRunAction(actionType, payload);
+      }
+      return publicRunAction(actionType, payload);
+    })
+  ), [isPrivateRoomView, privateRunAction, publicRunAction, refreshPlatformProfileAfterAction]);
 
   useEffect(() => {
     if (!platformLaunchToken || !platformLaunchGameId || screen !== "table" || !round?.id) {
@@ -836,7 +917,7 @@ export default function GameClient({
       return undefined;
     }
 
-    const roundKey = `public:${round.id}`;
+    const roundKey = `${isPrivateRoomView ? "private" : "public"}:${round.id}`;
     if (bootDeductionProfileRoundKeyRef.current === roundKey) {
       return undefined;
     }
@@ -859,6 +940,7 @@ export default function GameClient({
     return undefined;
   }, [
     commitPlatformProfile,
+    isPrivateRoomView,
     platformLaunchGameId,
     platformLaunchToken,
     round?.id,
@@ -896,6 +978,13 @@ export default function GameClient({
   function handleMenuAction(actionId) {
     setLobbyMenuOpen(false);
 
+    if (actionId === "custom_room") {
+      setCustomRoomInitialMode("create");
+      setCustomRoomError("");
+      setCustomRoomModalOpen(true);
+      return;
+    }
+
     if (actionId === "history") {
       router.push(withLaunchQuery("/transactions/history"));
       return;
@@ -919,20 +1008,156 @@ export default function GameClient({
     setLobbyRulesOpen(false);
   }, []);
 
+  const handleOpenCreateCustomRoom = useCallback(() => {
+    setCustomRoomInitialMode("create");
+    setCustomRoomError("");
+    setCustomRoomModalOpen(true);
+  }, []);
+
+  const handleOpenJoinCustomRoom = useCallback(() => {
+    setCustomRoomInitialMode("join");
+    setCustomRoomError("");
+    setCustomRoomModalOpen(true);
+  }, []);
+
+  const handleCloseCustomRoomModal = useCallback(() => {
+    if (customRoomBusy) return;
+    setCustomRoomModalOpen(false);
+    setCustomRoomError("");
+  }, [customRoomBusy]);
+
+  const handleCreateCustomRoomSubmit = useCallback(async ({ variant: selectedVariant }) => {
+    setCustomRoomBusy(true);
+    setCustomRoomError("");
+    try {
+      unlockAudioFromGesture();
+      const payload = {
+        variant: selectedVariant,
+        platformLaunchToken,
+        platformLaunchGameId,
+      };
+      const room = await createPrivateRoomAction(payload);
+      if (room?.roomCode) {
+        setActivePrivateRoomCode(room.roomCode);
+        setCustomRoomModalOpen(true);
+        router.replace(withLaunchQuery(`/public?room=${encodeURIComponent(room.roomCode)}`));
+      }
+    } catch (err) {
+      setCustomRoomError(err?.message || "Failed to create custom room. Please try again.");
+    } finally {
+      setCustomRoomBusy(false);
+    }
+  }, [createPrivateRoomAction, platformLaunchGameId, platformLaunchToken, router]);
+
+  const handleJoinCustomRoomSubmit = useCallback(async ({ roomCode }) => {
+    setCustomRoomBusy(true);
+    setCustomRoomError("");
+    try {
+      unlockAudioFromGesture();
+      const code = (roomCode || "").trim().toUpperCase();
+      const payload = {
+        roomCode: code,
+        platformLaunchToken,
+        platformLaunchGameId,
+      };
+      const room = await joinPrivateRoomAction(payload);
+      if (room?.roomCode) {
+        setActivePrivateRoomCode(room.roomCode);
+        setCustomRoomModalOpen(true);
+        router.replace(withLaunchQuery(`/public?room=${encodeURIComponent(room.roomCode)}`));
+      }
+    } catch (err) {
+      setCustomRoomError(err?.message || "Failed to join custom room. Please check the code and try again.");
+    } finally {
+      setCustomRoomBusy(false);
+    }
+  }, [joinPrivateRoomAction, platformLaunchGameId, platformLaunchToken, router]);
+
+  const handleCopyRoomCode = useCallback(async () => {
+    const code = currentPrivateRoomCode || activePrivateRoomCode;
+    if (!code) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(code);
+      } else {
+        const input = document.createElement("input");
+        input.value = code;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        document.body.removeChild(input);
+      }
+      setRoomCodeCopied(true);
+      window.setTimeout(() => setRoomCodeCopied(false), 2000);
+    } catch {}
+  }, [activePrivateRoomCode, currentPrivateRoomCode]);
+
+  const handleHostStartFirstRound = useCallback(async () => {
+    if (!isHost) return;
+    setCustomRoomBusy(true);
+    try {
+      await privateStartRound();
+      setCustomRoomModalOpen(false);
+    } catch (err) {
+      setCustomRoomError(err?.message || "Failed to start private round.");
+    } finally {
+      setCustomRoomBusy(false);
+    }
+  }, [isHost, privateStartRound]);
+
+  useEffect(() => {
+    if (round?.id && customRoomModalOpen) {
+      setCustomRoomModalOpen(false);
+    }
+  }, [round?.id, customRoomModalOpen]);
+
   const handleExitMatchmaking = useCallback(async () => {
     try {
-      await leavePublicTable();
+      if (isPrivateRoomView) {
+        await leavePrivateRoomAction();
+      } else {
+        await leavePublicTable();
+      }
     } catch {}
-    clearStoredPublicSession(variant);
+    if (isPrivateRoomView) {
+      if (currentPrivateRoomCode) {
+        clearStoredPrivateSession(currentPrivateRoomCode);
+      }
+      setActivePrivateRoomCode("");
+    } else {
+      clearStoredPublicSession(variant);
+    }
     router.replace(withLaunchQuery("/public"));
-  }, [leavePublicTable, router, variant]);
+  }, [currentPrivateRoomCode, isPrivateRoomView, leavePrivateRoomAction, leavePublicTable, router, variant]);
 
   const handleExitTable = useCallback(async () => {
     allowHistoryExitRef.current = true;
     setLeaveConfirmOpen(false);
-    await leavePublicTable();
+    try {
+      if (isPrivateRoomView) {
+        await leavePrivateRoomAction();
+      } else {
+        await leavePublicTable();
+      }
+    } catch {}
+    if (isPrivateRoomView) {
+      if (currentPrivateRoomCode) {
+        clearStoredPrivateSession(currentPrivateRoomCode);
+      }
+      setActivePrivateRoomCode("");
+    }
     router.replace(withLaunchQuery("/public"));
-  }, [leavePublicTable, router]);
+  }, [currentPrivateRoomCode, isPrivateRoomView, leavePrivateRoomAction, leavePublicTable, router]);
+
+  const handleLeaveCustomRoomLobby = useCallback(async () => {
+    setCustomRoomBusy(true);
+    try {
+      await handleExitTable();
+      setCustomRoomModalOpen(false);
+    } finally {
+      setCustomRoomBusy(false);
+    }
+  }, [handleExitTable]);
 
   const requestLeaveTable = useCallback(() => {
     setLeaveConfirmOpen(true);
@@ -985,12 +1210,28 @@ export default function GameClient({
     };
   }, [screen]);
 
-  async function handleStartNextPublicRound() {
+  const handleStartNextRound = useCallback(async () => {
+    if (isPrivateRoomView) {
+      if (isHost && canStartNextRound) {
+        await refreshPlatformProfileAfterAction(() => privateStartNextRound());
+      } else {
+        await refreshPlatformProfileAfterAction(() => privateReadyNextRound());
+      }
+      return;
+    }
     await refreshPlatformProfileAfterAction(() => publicReadyNextRound());
-  }
+  }, [
+    canStartNextRound,
+    isHost,
+    isPrivateRoomView,
+    privateReadyNextRound,
+    privateStartNextRound,
+    publicReadyNextRound,
+    refreshPlatformProfileAfterAction,
+  ]);
 
   useEffect(() => {
-    if (screen !== "table") {
+    if (isPrivateRoomView || screen !== "table") {
       publicDecisionHandledRef.current = false;
       publicDecisionPendingExitRef.current = false;
       return undefined;
@@ -1029,6 +1270,7 @@ export default function GameClient({
     };
   }, [
     handleExitTable,
+    isPrivateRoomView,
     nextRoundDecision.expired,
     nextRoundState?.viewerAccepted,
     publicTableState?.playerStatus,
@@ -1036,12 +1278,18 @@ export default function GameClient({
     screen,
   ]);
 
-  const activeLoading = publicLoading;
-  const activeActing = publicActing;
-  const activeError = publicError;
-  const platformBalanceFallback = publicTableState?.viewerPlatformBalance;
-  const platformNameFallback = publicTableState?.playerName;
-  const visibleChipBalance = userSeat?.balance ?? publicTableState?.table?.balance;
+  const activeLoading = isPrivateRoomView ? privateLoading : publicLoading;
+  const activeActing = isPrivateRoomView ? privateActing : publicActing;
+  const activeError = isPrivateRoomView ? privateError : publicError;
+  const platformBalanceFallback = isPrivateRoomView
+    ? privateRoomState?.viewerPlatformBalance
+    : publicTableState?.viewerPlatformBalance;
+  const platformNameFallback = isPrivateRoomView
+    ? privateRoomState?.viewerPlayerName
+    : publicTableState?.playerName;
+  const visibleChipBalance = userSeat?.balance ?? (
+    isPrivateRoomView ? privateRoomState?.viewerPlatformBalance : publicTableState?.table?.balance
+  );
   const displayedChipBalance = typeof platformProfile?.balance === "number"
     ? platformProfile.balance
     : typeof platformBalanceFallback === "number"
@@ -1058,7 +1306,9 @@ export default function GameClient({
     ? "..."
     : (typeof displayedChipBalance === "number" ? displayedChipBalance : 0).toLocaleString("en-IN");
   const walletBalanceLabel = `₹ ${headerChipBalanceLabel}`;
-  const minimumBootAmount = publicTableState?.config?.bootAmount || round?.bootAmount || 0;
+  const minimumBootAmount = isPrivateRoomView
+    ? (privateRoomState?.config?.bootAmount || round?.bootAmount || 0)
+    : (publicTableState?.config?.bootAmount || round?.bootAmount || 0);
   const roundAllowsLowBalanceView = round?.status === "active" || round?.status === "starting" || round?.status === "dealing";
   const shouldKickForLowBalance = Boolean(
     screen === "table" &&
@@ -1202,6 +1452,45 @@ export default function GameClient({
               <LobbyRulesModal open={lobbyRulesOpen} onClose={closeLobbyRules} />
 
               <div className="lobby-main">
+                <div className="mb-4 sm:mb-6 rounded-[22px] border-2 border-[#efc24e]/60 bg-[linear-gradient(180deg,rgba(111,11,18,0.92),rgba(54,6,10,0.96))] p-4 shadow-[0_16px_32px_rgba(0,0,0,0.36)] backdrop-blur-md">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3.5 text-center sm:text-left">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#ffe46d]/40 bg-gradient-to-br from-[#ffd973]/20 to-black/40 text-2xl shadow-inner">
+                        🔒
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-center sm:justify-start gap-2">
+                          <strong className="text-base sm:text-lg font-black text-[#ffe6a0] tracking-wide">
+                            Play with Friends (Custom Room)
+                          </strong>
+                          <span className="rounded-full bg-[#33d552]/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#96f2a5]">
+                            No Bots
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-xs sm:text-sm text-white/75">
+                          Create a private table with room code or join friends. Only invited players can join.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex w-full sm:w-auto items-center justify-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={handleOpenCreateCustomRoom}
+                        className="flex-1 sm:flex-initial rounded-xl border border-[#efc24e]/50 bg-gradient-to-b from-[#ffd973] to-[#c98e1f] px-4 py-2.5 text-xs sm:text-sm font-extrabold text-[#2a1300] shadow-[0_4px_12px_rgba(0,0,0,0.25)] transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                      >
+                        Create Room
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleOpenJoinCustomRoom}
+                        className="flex-1 sm:flex-initial rounded-xl border border-white/20 bg-gradient-to-b from-white/15 to-white/5 px-4 py-2.5 text-xs sm:text-sm font-extrabold text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                      >
+                        Join with Code
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <section className="lobby-grid" aria-label="Game variants">
                   {VARIANT_OPTIONS.map((variant) => (
                     <VariantCard
@@ -1220,6 +1509,61 @@ export default function GameClient({
             </section>
           ) : (
             <section className="table-screen">
+              {isPrivateRoomView ? (
+                <div className="private-room-panel">
+                  <div className="private-room-panel-copy">
+                    <div className="flex items-center gap-2">
+                      <strong>{privateRoomState?.roomName || privateRoomState?.name || "Custom Room"}</strong>
+                      <span className="private-room-pill">{privateRoomVariantLabel}</span>
+                    </div>
+                    <span>
+                      Room Code: <em>{currentPrivateRoomCode || activePrivateRoomCode}</em>
+                    </span>
+                  </div>
+                  <div className="private-room-panel-meta">
+                    <button
+                      type="button"
+                      className="private-room-copy"
+                      onClick={handleCopyRoomCode}
+                    >
+                      {roomCodeCopied ? "Copied!" : "Copy Code"}
+                    </button>
+                    <span className="private-room-meta-chip is-live">
+                      {displaySeats.length} {displaySeats.length === 1 ? "Player" : "Players"}
+                    </span>
+                    {isHost ? (
+                      <span className="private-room-meta-chip is-host">Host</span>
+                    ) : null}
+                    {isPrivateLobby && isHost ? (
+                      <button
+                        type="button"
+                        className="private-room-host-action"
+                        onClick={handleHostStartFirstRound}
+                        disabled={activeActing || displaySeats.length < 2}
+                      >
+                        {displaySeats.length < 2 ? "Waiting for Players" : "Start Game"}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
+              {isPrivateLobby ? (
+                <div className="private-room-status-bar">
+                  <strong>
+                    {displaySeats.length < 2
+                      ? "Waiting for friends to join..."
+                      : isHost
+                      ? "Ready to play! Start round 1 whenever you are ready."
+                      : "Waiting for the host to start round 1..."}
+                  </strong>
+                  <span>
+                    Share Room Code: <em className="font-mono text-[#ffe46d] font-bold tracking-widest">{currentPrivateRoomCode || activePrivateRoomCode}</em>.
+                    Only players with this code can join. No bots!
+                  </span>
+                </div>
+              ) : null}
+
               <GameplaySoundController
                 round={tableRound}
                 seats={displaySeats}
@@ -1233,7 +1577,7 @@ export default function GameClient({
                 onAction={handleGameplayAction}
                 acting={activeActing}
                 onExitTable={requestLeaveTable}
-                onStartNextRound={handleStartNextPublicRound}
+                onStartNextRound={handleStartNextRound}
                 onDeclineNextRound={handleExitTable}
                 nextRoundDecision={nextRoundDecision}
                 nextRoundState={nextRoundState}
@@ -1242,16 +1586,21 @@ export default function GameClient({
                 nowMs={turnNow}
                 waitingForSeat={waitingForSeat}
                 waitingMessage={
-                  publicTableState?.admissionMessage ||
-                  publicTableState?.round?.message ||
-                  "You will join automatically when the next round starts."
+                  isPrivateRoomView
+                    ? (isPrivateWaiting ? "You will be seated when the next round starts." : "Waiting for next round.")
+                    : (publicTableState?.admissionMessage || publicTableState?.round?.message || "You will join automatically when the next round starts.")
                 }
                 onDealCard={handleDealCardSound}
-                variant={publicTableState?.config?.variant || null}
+                variant={isPrivateRoomView ? (privateRoomState?.config?.variant || variant) : (publicTableState?.config?.variant || null)}
                 variantState={round?.variantState || null}
                 chipBalance={displayedChipBalance || 0}
-                maxPotAmount={publicTableState?.config?.maxPotAmount || 0}
+                maxPotAmount={isPrivateRoomView ? 0 : (publicTableState?.config?.maxPotAmount || 0)}
                 isPublicTable={isPublicTableView}
+                isPrivateMode={isPrivateRoomView}
+                roomCode={currentPrivateRoomCode || activePrivateRoomCode}
+                roomName={privateRoomState?.roomName || privateRoomState?.name || ""}
+                isHost={isHost}
+                canStartNextRound={canStartNextRound}
               />
 
               {round?.status === "active" && !waitingForSeat && userSeat ? (
@@ -1328,6 +1677,22 @@ export default function GameClient({
           void confirmLeaveTable();
         }}
         confirming={leaveConfirming}
+      />
+      <CustomRoomModal
+        open={customRoomModalOpen}
+        roomState={privateRoomState}
+        roomCode={currentPrivateRoomCode || activePrivateRoomCode}
+        isHost={isHost}
+        initialMode={customRoomInitialMode}
+        initialRoomCode={initialRoomCode || activePrivateRoomCode}
+        globalBootAmount={globalBootAmount}
+        onClose={handleCloseCustomRoomModal}
+        onCreateRoom={handleCreateCustomRoomSubmit}
+        onJoinRoom={handleJoinCustomRoomSubmit}
+        onStartGame={handleHostStartFirstRound}
+        onLeaveRoom={handleLeaveCustomRoomLobby}
+        busy={customRoomBusy}
+        error={customRoomError}
       />
     </div>
   );

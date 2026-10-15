@@ -1111,7 +1111,7 @@ export default function CasinoTable({
                   />
                 </div>
 
-                <InfoBadge label="Variant" value={variant?.label || "Teen Patti"} tone="red" />
+                <InfoBadge label="Variant" value={variant?.label || (typeof variant === "string" ? variant : "Teen Patti")} tone="red" />
               </div>
 
               <div
