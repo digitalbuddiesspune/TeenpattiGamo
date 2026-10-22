@@ -92,7 +92,7 @@ export function createPrivateRoom(roomName, playerName, clientSeed, variant, boo
       playerName,
       clientSeed,
       variant,
-      bootAmount
+      ...(typeof bootAmount === "number" ? { bootAmount } : {})
     })
   }, null);
 }
@@ -117,7 +117,7 @@ export function createPlatformPrivateRoom(token, gameId, roomName, clientSeed, v
       roomName,
       clientSeed,
       variant,
-      bootAmount
+      ...(typeof bootAmount === "number" ? { bootAmount } : {})
     })
   }, null);
 }

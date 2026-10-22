@@ -64,7 +64,7 @@ internal class PlatformController(
                 session,
                 body.clientSeed,
                 body.variant,
-                body.bootAmount,
+                null,
                 clientIp(request),
             ),
         )

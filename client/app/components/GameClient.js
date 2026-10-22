@@ -1491,7 +1491,7 @@ export default function GameClient({
                 variant={isPrivateRoomView ? (privateRoomState?.config?.variant || variant) : (publicTableState?.config?.variant || null)}
                 variantState={round?.variantState || null}
                 chipBalance={displayedChipBalance || 0}
-                maxPotAmount={isPrivateRoomView ? 0 : (publicTableState?.config?.maxPotAmount || 0)}
+                maxPotAmount={isPrivateRoomView ? (privateRoomState?.config?.maxPotAmount || 0) : (publicTableState?.config?.maxPotAmount || 0)}
                 isPublicTable={isPublicTableView}
                 isPrivateMode={isPrivateRoomView}
                 roomCode={currentPrivateRoomCode || activePrivateRoomCode}

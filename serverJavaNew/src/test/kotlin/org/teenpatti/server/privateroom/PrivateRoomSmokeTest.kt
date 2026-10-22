@@ -421,9 +421,9 @@ internal class PrivateRoomSmokeTest {
         val variant = config["variant"] as Map<String, Any?>
         val stored = repository.loadRoom(roomCode)!!
 
-        assertEquals(2500, config["bootAmount"])
+        assertEquals(1000, config["bootAmount"])
         assertEquals("ak47", variant["id"])
-        assertEquals(2500, stored.config!!.bootAmount)
+        assertEquals(1000, stored.config!!.bootAmount)
         assertEquals("ak47", stored.config!!.variant!!["id"])
     }
 
@@ -443,9 +443,9 @@ internal class PrivateRoomSmokeTest {
         val variant = config["variant"] as Map<String, Any?>
         val stored = repository.loadRoom(roomCode)!!
 
-        assertEquals(4000, config["bootAmount"])
+        assertEquals(1000, config["bootAmount"])
         assertEquals("jhandu", variant["id"])
-        assertEquals(4000, stored.config!!.bootAmount)
+        assertEquals(1000, stored.config!!.bootAmount)
         assertEquals("jhandu", stored.config!!.variant!!["id"])
     }
 

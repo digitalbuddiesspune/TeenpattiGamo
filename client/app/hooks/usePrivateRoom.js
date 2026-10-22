@@ -449,7 +449,7 @@ export function usePrivateRoom(initialRoomCode = "", enabled = true) {
     };
   }, [currentRoomCode, enabled, applyRoomState, clearHeartbeat, clearReconnectTimer, connectSocket]);
 
-  const handleCreateRoom = useCallback(async ({ roomName, playerName, variant = "classic", bootAmount = 1000 }) => {
+  const handleCreateRoom = useCallback(async ({ roomName, playerName, variant = "classic", bootAmount }) => {
     setLoading(true);
     setError("");
     manualCloseRef.current = false;

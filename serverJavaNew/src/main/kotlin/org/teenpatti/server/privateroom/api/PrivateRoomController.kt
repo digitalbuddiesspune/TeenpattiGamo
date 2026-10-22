@@ -23,7 +23,7 @@ internal class PrivateRoomController(
                 body?.playerName,
                 body?.clientSeed,
                 body?.variant,
-                body?.bootAmount,
+                null,
             ),
         )
 

@@ -774,7 +774,7 @@ internal class PrivateRoom(
         val config = GameConfig()
         val selectedConfig = variantConfigs[currentVariantId()] ?: defaultConfig
         config.tableId = state.roomCode
-        config.bootAmount = state.config?.bootAmount ?: selectedConfig.bootAmount
+        config.bootAmount = selectedConfig.bootAmount
         config.maxPotAmount = selectedConfig.maxPotAmount
         config.minStake = minOf(selectedConfig.minStake, config.bootAmount)
         config.maxStake = selectedConfig.maxStake
@@ -820,7 +820,7 @@ internal class PrivateRoom(
         val selectedConfig =
             variantConfigs[normalizedVariantId]
                 ?: throw AppException.badRequest("unsupported_variant", "Unsupported game variant: $normalizedVariantId")
-        val nextBootAmount = bootAmount ?: state.config?.bootAmount ?: selectedConfig.bootAmount
+        val nextBootAmount = selectedConfig.bootAmount
         if (nextBootAmount <= 0) {
             throw AppException.badRequest("private_room_boot_amount_invalid", "Boot amount must be greater than 0.")
         }
@@ -1175,7 +1175,7 @@ internal class PrivateRoomManager(
         val selectedConfig =
             variantConfigs[normalizedVariantId]
                 ?: throw AppException.badRequest("unsupported_variant", "Unsupported game variant: $normalizedVariantId")
-        val nextBootAmount = bootAmount ?: selectedConfig.bootAmount
+        val nextBootAmount = selectedConfig.bootAmount
         if (nextBootAmount <= 0) {
             throw AppException.badRequest("private_room_boot_amount_invalid", "Boot amount must be greater than 0.")
         }
