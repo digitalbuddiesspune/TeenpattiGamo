@@ -356,6 +356,9 @@ export function usePrivateRoom(initialRoomCode = "", enabled = true) {
             }
 
             if (message.type === "private_room:error") {
+              if (message.code === "unsupported_private_room_websocket_event") {
+                return;
+              }
               setError(message.message || "Private room action failed.");
             }
           } catch {

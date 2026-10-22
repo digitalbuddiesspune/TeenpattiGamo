@@ -5,10 +5,13 @@ import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.CloseStatus
+import org.springframework.web.socket.PingMessage
+import org.springframework.web.socket.PongMessage
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.TextWebSocketHandler
 import org.teenpatti.server.common.ApiSupport
+import org.teenpatti.server.common.ScheduledTask
 import org.teenpatti.server.common.Scheduler
 import org.teenpatti.server.config.AppEnvironment
 import java.util.concurrent.ConcurrentHashMap
@@ -32,14 +35,23 @@ internal class PrivateRoomWebSocketHandler(
     private val authenticatedSessions = ConcurrentHashMap<String, AuthenticatedPrivateSession>()
     private val roomSessions = ConcurrentHashMap<String, MutableSet<String>>()
     private var consumerId: String? = null
+    private var heartbeatTask: ScheduledTask? = null
+
+    @Volatile
+    private var running = false
 
     @PostConstruct
     fun start() {
         consumerId = bus.registerEventConsumer(::handleEvent)
+        running = true
+        scheduleHeartbeat()
     }
 
     @PreDestroy
     fun stop() {
+        running = false
+        heartbeatTask?.cancel()
+        heartbeatTask = null
         consumerId?.let(bus::removeEventConsumer)
     }
 
@@ -58,11 +70,59 @@ internal class PrivateRoomWebSocketHandler(
                 "private_room:accept_next_round" -> handleCommand(session, request, "accept_next_round")
                 "private_room:update_config" -> handleCommand(session, request, "update_config")
                 "private_room:leave" -> handleLeave(session, request)
+                "private_room:ping" -> handlePing(session, request)
                 else -> sendError(session, request.requestId, "unsupported_private_room_websocket_event", "Unsupported websocket event.")
             }
         } catch (error: Exception) {
             sendError(session, request.requestId, ApiSupport.errorCode(error), error.message ?: "Request failed.")
         }
+    }
+
+    override fun handlePongMessage(session: WebSocketSession, message: PongMessage) {
+        refreshPresence(session)
+    }
+
+    private fun scheduleHeartbeat() {
+        heartbeatTask =
+            scheduler.schedule(HEARTBEAT_INTERVAL_MS) {
+                try {
+                    sendHeartbeats()
+                } catch (_: Exception) {
+                } finally {
+                    if (running) {
+                        scheduleHeartbeat()
+                    }
+                }
+            }
+    }
+
+    private fun sendHeartbeats() {
+        for ((sessionId, session) in liveSessions) {
+            if (!session.isOpen) {
+                liveSessions.remove(sessionId)
+                continue
+            }
+            refreshPresence(session)
+            synchronized(session) {
+                try {
+                    session.sendMessage(PingMessage())
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
+
+    private fun refreshPresence(session: WebSocketSession) {
+        val auth = authenticatedSessions[session.id] ?: return
+        try {
+            presenceService.markConnected("private:${auth.roomCode}", auth.playerId, "${env.appNodeId}:${session.id}")
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun handlePing(session: WebSocketSession, request: PrivateSocketRequest) {
+        refreshPresence(session)
+        sendAck(session, request.requestId, mapOf("pong" to true))
     }
 
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
@@ -217,5 +277,9 @@ internal class PrivateRoomWebSocketHandler(
             } catch (_: Exception) {
             }
         }
+    }
+
+    private companion object {
+        const val HEARTBEAT_INTERVAL_MS = 25_000L
     }
 }
