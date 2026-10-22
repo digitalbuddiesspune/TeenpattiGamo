@@ -637,7 +637,6 @@ export default function GameClient({
   const [customRoomInitialMode, setCustomRoomInitialMode] = useState(() => initialRoomCode ? "join" : "create");
   const [customRoomBusy, setCustomRoomBusy] = useState(false);
   const [customRoomError, setCustomRoomError] = useState("");
-  const [roomCodeCopied, setRoomCodeCopied] = useState(false);
 
   const isPrivateRoomView = view === "private-room" || Boolean(activePrivateRoomCode);
   const isPublicTableView = view === "public-table" && !isPrivateRoomView;
@@ -680,13 +679,7 @@ export default function GameClient({
   const waitingForSeat = isPrivateRoomView ? isPrivateWaiting : isPublicWaiting;
 
   const round = activeTableState?.round || null;
-  const isPrivateLobby = Boolean(isPrivateRoomView && (!round || privateRoomState?.status === "lobby"));
   const isPublicLobbyWaiting = !isPrivateRoomView && publicTableState?.playerStatus === "active_at_table" && !round;
-  const privateRoomVariantLabel = (
-    typeof privateRoomState?.config?.variant === "object"
-      ? (privateRoomState.config.variant?.label || privateRoomState.config.variant?.id)
-      : (typeof privateRoomState?.config?.variant === "string" ? privateRoomState.config.variant : null)
-  ) || (typeof variant === "string" ? variant : "Classic");
 
   const rawSeats = round?.seats || (isPrivateRoomView && privateRoomState?.players ? privateRoomState.players.map((p, idx) => ({
     id: p.id,
@@ -1073,25 +1066,6 @@ export default function GameClient({
     }
   }, [joinPrivateRoomAction, platformLaunchGameId, platformLaunchToken, router]);
 
-  const handleCopyRoomCode = useCallback(async () => {
-    const code = currentPrivateRoomCode || activePrivateRoomCode;
-    if (!code) return;
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(code);
-      } else {
-        const input = document.createElement("input");
-        input.value = code;
-        document.body.appendChild(input);
-        input.select();
-        document.execCommand("copy");
-        document.body.removeChild(input);
-      }
-      setRoomCodeCopied(true);
-      window.setTimeout(() => setRoomCodeCopied(false), 2000);
-    } catch {}
-  }, [activePrivateRoomCode, currentPrivateRoomCode]);
-
   const handleHostStartFirstRound = useCallback(async () => {
     if (!isHost) return;
     setCustomRoomBusy(true);
@@ -1411,6 +1385,23 @@ export default function GameClient({
                   </div>
 
                   <div className="lobby-topbar__center">
+                    <div className="hidden md:flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleOpenCreateCustomRoom}
+                        className="rounded-xl border border-[#efc24e]/50 bg-gradient-to-b from-[#ffd973] to-[#c98e1f] px-3.5 py-1.5 text-xs lg:text-sm font-extrabold text-[#2a1300] shadow-[0_4px_12px_rgba(0,0,0,0.25)] transition-transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
+                      >
+                        Create Room
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleOpenJoinCustomRoom}
+                        className="rounded-xl border border-white/20 bg-gradient-to-b from-white/15 to-white/5 px-3.5 py-1.5 text-xs lg:text-sm font-extrabold text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] transition-transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
+                      >
+                        Join with Code
+                      </button>
+                    </div>
+
                     <span className="lobby-topbar__wallet">
                       <Image
                         src="/newAssets/chip.png"
@@ -1452,45 +1443,6 @@ export default function GameClient({
               <LobbyRulesModal open={lobbyRulesOpen} onClose={closeLobbyRules} />
 
               <div className="lobby-main">
-                <div className="mb-4 sm:mb-6 rounded-[22px] border-2 border-[#efc24e]/60 bg-[linear-gradient(180deg,rgba(111,11,18,0.92),rgba(54,6,10,0.96))] p-4 shadow-[0_16px_32px_rgba(0,0,0,0.36)] backdrop-blur-md">
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-3.5 text-center sm:text-left">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#ffe46d]/40 bg-gradient-to-br from-[#ffd973]/20 to-black/40 text-2xl shadow-inner">
-                        🔒
-                      </div>
-                      <div>
-                        <div className="flex items-center justify-center sm:justify-start gap-2">
-                          <strong className="text-base sm:text-lg font-black text-[#ffe6a0] tracking-wide">
-                            Play with Friends (Custom Room)
-                          </strong>
-                          <span className="rounded-full bg-[#33d552]/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#96f2a5]">
-                            No Bots
-                          </span>
-                        </div>
-                        <p className="mt-0.5 text-xs sm:text-sm text-white/75">
-                          Create a private table with room code or join friends. Only invited players can join.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex w-full sm:w-auto items-center justify-center gap-2.5">
-                      <button
-                        type="button"
-                        onClick={handleOpenCreateCustomRoom}
-                        className="flex-1 sm:flex-initial rounded-xl border border-[#efc24e]/50 bg-gradient-to-b from-[#ffd973] to-[#c98e1f] px-4 py-2.5 text-xs sm:text-sm font-extrabold text-[#2a1300] shadow-[0_4px_12px_rgba(0,0,0,0.25)] transition-transform hover:scale-[1.02] active:scale-[0.98]"
-                      >
-                        Create Room
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleOpenJoinCustomRoom}
-                        className="flex-1 sm:flex-initial rounded-xl border border-white/20 bg-gradient-to-b from-white/15 to-white/5 px-4 py-2.5 text-xs sm:text-sm font-extrabold text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] transition-transform hover:scale-[1.02] active:scale-[0.98]"
-                      >
-                        Join with Code
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
                 <section className="lobby-grid" aria-label="Game variants">
                   {VARIANT_OPTIONS.map((variant) => (
                     <VariantCard
@@ -1509,61 +1461,6 @@ export default function GameClient({
             </section>
           ) : (
             <section className="table-screen">
-              {isPrivateRoomView ? (
-                <div className="private-room-panel">
-                  <div className="private-room-panel-copy">
-                    <div className="flex items-center gap-2">
-                      <strong>{privateRoomState?.roomName || privateRoomState?.name || "Custom Room"}</strong>
-                      <span className="private-room-pill">{privateRoomVariantLabel}</span>
-                    </div>
-                    <span>
-                      Room Code: <em>{currentPrivateRoomCode || activePrivateRoomCode}</em>
-                    </span>
-                  </div>
-                  <div className="private-room-panel-meta">
-                    <button
-                      type="button"
-                      className="private-room-copy"
-                      onClick={handleCopyRoomCode}
-                    >
-                      {roomCodeCopied ? "Copied!" : "Copy Code"}
-                    </button>
-                    <span className="private-room-meta-chip is-live">
-                      {displaySeats.length} {displaySeats.length === 1 ? "Player" : "Players"}
-                    </span>
-                    {isHost ? (
-                      <span className="private-room-meta-chip is-host">Host</span>
-                    ) : null}
-                    {isPrivateLobby && isHost ? (
-                      <button
-                        type="button"
-                        className="private-room-host-action"
-                        onClick={handleHostStartFirstRound}
-                        disabled={activeActing || displaySeats.length < 2}
-                      >
-                        {displaySeats.length < 2 ? "Waiting for Players" : "Start Game"}
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-
-              {isPrivateLobby ? (
-                <div className="private-room-status-bar">
-                  <strong>
-                    {displaySeats.length < 2
-                      ? "Waiting for friends to join..."
-                      : isHost
-                      ? "Ready to play! Start round 1 whenever you are ready."
-                      : "Waiting for the host to start round 1..."}
-                  </strong>
-                  <span>
-                    Share Room Code: <em className="font-mono text-[#ffe46d] font-bold tracking-widest">{currentPrivateRoomCode || activePrivateRoomCode}</em>.
-                    Only players with this code can join. No bots!
-                  </span>
-                </div>
-              ) : null}
-
               <GameplaySoundController
                 round={tableRound}
                 seats={displaySeats}

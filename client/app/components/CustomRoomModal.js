@@ -108,7 +108,7 @@ function CustomRoomModalDialog({
             <div className="private-room-modal-copy !mb-2">
               <div className="flex items-center gap-2">
                 <p className="private-room-kicker">Custom Room Lobby</p>
-                <span className="rounded-full bg-[#33d552]/20 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[#96f2a5]">
+                <span className="rounded-full bg-[#33d552]/20 px-2 py-0.5 text-[10px] font-semibold sm:font-extrabold uppercase tracking-wider text-[#96f2a5]">
                   No Bots
                 </span>
               </div>
@@ -120,28 +120,28 @@ function CustomRoomModalDialog({
 
             {/* Room Code Card */}
             <div className="rounded-2xl border-2 border-[#efc24e]/70 bg-gradient-to-b from-[#3a080e] to-[#1e0407] p-4 text-center shadow-[0_12px_28px_rgba(0,0,0,0.38)]">
-              <span className="block text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#ffd778]">
+              <span className="block text-[11px] font-semibold sm:font-extrabold uppercase tracking-[0.2em] text-[#ffd778]">
                 Room Code
               </span>
               <div className="my-2.5 flex items-center justify-center gap-3">
-                <span className="font-mono text-3xl sm:text-4xl font-black tracking-[0.28em] text-white select-all">
+                <span className="font-mono text-3xl sm:text-4xl font-bold sm:font-black tracking-[0.28em] text-white select-all">
                   {activeRoomCode}
                 </span>
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className="rounded-xl border border-[#ffe46d]/40 bg-gradient-to-b from-[#ffd973] to-[#c98e1f] px-3.5 py-2 text-xs font-black text-[#2e1304] shadow-md transition hover:scale-105 active:scale-95"
+                  className="rounded-xl border border-[#ffe46d]/40 bg-gradient-to-b from-[#ffd973] to-[#c98e1f] px-3.5 py-2 text-xs font-semibold sm:font-black text-[#2e1304] shadow-md transition hover:scale-105 active:scale-95"
                 >
                   {copied ? "Copied!" : "Copy Code"}
                 </button>
               </div>
-              <div className="flex items-center justify-center gap-4 text-xs font-semibold text-white/70">
+              <div className="flex items-center justify-center gap-4 text-xs font-medium sm:font-semibold text-white/70">
                 <span>
-                  Variant: <strong className="text-[#ffe6a0]">{variantLabel}</strong>
+                  Variant: <strong className="font-semibold sm:font-bold text-[#ffe6a0]">{variantLabel}</strong>
                 </span>
                 <span>•</span>
                 <span>
-                  Boot: <strong className="text-[#ffe46d]">₹{tableBootAmount.toLocaleString("en-IN")}</strong>
+                  Boot: <strong className="font-semibold sm:font-bold text-[#ffe46d]">₹{tableBootAmount.toLocaleString("en-IN")}</strong>
                 </span>
               </div>
             </div>
@@ -149,15 +149,15 @@ function CustomRoomModalDialog({
             {/* Players in Lobby */}
             <div>
               <div className="mb-2.5 flex items-center justify-between">
-                <span className="text-xs font-black uppercase tracking-wider text-[#ffe7a2]">
+                <span className="text-xs font-semibold sm:font-black uppercase tracking-wider text-[#ffe7a2]">
                   Players in Lobby ({players.length}/6)
                 </span>
                 {players.length < 2 ? (
-                  <span className="text-[11px] font-bold text-[#ffbe76]">
+                  <span className="text-[11px] font-medium sm:font-bold text-[#ffbe76]">
                     Waiting for at least 1 more player...
                   </span>
                 ) : (
-                  <span className="text-[11px] font-bold text-[#96f2a5]">
+                  <span className="text-[11px] font-medium sm:font-bold text-[#96f2a5]">
                     ✓ Ready to start
                   </span>
                 )}
@@ -183,10 +183,10 @@ function CustomRoomModalDialog({
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <strong className="block truncate text-xs font-black text-white">
+                      <strong className="block truncate text-xs font-semibold sm:font-black text-white">
                         {p.name || (p.isHost ? "Host" : "Player")}
                       </strong>
-                      <span className="block truncate text-[10px] font-bold text-[#ffe7a2]/75">
+                      <span className="block truncate text-[10px] font-medium sm:font-bold text-[#ffe7a2]/75">
                         {p.isHost ? "👑 Host" : p.isViewer ? "You" : "Connected"}
                       </span>
                     </div>
@@ -202,7 +202,7 @@ function CustomRoomModalDialog({
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-dashed border-white/20 text-xs">
                       ⌛
                     </div>
-                    <span className="text-[11px] font-medium italic">Waiting for friend...</span>
+                    <span className="text-[11px] font-normal sm:font-medium italic">Waiting for friend...</span>
                   </div>
                 ))}
               </div>
@@ -222,7 +222,7 @@ function CustomRoomModalDialog({
                   onClick={onStartGame}
                   disabled={busy || !canStartGame}
                   className={[
-                    "min-h-[54px] w-full rounded-2xl border-2 text-base font-black shadow-lg transition",
+                    "min-h-[54px] w-full rounded-2xl border-2 text-base font-semibold sm:font-black shadow-lg transition",
                     canStartGame
                       ? "border-[#65f27c] bg-gradient-to-b from-[#33d552] to-[#168122] text-white hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
                       : "border-white/10 bg-white/10 text-white/40 cursor-not-allowed",
@@ -231,7 +231,7 @@ function CustomRoomModalDialog({
                   {busy ? "Starting Round..." : canStartGame ? "Start Game" : "Waiting for Players (Min 2)"}
                 </button>
               ) : (
-                <div className="rounded-xl border border-[#ffe46d]/20 bg-black/35 p-3 text-center text-xs font-semibold text-white/80">
+                <div className="rounded-xl border border-[#ffe46d]/20 bg-black/35 p-3 text-center text-xs font-medium sm:font-semibold text-white/80">
                   Waiting for the host to start the game...
                 </div>
               )}
@@ -240,7 +240,7 @@ function CustomRoomModalDialog({
                 type="button"
                 onClick={typeof onLeaveRoom === "function" ? onLeaveRoom : onClose}
                 disabled={busy}
-                className="min-h-[42px] w-full rounded-xl border border-white/15 bg-white/5 text-xs font-bold text-white/70 hover:bg-white/10 transition"
+                className="min-h-[42px] w-full rounded-xl border border-white/15 bg-white/5 text-xs font-medium sm:font-bold text-white/70 hover:bg-white/10 transition"
               >
                 Leave Lobby
               </button>
@@ -308,10 +308,10 @@ function CustomRoomModalDialog({
                               : "border-white/10 bg-black/25 text-white/70 hover:border-white/30",
                           ].join(" ")}
                         >
-                          <strong className="text-xs font-black uppercase tracking-wider text-[#ffe7a2]">
+                          <strong className="text-xs font-semibold sm:font-black uppercase tracking-wider text-[#ffe7a2]">
                             {opt.label}
                           </strong>
-                          <span className="mt-0.5 line-clamp-1 text-[11px] text-white/60">
+                          <span className="mt-0.5 line-clamp-1 text-[11px] font-normal text-white/60">
                             {opt.summary}
                           </span>
                         </button>
@@ -321,14 +321,14 @@ function CustomRoomModalDialog({
                 </div>
 
                 <div className="flex items-center justify-between rounded-[14px] border border-white/10 bg-black/25 px-4 py-3 text-xs text-white/80">
-                  <span className="font-semibold text-white/70">Table Boot Amount</span>
-                  <strong className="font-mono text-sm font-black text-[#ffe46d]">
+                  <span className="font-medium sm:font-semibold text-white/70">Table Boot Amount</span>
+                  <strong className="font-mono text-sm font-semibold sm:font-black text-[#ffe46d]">
                     ₹{typeof globalBootAmount === "number" ? globalBootAmount.toLocaleString("en-IN") : "100"}
                   </strong>
                 </div>
 
                 <div className="rounded-[14px] border border-white/10 bg-black/25 p-3 text-xs text-white/70">
-                  <strong className="block text-[#ffe7a2]">Private & Protected</strong>
+                  <strong className="block font-semibold sm:font-bold text-[#ffe7a2]">Private & Protected</strong>
                   Only friends who enter your room code can join. Throughout all rounds, no bots are ever added.
                 </div>
 
@@ -359,7 +359,7 @@ function CustomRoomModalDialog({
                       )
                     }
                     placeholder="e.g. ABCDEF"
-                    className="font-mono text-center text-2xl font-black tracking-[0.3em] uppercase"
+                    className="font-mono text-center text-2xl font-semibold sm:font-black tracking-[0.3em] uppercase"
                     disabled={busy}
                     autoFocus
                     required
@@ -367,7 +367,7 @@ function CustomRoomModalDialog({
                 </label>
 
                 <div className="rounded-[14px] border border-white/10 bg-black/25 p-3 text-xs text-white/70">
-                  <strong className="block text-[#ffe7a2]">Invite-Only Table</strong>
+                  <strong className="block font-semibold sm:font-bold text-[#ffe7a2]">Invite-Only Table</strong>
                   Only players who enter this exact room code can join. Bots and random users cannot enter this room.
                 </div>
 

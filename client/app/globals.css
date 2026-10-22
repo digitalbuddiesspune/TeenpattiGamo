@@ -191,10 +191,11 @@ body.app-body-portrait-blocked {
 }
 
 .lobby-topbar__center {
-  display: grid;
+  display: flex;
   flex: none;
-  align-content: center;
-  justify-items: end;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
   min-width: 0;
   padding-inline: 4px;
 }
@@ -2166,6 +2167,10 @@ body.app-body-portrait-blocked {
 }
 
 @media (max-width: 820px) {
+  .lobby-menu__item strong {
+    font-weight: 500;
+  }
+
   .private-room-modal-backdrop {
     align-items: flex-end;
     padding: 12px;
@@ -2177,12 +2182,29 @@ body.app-body-portrait-blocked {
     max-height: calc(100dvh - 24px);
   }
 
+  .private-room-kicker {
+    font-weight: 600;
+  }
+
   .private-room-modal-copy h2 {
-    font-size: 30px;
+    font-size: 26px;
+    font-weight: 600;
   }
 
   .private-room-toggle {
     grid-template-columns: 1fr;
+  }
+
+  .private-room-toggle button {
+    font-weight: 500;
+  }
+
+  .private-room-field span {
+    font-weight: 600;
+  }
+
+  .private-room-submit {
+    font-weight: 600;
   }
 }
 
@@ -2267,10 +2289,27 @@ body.app-body-portrait-blocked {
 
   .private-room-panel-copy strong {
     font-size: 20px;
+    font-weight: 600;
   }
 
   .private-room-panel-copy span {
     font-size: 13px;
+    font-weight: 500;
+  }
+
+  .private-room-pill,
+  .private-room-meta-chip,
+  .private-room-copy,
+  .private-room-host-action {
+    font-weight: 600;
+  }
+
+  .private-room-status-bar strong {
+    font-weight: 600;
+  }
+
+  .private-room-status-bar span {
+    font-weight: 500;
   }
 }
 
