@@ -1069,21 +1069,51 @@ export default function GameClient({
   const handleHostStartFirstRound = useCallback(async () => {
     if (!isHost) return;
     setCustomRoomBusy(true);
+    setCustomRoomError("");
     try {
-      await privateStartRound();
+      await refreshPlatformProfileAfterAction(() => privateStartRound());
       setCustomRoomModalOpen(false);
     } catch (err) {
       setCustomRoomError(err?.message || "Failed to start private round.");
     } finally {
       setCustomRoomBusy(false);
     }
-  }, [isHost, privateStartRound]);
+  }, [isHost, privateStartRound, refreshPlatformProfileAfterAction]);
 
   useEffect(() => {
-    if (round?.id && customRoomModalOpen) {
+    if (round?.id && round?.status !== "complete" && customRoomModalOpen) {
       setCustomRoomModalOpen(false);
     }
-  }, [round?.id, customRoomModalOpen]);
+  }, [round?.id, round?.status, customRoomModalOpen]);
+
+  useEffect(() => {
+    if (!isPrivateRoomView || !privateRoomState) {
+      return undefined;
+    }
+
+    if (!round || privateRoomState.status === "lobby") {
+      if (!customRoomModalOpen) {
+        const timer = window.setTimeout(() => {
+          setCustomRoomModalOpen(true);
+        }, 0);
+        return () => window.clearTimeout(timer);
+      }
+      return undefined;
+    }
+
+    if (round.status === "complete") {
+      if (customRoomModalOpen) {
+        return undefined;
+      }
+      const timer = window.setTimeout(() => {
+        setCustomRoomError("");
+        setCustomRoomModalOpen(true);
+      }, 3200);
+      return () => window.clearTimeout(timer);
+    }
+
+    return undefined;
+  }, [customRoomModalOpen, isPrivateRoomView, privateRoomState, round]);
 
   const handleExitMatchmaking = useCallback(async () => {
     try {

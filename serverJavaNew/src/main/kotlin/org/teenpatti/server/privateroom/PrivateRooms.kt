@@ -272,29 +272,15 @@ internal class PrivateRoom(
 
     @Synchronized
     fun nextRound(requestingPlayerId: String): Map<String, Any?> {
-        if (state.status != "between_rounds") {
+        if (state.status != "between_rounds" && state.status != "lobby") {
             throw AppException.badRequest("private_room_not_between_rounds", "The room is not waiting for the next round.")
         }
         if (requestingPlayerId != state.hostPlayerId) {
             throw AppException.badRequest("private_room_host_required", "Only the host can start the next round.")
         }
-        if (state.acceptedNextRoundPlayerIds.none { it == requestingPlayerId }) {
-            state.acceptedNextRoundPlayerIds.add(requestingPlayerId)
-        }
         if (state.round?.dealerTipState?.pending == true) {
-            val winner = getPlayerById(state.round!!.dealerTipState!!.winnerId)
-            if (winner == null || !winner.connected) {
-                runtime.performAction(state.round!!.dealerTipState!!.winnerId, "dealer_tip", mapOf("amount" to 0))
-                syncRuntimeToRoom()
-            }
-            if (state.round?.dealerTipState?.pending == true) {
-                throw AppException.badRequest("private_room_dealer_tip_pending", "Resolve the dealer tip before starting the next round.")
-            }
-        }
-        val connectedPlayerIds = connectedActivePlayers().map { it.id }
-        val acceptedPlayerIds = state.acceptedNextRoundPlayerIds.filter { connectedPlayerIds.contains(it) }
-        if (!acceptedPlayerIds.containsAll(connectedPlayerIds)) {
-            throw AppException.badRequest("private_room_acceptance_pending", "All connected players must accept before the host can start the next round.")
+            runtime.performAction(state.round!!.dealerTipState!!.winnerId, "dealer_tip", mapOf("amount" to 0))
+            syncRuntimeToRoom()
         }
         promoteWaitingPlayers()
         if (buildParticipants().size < 2) {
@@ -318,7 +304,7 @@ internal class PrivateRoom(
     @Synchronized
     fun updateConfig(requestingPlayerId: String, variantId: String?, bootAmount: Int?): Map<String, Any?> {
         requireHost(requestingPlayerId)
-        if (state.status != "lobby") {
+        if (state.status != "lobby" && state.status != "between_rounds") {
             throw AppException.badRequest("private_room_config_locked", "Private room settings can only be updated in the lobby.")
         }
         val nextConfig = createRoomConfig(state.roomCode, variantId, bootAmount)
@@ -600,6 +586,7 @@ internal class PrivateRoom(
             state.acceptedNextRoundPlayerIds = mutableListOf()
         }
         state.status = "between_rounds"
+        promoteWaitingPlayers()
     }
 
     @Synchronized

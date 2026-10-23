@@ -278,6 +278,7 @@ export default function CasinoTable({
     isComplete &&
     revealedCompleteRoundId !== round?.id;
   const showRoundCompleteOverlay =
+    !isPrivateMode &&
     isComplete &&
     (result || isQueuedSpectator) &&
     !isHoldingRoundCompleteOverlay &&

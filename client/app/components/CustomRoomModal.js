@@ -27,7 +27,21 @@ function CustomRoomModalDialog({
 
   const activeError = error || localError;
   const activeRoomCode = (roomCode || roomState?.roomCode || "").toUpperCase();
-  const isInLobby = Boolean(activeRoomCode && roomState && (!roomState.round || roomState.status === "lobby"));
+  const isInLobby = Boolean(
+    activeRoomCode &&
+    roomState &&
+    (!roomState.round ||
+      roomState.status === "lobby" ||
+      roomState.status === "between_rounds" ||
+      roomState.round?.status === "complete")
+  );
+  const lastRoundResult = roomState?.round?.status === "complete" ? roomState.round.result : null;
+  const lastRoundWinAmount =
+    typeof roomState?.round?.potAmount === "number" && roomState.round.potAmount > 0
+      ? roomState.round.potAmount
+      : typeof lastRoundResult?.payout === "number"
+        ? lastRoundResult.payout
+        : 0;
 
   const players = roomState?.players || [];
   const variantObj = typeof roomState?.config?.variant === "object"
@@ -117,6 +131,14 @@ function CustomRoomModalDialog({
                 Share this room code with friends. The game will start when the host clicks Start Game.
               </span>
             </div>
+
+            {lastRoundResult ? (
+              <div className="rounded-xl border border-[#65f27c]/35 bg-[#33d552]/12 px-3.5 py-2.5 text-center text-xs font-medium sm:font-bold text-[#c7ffd0]">
+                🏆 Last Round: <strong className="font-semibold sm:font-black text-white">{lastRoundResult.winnerName || "Winner"}</strong> won
+                {lastRoundWinAmount > 0 ? ` ₹${lastRoundWinAmount.toLocaleString("en-IN")}` : ""}
+                {lastRoundResult.winningHand ? ` with ${lastRoundResult.winningHand}` : ""}.
+              </div>
+            ) : null}
 
             {/* Room Code Card */}
             <div className="rounded-2xl border-2 border-[#efc24e]/70 bg-gradient-to-b from-[#3a080e] to-[#1e0407] p-4 text-center shadow-[0_12px_28px_rgba(0,0,0,0.38)]">
