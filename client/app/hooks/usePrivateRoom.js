@@ -632,26 +632,29 @@ export function usePrivateRoom(initialRoomCode = "", enabled = true) {
   }, [applyRoomState, emitWithAck]);
 
   const leaveRoom = useCallback(async () => {
+    const session = sessionRef.current;
+    if (session?.roomCode) {
+      try {
+        if (socketRef.current?.readyState === WebSocket.OPEN && socketReadyRef.current) {
+          try {
+            await emitWithAck("private_room:leave", {});
+          } catch {
+            await apiLeavePrivateRoom(session.roomCode, session.playerId, session.playerToken);
+          }
+        } else {
+          await apiLeavePrivateRoom(session.roomCode, session.playerId, session.playerToken);
+        }
+      } catch (err) {
+        setError(err?.message || "Unable to leave the room. Please try again.");
+        throw err;
+      }
+      clearStoredPrivateSession(session.roomCode);
+    }
+
     manualCloseRef.current = true;
     clearReconnectTimer();
     clearHeartbeat();
-
-    const session = sessionRef.current;
-    if (session?.roomCode) {
-      clearStoredPrivateSession(session.roomCode);
-      if (socketRef.current && socketReadyRef.current) {
-        try {
-          await emitWithAck("private_room:leave", {});
-        } catch {
-          if (session.playerId && session.playerToken) {
-            try {
-              await apiLeavePrivateRoom(session.roomCode, session.playerId, session.playerToken);
-            } catch {}
-          }
-        }
-      }
-    }
-
+    rejectPendingRequests("Private room connection closed.");
     if (socketRef.current && socketRef.current.readyState < WebSocket.CLOSING) {
       socketRef.current.close();
     }
@@ -660,7 +663,7 @@ export function usePrivateRoom(initialRoomCode = "", enabled = true) {
     sessionRef.current = null;
     setRoomState(null);
     setCurrentRoomCode("");
-  }, [clearHeartbeat, clearReconnectTimer, emitWithAck]);
+  }, [clearHeartbeat, clearReconnectTimer, emitWithAck, rejectPendingRequests]);
 
   return {
     roomCode: currentRoomCode,

@@ -317,27 +317,47 @@ function LobbyRulesModal({ open, onClose }) {
   );
 }
 
-function LeaveTableConfirmModal({ open, onCancel, onConfirm, confirming }) {
+function LeaveTableConfirmModal({ open, onCancel, onConfirm, confirming, error }) {
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!open || !dialog) return;
+    const previousFocus = document.activeElement;
+    dialog.showModal();
+    return () => {
+      dialog.close();
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [open]);
+
   if (!open) {
     return null;
   }
 
   return (
-    <div className="leave-confirm" role="dialog" aria-modal="true" aria-label="Leave table">
-      <button
-        type="button"
-        className="leave-confirm__backdrop"
-        onClick={onCancel}
-        aria-label="Stay at table"
-        disabled={confirming}
-      />
+    <dialog
+      ref={dialogRef}
+      className="leave-confirm"
+      aria-labelledby="leave-confirm-title"
+      aria-describedby="leave-confirm-copy"
+      aria-busy={confirming}
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!confirming) onCancel();
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget && !confirming) onCancel();
+      }}
+    >
       <div className="leave-confirm__panel">
         <header className="leave-confirm__header">
-          <h2>Leave Table?</h2>
+          <h2 id="leave-confirm-title">Leave Table?</h2>
         </header>
-        <p className="leave-confirm__copy">
+        <p id="leave-confirm-copy" className="leave-confirm__copy">
           Going back will leave this table and forfeit the current round. Are you sure you want to exit?
         </p>
+        {error ? <p className="leave-confirm__error" role="alert">{error}</p> : null}
         <div className="leave-confirm__actions">
           <button
             type="button"
@@ -357,7 +377,7 @@ function LeaveTableConfirmModal({ open, onCancel, onConfirm, confirming }) {
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 
@@ -602,6 +622,8 @@ export default function GameClient({
   const [lobbyRulesOpen, setLobbyRulesOpen] = useState(false);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [leaveConfirming, setLeaveConfirming] = useState(false);
+  const [leaveError, setLeaveError] = useState("");
+  const leaveInFlightRef = useRef(false);
   const lobbyMenuAnchorRef = useRef(null);
   const allowHistoryExitRef = useRef(false);
   const [platformProfile, setPlatformProfile] = useState(() => {
@@ -1135,58 +1157,61 @@ export default function GameClient({
   }, [currentPrivateRoomCode, isPrivateRoomView, leavePrivateRoomAction, leavePublicTable, router, variant]);
 
   const handleExitTable = useCallback(async () => {
-    allowHistoryExitRef.current = true;
-    setLeaveConfirmOpen(false);
+    if (leaveInFlightRef.current) return false;
+    leaveInFlightRef.current = true;
+    setLeaveConfirming(true);
+    setLeaveError("");
     try {
       if (isPrivateRoomView) {
         await leavePrivateRoomAction();
       } else {
         await leavePublicTable();
       }
-    } catch {}
-    if (isPrivateRoomView) {
-      if (currentPrivateRoomCode) {
-        clearStoredPrivateSession(currentPrivateRoomCode);
+      allowHistoryExitRef.current = true;
+      if (isPrivateRoomView) {
+        if (currentPrivateRoomCode) {
+          clearStoredPrivateSession(currentPrivateRoomCode);
+        }
+        setActivePrivateRoomCode("");
       }
-      setActivePrivateRoomCode("");
+      setLeaveConfirmOpen(false);
+      setCustomRoomModalOpen(false);
+      // Lobby and table share /public. Update its query through Next's History
+      // API integration, including when the room was opened by a direct link.
+      window.history.replaceState(null, "", withLaunchQuery("/public"));
+      return true;
+    } catch (error) {
+      allowHistoryExitRef.current = false;
+      setLeaveError(error?.message || "Unable to leave the table. Please try again.");
+      setLeaveConfirmOpen(true);
+      return false;
+    } finally {
+      leaveInFlightRef.current = false;
+      setLeaveConfirming(false);
     }
-    router.replace(withLaunchQuery("/public"));
-  }, [currentPrivateRoomCode, isPrivateRoomView, leavePrivateRoomAction, leavePublicTable, router]);
+  }, [currentPrivateRoomCode, isPrivateRoomView, leavePrivateRoomAction, leavePublicTable]);
 
   const handleLeaveCustomRoomLobby = useCallback(async () => {
     setCustomRoomBusy(true);
     try {
       await handleExitTable();
-      setCustomRoomModalOpen(false);
     } finally {
       setCustomRoomBusy(false);
     }
   }, [handleExitTable]);
 
   const requestLeaveTable = useCallback(() => {
+    if (leaveInFlightRef.current) return;
+    setLeaveError("");
     setLeaveConfirmOpen(true);
   }, []);
 
   const cancelLeaveTable = useCallback(() => {
-    if (leaveConfirming) {
+    if (leaveInFlightRef.current) {
       return;
     }
     setLeaveConfirmOpen(false);
-  }, [leaveConfirming]);
-
-  const confirmLeaveTable = useCallback(async () => {
-    if (leaveConfirming) {
-      return;
-    }
-    setLeaveConfirming(true);
-    try {
-      await handleExitTable();
-    } catch {
-      allowHistoryExitRef.current = false;
-      setLeaveConfirming(false);
-      setLeaveConfirmOpen(false);
-    }
-  }, [handleExitTable, leaveConfirming]);
+  }, []);
 
   useEffect(() => {
     if (screen !== "table" || typeof window === "undefined") {
@@ -1194,25 +1219,31 @@ export default function GameClient({
     }
 
     allowHistoryExitRef.current = false;
-    const guardState = { __teenPattiLeaveGuard: true };
+    const tableUrl = window.location.href;
+    // Let Next's History API wrapper attach its own router state. Copying its
+    // internal markers here bypasses URL synchronization on direct room links.
+    const guardState = { __teenPattiLeaveGuard: tableUrl };
 
-    if (window.history.state?.__teenPattiLeaveGuard !== true) {
-      window.history.pushState(guardState, "", window.location.href);
+    if (window.history.state?.__teenPattiLeaveGuard !== tableUrl) {
+      window.history.pushState(guardState, "", tableUrl);
     }
 
-    const onPopState = () => {
+    const onPopState = (event) => {
       if (allowHistoryExitRef.current) {
         return;
       }
-      window.history.pushState(guardState, "", window.location.href);
-      setLeaveConfirmOpen(true);
+      // Keep Next's popstate listener from restoring a route while confirmation
+      // is pending. Its deferred restore can otherwise undo a confirmed exit.
+      event.stopImmediatePropagation();
+      window.history.pushState(guardState, "", tableUrl);
+      requestLeaveTable();
     };
 
-    window.addEventListener("popstate", onPopState);
+    window.addEventListener("popstate", onPopState, true);
     return () => {
-      window.removeEventListener("popstate", onPopState);
+      window.removeEventListener("popstate", onPopState, true);
     };
-  }, [screen]);
+  }, [screen, view, variant, initialRoomCode, requestLeaveTable]);
 
   const handleStartNextRound = useCallback(async () => {
     if (isPrivateRoomView) {
@@ -1601,9 +1632,10 @@ export default function GameClient({
         open={leaveConfirmOpen}
         onCancel={cancelLeaveTable}
         onConfirm={() => {
-          void confirmLeaveTable();
+          void handleExitTable();
         }}
         confirming={leaveConfirming}
+        error={leaveError}
       />
       <CustomRoomModal
         open={customRoomModalOpen}

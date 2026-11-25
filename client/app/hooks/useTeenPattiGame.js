@@ -722,36 +722,36 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
   }
 
   async function leaveTable() {
-    if (!sessionRef.current) {
+    const session = sessionRef.current;
+    if (!session) {
       return;
     }
-
-    manualCloseRef.current = true;
-    clearReconnectTimer();
 
     const canLeaveOverSocket =
       socketRef.current?.readyState === WebSocket.OPEN && socketReadyRef.current;
 
     try {
       if (canLeaveOverSocket) {
-        await emitWithAck("public_table:leave");
+        try {
+          await emitWithAck("public_table:leave");
+        } catch {
+          await apiLeavePublicTable(session.playerId, session.playerToken, variant);
+        }
       } else {
         await apiLeavePublicTable(
-          sessionRef.current.playerId,
-          sessionRef.current.playerToken,
+          session.playerId,
+          session.playerToken,
           variant
         );
       }
-    } catch {
-      try {
-        await apiLeavePublicTable(
-          sessionRef.current.playerId,
-          sessionRef.current.playerToken,
-          variant
-        );
-      } catch {}
+    } catch (nextError) {
+      setError(nextError?.message || "Unable to leave the table. Please try again.");
+      throw nextError;
     }
 
+    manualCloseRef.current = true;
+    clearReconnectTimer();
+    clearHeartbeat();
     socketReadyRef.current = false;
 
     writeStoredSession(variant, null);
