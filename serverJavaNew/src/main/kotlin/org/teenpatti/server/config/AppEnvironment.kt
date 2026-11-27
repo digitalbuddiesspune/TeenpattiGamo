@@ -26,6 +26,13 @@ internal class AppEnvironment {
     var initialBalance: Int = 0
     var turnDurationMs: Int = 0
     var platformEnabled: Boolean = false
+    var operationsBaseUrl: String = ""
+    var operationsWalletBalancePath: String = ""
+    var operationsWalletCreditTransferPath: String = ""
+    var operationsBalanceUrl: String = ""
+    var operationsCreditTransferUrl: String = ""
+    var internalServiceKey: String = ""
+    var operationsDefaultPartnerCode: String = ""
     var appOperatorBaseUrl: String = ""
     var appOperatorUserDetailPath: String = ""
     var appOperatorBalancePath: String = ""

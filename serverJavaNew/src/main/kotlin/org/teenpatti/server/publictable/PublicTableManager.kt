@@ -231,8 +231,39 @@ internal class PublicTableManager(
             throw IllegalStateException("Player is not seated at this table.")
         }
         markConnected(session)
-        debitActionIfNeeded(table, session, actionType, payload)
-        table.service.performAction(sessionId, actionType, payload)
+        val debitedAction = debitActionIfNeeded(table, session, actionType, payload)
+        try {
+            table.service.performAction(sessionId, actionType, payload)
+        } catch (error: Exception) {
+            if (debitedAction != null) {
+                try {
+                    platformWalletService?.refund(
+                        platformRef(session),
+                        debitedAction.roundId,
+                        "${debitedAction.operationKey}:refund",
+                        debitedAction.amount,
+                        TeenPattiWalletStatement.description(
+                            debitedAction.amount,
+                            "credited",
+                            "$actionType refund",
+                            debitedAction.roundId,
+                            table.tableId,
+                        ),
+                        debitedAction.operationKey,
+                    )
+                } catch (refundError: Exception) {
+                    GameEventLog.error(
+                        "wallet_action_refund_failed",
+                        refundError,
+                        "playerId" to session.id,
+                        "roundId" to debitedAction.roundId,
+                        "lobbyId" to table.tableId,
+                        "amount" to debitedAction.amount,
+                    )
+                }
+            }
+            throw error
+        }
         creditWinnerIfNeeded(table)
         return serializeForPlayer(sessionId, playerToken)
     }
@@ -272,6 +303,7 @@ internal class PublicTableManager(
                 val activeSeat = round.seats[round.activePlayerIndex]
                 if (activeSeat.id == sessionId && round.status == "active" && !activeSeat.packed) {
                     table.service.performAction(sessionId, "pack", emptyMap())
+                    creditWinnerIfNeeded(table)
                 } else {
                     table.service.persistSnapshot()
                 }
@@ -754,37 +786,42 @@ internal class PublicTableManager(
         }
         val participants = buildParticipants(table, nextSeatedPlayerIds)
         val roundId = idGenerator.newId()
-        debitBootsIfNeeded(table, participants, roundId)
-        retained.forEach { activatePublicSession(it, table.tableId) }
-        promoted.forEach { activatePublicSession(it, table.tableId) }
-        matchmakingPromoted.forEach { activatePublicSession(it.id, table.tableId) }
-        remainingWaiting.forEach { playerId ->
-            val session = loadSession(playerId)
-            if (session != null) {
-                session.status = "waiting_for_next_round"
-                session.nextRoundReady = false
-                session.tableId = table.tableId
-                saveSession(session)
+        val debitedSessions = debitBootsIfNeeded(table, participants, roundId)
+        try {
+            retained.forEach { activatePublicSession(it, table.tableId) }
+            promoted.forEach { activatePublicSession(it, table.tableId) }
+            matchmakingPromoted.forEach { activatePublicSession(it.id, table.tableId) }
+            remainingWaiting.forEach { playerId ->
+                val session = loadSession(playerId)
+                if (session != null) {
+                    session.status = "waiting_for_next_round"
+                    session.nextRoundReady = false
+                    session.tableId = table.tableId
+                    saveSession(session)
+                }
             }
-        }
-        seating.seatedPlayerIds = mutableListOf<String>().apply {
-            addAll(nextSeatedPlayerIds)
-        }
-        seating.waitingPlayerIds = remainingWaiting
-        val allPromotedCount = promoted.size + matchmakingPromoted.size
-        seating.lastPromotionMessage =
-            if (allPromotedCount == 0) {
-                null
-            } else if (allPromotedCount == 1) {
-                val newPlayerId = (promoted + matchmakingPromoted.map { it.id }).first()
-                "${loadSession(newPlayerId)!!.displayName} joins this round."
-            } else {
-                "$allPromotedCount new players joined this round."
+            seating.seatedPlayerIds = mutableListOf<String>().apply {
+                addAll(nextSeatedPlayerIds)
             }
-        seating.joinWaitStartedAt = null
-        seating.joinWaitEndsAt = null
-        table.service.state.expiresAt = null
-        table.service.startRound(participants, roundId)
+            seating.waitingPlayerIds = remainingWaiting
+            val allPromotedCount = promoted.size + matchmakingPromoted.size
+            seating.lastPromotionMessage =
+                if (allPromotedCount == 0) {
+                    null
+                } else if (allPromotedCount == 1) {
+                    val newPlayerId = (promoted + matchmakingPromoted.map { it.id }).first()
+                    "${loadSession(newPlayerId)!!.displayName} joins this round."
+                } else {
+                    "$allPromotedCount new players joined this round."
+                }
+            seating.joinWaitStartedAt = null
+            seating.joinWaitEndsAt = null
+            table.service.state.expiresAt = null
+            table.service.startRound(participants, roundId)
+        } catch (error: Exception) {
+            refundDebitedBoots(table, debitedSessions, roundId)
+            throw error
+        }
     }
 
     private fun shouldRetainForNextRound(round: RoundState?, session: PublicPlayerSessionState?): Boolean {
@@ -839,7 +876,17 @@ internal class PublicTableManager(
             }
     }
 
-    private fun debitBootsIfNeeded(table: ManagedPublicTable, participants: List<RoundParticipant>, roundId: String) {
+    private data class DebitedActionRef(
+        val roundId: String,
+        val operationKey: String,
+        val amount: Int,
+    )
+
+    private fun debitBootsIfNeeded(
+        table: ManagedPublicTable,
+        participants: List<RoundParticipant>,
+        roundId: String,
+    ): List<PublicPlayerSessionState> {
         val debited = mutableListOf<PublicPlayerSessionState>()
         try {
             for (participant in participants) {
@@ -857,27 +904,37 @@ internal class PublicTableManager(
                 debited.add(session)
             }
         } catch (error: Exception) {
-            debited.forEach { session ->
-                try {
-                    platformWalletService?.credit(
-                        platformRef(session),
-                        roundId,
-                        "tp:$roundId:${session.id}:boot-refund",
-                        config.bootAmount,
-                        TeenPattiWalletStatement.description(config.bootAmount, "credited", "boot refund", roundId, table.tableId),
-                    )
-                } catch (refundError: Exception) {
-                    GameEventLog.error(
-                        "wallet_boot_refund_failed",
-                        refundError,
-                        "playerId" to session.id,
-                        "roundId" to roundId,
-                        "lobbyId" to table.tableId,
-                        "amount" to config.bootAmount,
-                    )
-                }
-            }
+            refundDebitedBoots(table, debited, roundId)
             throw error
+        }
+        return debited
+    }
+
+    private fun refundDebitedBoots(
+        table: ManagedPublicTable,
+        debited: List<PublicPlayerSessionState>,
+        roundId: String,
+    ) {
+        debited.forEach { session ->
+            try {
+                platformWalletService?.refund(
+                    platformRef(session),
+                    roundId,
+                    "tp:$roundId:${session.id}:boot-refund",
+                    config.bootAmount,
+                    TeenPattiWalletStatement.description(config.bootAmount, "credited", "boot refund", roundId, table.tableId),
+                    "tp:$roundId:${session.id}:boot",
+                )
+            } catch (refundError: Exception) {
+                GameEventLog.error(
+                    "wallet_boot_refund_failed",
+                    refundError,
+                    "playerId" to session.id,
+                    "roundId" to roundId,
+                    "lobbyId" to table.tableId,
+                    "amount" to config.bootAmount,
+                )
+            }
         }
     }
 
@@ -901,10 +958,10 @@ internal class PublicTableManager(
         session: PublicPlayerSessionState,
         actionType: String,
         payload: Map<String, Any?> = emptyMap(),
-    ) {
+    ): DebitedActionRef? {
         val amount = table.service.quoteDebitForAction(session.id, actionType, payload)
         if (amount <= 0) {
-            return
+            return null
         }
         val roundId = table.service.currentRoundId() ?: throw IllegalStateException("No active round is available.")
         val actionIndex = table.service.currentActionLogSize()
@@ -921,6 +978,7 @@ internal class PublicTableManager(
             amount,
             TeenPattiWalletStatement.description(amount, "debited", actionType, roundId, table.tableId),
         )
+        return DebitedActionRef(roundId, operationKey, amount)
     }
 
     private fun creditWinnerIfNeeded(table: ManagedPublicTable) {

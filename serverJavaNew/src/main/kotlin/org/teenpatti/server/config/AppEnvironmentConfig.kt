@@ -36,6 +36,25 @@ internal class AppEnvironmentConfig {
         env.initialBalance = number(environment, "INITIAL_BALANCE", 30000000)
         env.turnDurationMs = number(environment, "TURN_DURATION_MS", 15000)
         env.platformEnabled = boolean(environment, "PLATFORM_ENABLED", false)
+        env.operationsBaseUrl = text(environment, "OPERATIONS_BASE_URL", "https://operations.dpbossking.com")
+        env.operationsWalletBalancePath = text(environment, "OPERATIONS_WALLET_BALANCE_PATH", "/api/v1/wallet/balance")
+        env.operationsWalletCreditTransferPath =
+            text(environment, "OPERATIONS_WALLET_CREDIT_TRANSFER_PATH", "/api/v1/wallet/credit-transfer")
+        env.operationsBalanceUrl =
+            text(
+                environment,
+                "OPERATIONS_WALLET_BALANCE_URL",
+                joinUrl(env.operationsBaseUrl, env.operationsWalletBalancePath),
+            )
+        env.operationsCreditTransferUrl =
+            text(
+                environment,
+                "OPERATIONS_WALLET_CREDIT_TRANSFER_URL",
+                joinUrl(env.operationsBaseUrl, env.operationsWalletCreditTransferPath),
+            )
+        env.internalServiceKey =
+            text(environment, "INTERNAL_SERVICE_KEY", text(environment, "OPERATIONS_INTERNAL_KEY", ""))
+        env.operationsDefaultPartnerCode = text(environment, "OPERATIONS_DEFAULT_PARTNER_CODE", "").trim().uppercase()
         env.appOperatorBaseUrl = text(environment, "APP_OPERATOR_BASE_URL", "")
         env.appOperatorUserDetailPath = text(environment, "APP_OPERATOR_USER_DETAIL_PATH", "")
         env.appOperatorBalancePath = text(environment, "APP_OPERATOR_BALANCE_PATH", "")
@@ -75,26 +94,15 @@ internal class AppEnvironmentConfig {
         if (!env.platformEnabled) {
             return
         }
-        check(env.appOperatorBaseUrl.isNotBlank()) { "APP_OPERATOR_BASE_URL is required when PLATFORM_ENABLED=true." }
-        check(env.appOperatorUserDetailPath.isNotBlank()) {
-            "APP_OPERATOR_USER_DETAIL_PATH is required when PLATFORM_ENABLED=true."
+        check(env.operationsBalanceUrl.isNotBlank()) {
+            "OPERATIONS_BASE_URL or OPERATIONS_WALLET_BALANCE_URL is required when PLATFORM_ENABLED=true."
         }
-        check(env.appOperatorBalancePath.isNotBlank()) {
-            "APP_OPERATOR_BALANCE_PATH is required when PLATFORM_ENABLED=true."
+        check(env.operationsCreditTransferUrl.isNotBlank()) {
+            "OPERATIONS_BASE_URL or OPERATIONS_WALLET_CREDIT_TRANSFER_URL is required when PLATFORM_ENABLED=true."
         }
-        check(env.appOperatorCreditPath.isNotBlank()) {
-            "APP_OPERATOR_CREDIT_PATH is required when PLATFORM_ENABLED=true."
+        check(env.internalServiceKey.isNotBlank()) {
+            "INTERNAL_SERVICE_KEY is required when PLATFORM_ENABLED=true."
         }
-        check(env.appOperatorLoginPath.isNotBlank()) {
-            "APP_OPERATOR_LOGIN_PATH is required when PLATFORM_ENABLED=true."
-        }
-        check(env.platformAmqpUrl.isNotBlank()) { "PLATFORM_AMQP_URL is required when PLATFORM_ENABLED=true." }
-        check(env.platformAmqpExchange.isNotBlank()) { "PLATFORM_AMQP_EXCHANGE is required when PLATFORM_ENABLED=true." }
-        check(env.platformAmqpRoutingKey.isNotBlank()) {
-            "PLATFORM_AMQP_ROUTING_KEY or PLATFORM_AMQP_QUEUE_NAME is required when PLATFORM_ENABLED=true."
-        }
-        check(env.platformGameId > 0) { "PLATFORM_GAME_ID is required when PLATFORM_ENABLED=true." }
-        check(env.platformGameName.isNotBlank()) { "PLATFORM_GAME_NAME is required when PLATFORM_ENABLED=true." }
     }
 
     private fun joinUrl(baseUrl: String, path: String): String {

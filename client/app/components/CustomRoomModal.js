@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { VARIANT_OPTIONS } from "../lib/variants";
+import { formatCurrencyAmount } from "../lib/platformLaunch";
 
 function CustomRoomModalDialog({
   onClose,
@@ -14,6 +15,8 @@ function CustomRoomModalDialog({
   roomCode = "",
   isHost = false,
   globalBootAmount = null,
+  currency = "INR",
+  lang = "en",
   initialRoomCode = "",
   initialMode = "create",
   busy = false,
@@ -135,7 +138,7 @@ function CustomRoomModalDialog({
             {lastRoundResult ? (
               <div className="rounded-xl border border-[#65f27c]/35 bg-[#33d552]/12 px-3.5 py-2.5 text-center text-xs font-medium sm:font-bold text-[#c7ffd0]">
                 🏆 Last Round: <strong className="font-semibold sm:font-black text-white">{lastRoundResult.winnerName || "Winner"}</strong> won
-                {lastRoundWinAmount > 0 ? ` ₹${lastRoundWinAmount.toLocaleString("en-IN")}` : ""}
+                {lastRoundWinAmount > 0 ? ` ${formatCurrencyAmount(lastRoundWinAmount, currency, lang)}` : ""}
                 {lastRoundResult.winningHand ? ` with ${lastRoundResult.winningHand}` : ""}.
               </div>
             ) : null}
@@ -163,7 +166,7 @@ function CustomRoomModalDialog({
                 </span>
                 <span>•</span>
                 <span>
-                  Boot: <strong className="font-semibold sm:font-bold text-[#ffe46d]">₹{tableBootAmount.toLocaleString("en-IN")}</strong>
+                  Boot: <strong className="font-semibold sm:font-bold text-[#ffe46d]">{formatCurrencyAmount(tableBootAmount, currency, lang)}</strong>
                 </span>
               </div>
             </div>
@@ -345,7 +348,7 @@ function CustomRoomModalDialog({
                 <div className="flex items-center justify-between rounded-[14px] border border-white/10 bg-black/25 px-4 py-3 text-xs text-white/80">
                   <span className="font-medium sm:font-semibold text-white/70">Table Boot Amount</span>
                   <strong className="font-mono text-sm font-semibold sm:font-black text-[#ffe46d]">
-                    ₹{typeof globalBootAmount === "number" ? globalBootAmount.toLocaleString("en-IN") : "100"}
+                    {formatCurrencyAmount(typeof globalBootAmount === "number" ? globalBootAmount : 100, currency, lang)}
                   </strong>
                 </div>
 

@@ -3249,8 +3249,11 @@ body.app-body-portrait-blocked {
       calc(-50% + var(--pot-mid-y))
     ) scale(1.02);
   }
+  84% {
+    opacity: 0.72;
+  }
   100% {
-    opacity: 0.2;
+    opacity: 0;
     transform: translate(
       calc(-50% + var(--pot-x)),
       calc(-50% + var(--pot-y))

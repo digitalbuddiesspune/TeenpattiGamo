@@ -1,5 +1,6 @@
 import Image from "./AppImage";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { formatCurrencyAmount, formatLocalizedNumber } from "../lib/platformLaunch";
 import PlayingCard from "./PlayingCard";
 import Seat from "./Seat";
 import TableCelebration from "./TableCelebration";
@@ -162,11 +163,11 @@ function InfoBadge({ label, value, align = "left", tone = "default" }) {
   );
 }
 
-function ChipBalanceDisplay({ chipBalance }) {
+function ChipBalanceDisplay({ chipBalance, currency = "INR", lang = "en" }) {
   return (
-    <div className="relative flex h-[34px] min-w-[100px] items-center pl-[12px] pr-[6px] sm:h-[40px] sm:min-w-[118px] sm:pl-[14px] sm:pr-[8px]">
-      <div className="absolute inset-y-[3px] left-[12px] right-0 rounded-full border border-white/12 bg-[linear-gradient(180deg,rgba(60,60,60,0.96),rgba(38,38,38,0.98))] shadow-[0_10px_18px_rgba(0,0,0,0.26)] sm:inset-y-[4px] sm:left-[14px] sm:shadow-[0_12px_22px_rgba(0,0,0,0.28)]" />
-      <div className="relative z-[1] mr-[-4px] flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full bg-[radial-gradient(circle_at_35%_30%,rgba(255,255,255,0.18),rgba(255,255,255,0.02))] shadow-[0_8px_14px_rgba(0,0,0,0.28)] sm:mr-[-5px] sm:h-[32px] sm:w-[32px]">
+    <div className="relative flex h-[32px] min-w-[78px] items-center pl-[10px] pr-[5px] sm:h-[40px] sm:min-w-[114px] sm:pl-[14px] sm:pr-[8px]">
+      <div className="absolute inset-y-[3px] left-[10px] right-0 rounded-full border border-white/12 bg-[linear-gradient(180deg,rgba(60,60,60,0.96),rgba(38,38,38,0.98))] shadow-[0_10px_18px_rgba(0,0,0,0.26)] sm:inset-y-[4px] sm:left-[14px] sm:shadow-[0_12px_22px_rgba(0,0,0,0.28)]" />
+      <div className="relative z-[1] mr-[-4px] flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-full bg-[radial-gradient(circle_at_35%_30%,rgba(255,255,255,0.18),rgba(255,255,255,0.02))] shadow-[0_8px_14px_rgba(0,0,0,0.28)] sm:mr-[-5px] sm:h-[32px] sm:w-[32px]">
         <Image
           src="/newAssets/chip.png"
           alt=""
@@ -174,12 +175,12 @@ function ChipBalanceDisplay({ chipBalance }) {
           height={29}
           aria-hidden="true"
           className="object-contain"
-          style={{ width: 24, height: "auto" }}
+          style={{ width: 22, height: "auto" }}
         />
       </div>
-      <div className="relative z-[1] ml-1 flex min-w-0 flex-1 items-center justify-end pr-1.5 sm:ml-1.5 sm:pr-2">
-        <strong className="truncate text-[11px] font-black tracking-[0.05em] text-white sm:text-[13px]">
-          {(chipBalance || 0).toLocaleString("en-IN")}
+      <div className="relative z-[1] ml-1 flex min-w-0 flex-1 items-center justify-end pr-1 sm:ml-1.5 sm:pr-2">
+        <strong className="truncate text-[10px] font-black tracking-[0.03em] text-white sm:text-[13px] sm:tracking-[0.05em]">
+          {formatCurrencyAmount(chipBalance || 0, currency, lang)}
         </strong>
       </div>
     </div>
@@ -205,6 +206,8 @@ export default function CasinoTable({
   variantState,
   variant,
   chipBalance = 0,
+  currency = "INR",
+  lang = "en",
   maxPotAmount = 0,
   roomCode = "",
   roomName = "",
@@ -292,7 +295,7 @@ export default function CasinoTable({
   const displayPotWinAmount = roundPotAmount > 0 ? roundPotAmount : finalPayout;
   const roundWinSummary = result
     ? displayPotWinAmount > 0
-      ? `${winnerDisplayName} won ₹${displayPotWinAmount.toLocaleString("en-IN")} with ${result.winningHand}.`
+      ? `${winnerDisplayName} won ${formatCurrencyAmount(displayPotWinAmount, currency, lang)} with ${result.winningHand}.`
       : `${winnerDisplayName} won with ${result.winningHand}.`
     : "";
   const pendingSideShowSeconds = pendingSideShow?.expiresAt
@@ -318,6 +321,8 @@ export default function CasinoTable({
   const showSharedJokersTray = sharedJokers.length > 0 && variant?.publicCardMode !== "third_card_rank_joker" && variant?.publicCardMode !== "flipper_blue_card";
 
   const processedChipKeysRef = useRef(new Set());
+  const chipTransferClearTimerRef = useRef(null);
+  const chipTransferRetryTimerRef = useRef(null);
   const tableSeatsRef = useRef(tableSeats);
   useEffect(() => {
     tableSeatsRef.current = tableSeats;
@@ -330,9 +335,32 @@ export default function CasinoTable({
       window.clearTimeout(bootPotRevealTimerRef.current);
       bootPotRevealTimerRef.current = null;
     }
+    if (chipTransferClearTimerRef.current) {
+      window.clearTimeout(chipTransferClearTimerRef.current);
+      chipTransferClearTimerRef.current = null;
+    }
+    if (chipTransferRetryTimerRef.current) {
+      window.clearTimeout(chipTransferRetryTimerRef.current);
+      chipTransferRetryTimerRef.current = null;
+    }
     setBootPotReadyRoundId("");
     setChipTransferFlights([]);
   }, [round?.id]);
+
+  useEffect(() => () => {
+    if (bootPotRevealTimerRef.current) {
+      window.clearTimeout(bootPotRevealTimerRef.current);
+      bootPotRevealTimerRef.current = null;
+    }
+    if (chipTransferClearTimerRef.current) {
+      window.clearTimeout(chipTransferClearTimerRef.current);
+      chipTransferClearTimerRef.current = null;
+    }
+    if (chipTransferRetryTimerRef.current) {
+      window.clearTimeout(chipTransferRetryTimerRef.current);
+      chipTransferRetryTimerRef.current = null;
+    }
+  }, []);
 
   const clearDealTimers = useCallback(() => {
     dealTimersRef.current.forEach((timerId) => {
@@ -416,6 +444,22 @@ export default function CasinoTable({
     return null;
   }, []);
 
+  const scheduleChipTransferCleanup = useCallback((flights) => {
+    if (chipTransferClearTimerRef.current) {
+      window.clearTimeout(chipTransferClearTimerRef.current);
+      chipTransferClearTimerRef.current = null;
+    }
+    const maxFlightMs = flights.reduce(
+      (max, flight) => Math.max(max, (flight.delayMs || 0) + (flight.durationMs || CHIP_TRANSFER_DURATION_MS)),
+      CHIP_TRANSFER_DURATION_MS,
+    );
+    const flightIds = new Set(flights.map((flight) => flight.id));
+    chipTransferClearTimerRef.current = window.setTimeout(() => {
+      setChipTransferFlights((current) => current.filter((flight) => !flightIds.has(flight.id)));
+      chipTransferClearTimerRef.current = null;
+    }, maxFlightMs + 120);
+  }, []);
+
   const launchChipTransferToPot = useCallback((fromSeatId, amount, dedupeKey) => {
     if (!fromSeatId) {
       return undefined;
@@ -428,22 +472,19 @@ export default function CasinoTable({
       processedChipKeysRef.current.add(dedupeKey);
     }
 
-    let cancelled = false;
-    let retryTimer = null;
-    let clearTimer = null;
+    if (chipTransferRetryTimerRef.current) {
+      window.clearTimeout(chipTransferRetryTimerRef.current);
+      chipTransferRetryTimerRef.current = null;
+    }
 
     const startFlight = (attempt = 0) => {
-      if (cancelled) {
-        return;
-      }
-
       const surface = surfaceRef.current;
       const potNode = potRef.current;
       const fromNode = findSeatAnchorNode(fromSeatId);
 
       if (!surface || !potNode || !fromNode) {
         if (attempt < 30) {
-          retryTimer = window.setTimeout(() => startFlight(attempt + 1), 50);
+          chipTransferRetryTimerRef.current = window.setTimeout(() => startFlight(attempt + 1), 50);
         }
         return;
       }
@@ -460,23 +501,12 @@ export default function CasinoTable({
       );
 
       setChipTransferFlights(flights);
-      clearTimer = window.setTimeout(() => {
-        setChipTransferFlights([]);
-      }, CHIP_TRANSFER_DURATION_MS + CHIP_TRANSFER_COUNT * 100 + 240);
+      scheduleChipTransferCleanup(flights);
     };
 
     startFlight();
-
-    return () => {
-      cancelled = true;
-      if (retryTimer) {
-        window.clearTimeout(retryTimer);
-      }
-      if (clearTimer) {
-        window.clearTimeout(clearTimer);
-      }
-    };
-  }, [findSeatAnchorNode]);
+    return undefined;
+  }, [findSeatAnchorNode, scheduleChipTransferCleanup]);
 
   const launchMultiSeatBootTransfer = useCallback((bootAmount, dedupeKey) => {
     if (!bootAmount) {
@@ -490,22 +520,19 @@ export default function CasinoTable({
       processedChipKeysRef.current.add(dedupeKey);
     }
 
-    let cancelled = false;
-    let retryTimer = null;
-    let clearTimer = null;
+    if (chipTransferRetryTimerRef.current) {
+      window.clearTimeout(chipTransferRetryTimerRef.current);
+      chipTransferRetryTimerRef.current = null;
+    }
 
     const startFlight = (attempt = 0) => {
-      if (cancelled) {
-        return;
-      }
-
       const surface = surfaceRef.current;
       const potNode = potRef.current;
       const seats = tableSeatsRef.current || [];
 
       if (!surface || !potNode || !seats.length) {
         if (attempt < 30) {
-          retryTimer = window.setTimeout(() => startFlight(attempt + 1), 50);
+          chipTransferRetryTimerRef.current = window.setTimeout(() => startFlight(attempt + 1), 50);
         }
         return;
       }
@@ -531,24 +558,13 @@ export default function CasinoTable({
 
       if (allFlights.length > 0) {
         setChipTransferFlights(allFlights);
-        clearTimer = window.setTimeout(() => {
-          setChipTransferFlights([]);
-        }, CHIP_TRANSFER_DURATION_MS + CHIP_TRANSFER_COUNT * 100 + 240);
+        scheduleChipTransferCleanup(allFlights);
       }
     };
 
     startFlight();
-
-    return () => {
-      cancelled = true;
-      if (retryTimer) {
-        window.clearTimeout(retryTimer);
-      }
-      if (clearTimer) {
-        window.clearTimeout(clearTimer);
-      }
-    };
-  }, [findSeatAnchorNode]);
+    return undefined;
+  }, [findSeatAnchorNode, scheduleChipTransferCleanup]);
 
   useEffect(() => () => {
     clearDealTimers();
@@ -1086,8 +1102,8 @@ export default function CasinoTable({
       <div className="casino-table-scene__page relative z-[20] mx-auto h-dvh w-full max-w-none overflow-x-hidden overflow-y-auto overscroll-y-contain">
         <div className="casino-table-scene__column flex min-h-full w-full flex-col">
           <div className="casino-table-scene__hud sticky top-0 z-[40] -mx-3 px-3 pb-1 pt-[max(4px,env(safe-area-inset-top))] sm:mx-0 sm:px-0 sm:pb-3 sm:pt-[18px]">
-            <div className="relative flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+            <div className="relative flex items-center justify-between gap-1 sm:gap-2">
+              <div className="flex min-w-0 items-center gap-1 sm:gap-2">
                 <div className="relative shrink-0" onPointerDown={(event) => event.stopPropagation()}>
                   <TopHudButton
                     label="Open settings"
@@ -1116,7 +1132,7 @@ export default function CasinoTable({
               </div>
 
               <div
-                className="pointer-events-auto absolute left-1/2 top-1/2 z-[2] -translate-x-1/2 -translate-y-1/2"
+                className="pointer-events-auto z-[2] shrink-0 sm:absolute sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2"
                 onPointerDown={(event) => event.stopPropagation()}
               >
                 <div className="flex items-center gap-0.5 rounded-full border border-[#ffe888]/60 bg-[linear-gradient(135deg,rgba(40,25,5,0.94)_0%,rgba(15,10,2,0.98)_100%)] p-0.5 text-white shadow-[0_4px_14px_rgba(0,0,0,0.5),0_0_12px_rgba(255,232,136,0.3)] sm:gap-1 sm:p-1">
@@ -1124,7 +1140,7 @@ export default function CasinoTable({
                     type="button"
                     onClick={() => setMidGameTipAmount((prev) => Math.max(10, prev - 10))}
                     disabled={midGameTipAmount <= 10 || midGameTipSending}
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/8 text-sm font-black text-white transition-transform active:scale-90 disabled:opacity-40 sm:h-8 sm:w-8 sm:text-base"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/8 text-xs font-black text-white transition-transform active:scale-90 disabled:opacity-40 sm:h-7 sm:w-7 sm:text-sm"
                     aria-label="Decrease tip amount"
                   >
                     −
@@ -1136,18 +1152,18 @@ export default function CasinoTable({
                       void handleSendTip();
                     }}
                     disabled={midGameTipSending}
-                    className="group flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded-full px-2 py-1 transition-all duration-200 hover:bg-white/6 active:scale-95 disabled:opacity-70 sm:min-w-[8.5rem] sm:px-2.5 sm:py-1.5"
+                    className="group flex items-center justify-center gap-1 rounded-full px-1.5 py-0.5 transition-all duration-200 hover:bg-white/6 active:scale-95 disabled:opacity-70 sm:gap-1.5 sm:px-2 sm:py-1"
                     title="Tip Dealer"
                   >
-                    <div className="flex h-5 w-5 items-center justify-center rounded-full border border-[#ffe888]/80 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] text-[10px] shadow-sm sm:h-6 sm:w-6 sm:text-[11px]">
+                    <div className="hidden h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#ffe888]/80 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] text-[10px] shadow-sm sm:flex">
                       🪙
                     </div>
-                    <div className="flex flex-col text-left">
-                      <span className="text-[7.5px] font-black uppercase tracking-[0.14em] text-[#ffe888] sm:text-[8px]">
+                    <div className="flex flex-col text-center sm:text-left">
+                      <span className="whitespace-nowrap text-[6.5px] font-black uppercase leading-tight tracking-[0.08em] text-[#ffe888] sm:text-[7.5px] sm:tracking-[0.12em]">
                         {midGameTipSending ? "Sending..." : "Tip Dealer"}
                       </span>
-                      <span className="text-[9px] font-extrabold text-[#fff7d6] sm:text-[10px]">
-                        ₹{midGameTipAmount}
+                      <span className="whitespace-nowrap text-[8.5px] font-extrabold leading-tight text-[#fff7d6] sm:text-[10px]">
+                        {formatCurrencyAmount(midGameTipAmount, currency, lang)}
                       </span>
                     </div>
                   </button>
@@ -1156,7 +1172,7 @@ export default function CasinoTable({
                     type="button"
                     onClick={() => setMidGameTipAmount((prev) => prev + 10)}
                     disabled={midGameTipSending}
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#ffe888]/40 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] text-sm font-black text-[#4a2e00] shadow-sm transition-transform active:scale-90 disabled:opacity-40 sm:h-8 sm:w-8 sm:text-base"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#ffe888]/40 bg-[linear-gradient(180deg,#fff2a8_0%,#d0a22e_100%)] text-xs font-black text-[#4a2e00] shadow-sm transition-transform active:scale-90 disabled:opacity-40 sm:h-7 sm:w-7 sm:text-sm"
                     aria-label="Increase tip amount"
                   >
                     +
@@ -1172,7 +1188,7 @@ export default function CasinoTable({
                     align="right"
                   />
                 ) : null}
-                <ChipBalanceDisplay chipBalance={chipBalance} />
+                <ChipBalanceDisplay chipBalance={chipBalance} currency={currency} lang={lang} />
               </div>
             </div>
 
@@ -1286,7 +1302,7 @@ export default function CasinoTable({
                   Table Pot
                 </span>
                 <strong className="block text-[28px] font-black leading-none text-[#ffde83] sm:text-[32px] transition-transform duration-300">
-                  {displayedPotAmount.toLocaleString("en-IN")}
+                  {formatLocalizedNumber(displayedPotAmount, currency, lang)}
                 </strong>
               </div>
 
@@ -1296,6 +1312,18 @@ export default function CasinoTable({
                     <div
                       key={flight.id}
                       className="casino-table-scene__pot-flight"
+                      onAnimationEnd={() => {
+                        setChipTransferFlights((current) =>
+                          current.some((item) => item.id === flight.id)
+                            ? current.filter((item) => item.id !== flight.id)
+                            : current,
+                        );
+                        setPotPayoutFlights((current) =>
+                          current.some((item) => item.id === flight.id)
+                            ? current.filter((item) => item.id !== flight.id)
+                            : current,
+                        );
+                      }}
                       style={{
                         left: `${flight.startX}px`,
                         top: `${flight.startY}px`,
@@ -1373,8 +1401,8 @@ export default function CasinoTable({
                     {!isQueuedSpectator && isWinningViewer && finalPayout > 0 ? (
                       <div className="rounded-full border border-[#3be7de]/24 bg-black/22 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[#a6fff2]">
                         {finalPayout !== displayPotWinAmount
-                          ? `You receive ₹${finalPayout.toLocaleString("en-IN")} after commission`
-                          : `Final payout ₹${finalPayout.toLocaleString("en-IN")}`}
+                          ? `You receive ${formatCurrencyAmount(finalPayout, currency, lang)} after commission`
+                          : `Final payout ${formatCurrencyAmount(finalPayout, currency, lang)}`}
                       </div>
                     ) : null}
 

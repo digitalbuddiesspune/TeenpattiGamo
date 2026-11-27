@@ -100,7 +100,7 @@ function createPublicSessionOnce(variant) {
     const clientSeed = createClientSeed();
     const platformContext = getPlatformLaunchContext();
     const data = platformContext
-      ? await createPlatformPublicSession(platformContext.token, platformContext.gameId, clientSeed, variant)
+      ? await createPlatformPublicSession(platformContext, platformContext.gameId, clientSeed, variant)
       : await joinPublicTable(undefined, clientSeed, variant);
 
     return {
@@ -176,6 +176,7 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [error, setError] = useState("");
+  const [errorCode, setErrorCode] = useState("");
   const sessionRef = useRef(null);
   const socketRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
@@ -447,7 +448,11 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
                 if (message.status === "ok") {
                   pending.resolve(message.data);
                 } else {
-                  pending.reject(new Error(message.message || "Request failed."));
+                  const err = new Error(message.message || "Request failed.");
+                  if (message.code) {
+                    err.code = message.code;
+                  }
+                  pending.reject(err);
                 }
                 return;
               }
@@ -475,6 +480,7 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
 
               if (message.type === "public_table:error") {
                 setError(message.message || "Public table action failed.");
+                setErrorCode(message.code || "");
               }
             } catch {
               if (!cancelled) {
@@ -658,14 +664,24 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
 
     setActing(true);
     setError("");
+    setErrorCode("");
 
     try {
       const data = await runTransportAction(actionType, payload || {});
       applyState(data);
     } catch (nextError) {
       const message = nextError.message || "Request failed";
+      const code = nextError.code || "";
+      setErrorCode(code);
 
-      if (message.includes("Insufficient balance") && packableActionsRef.current.has(actionType)) {
+      const isPlatformError =
+        Boolean(getPlatformLaunchContext()?.token) ||
+        code === "platform_operator_refusal" ||
+        code === "platform_session_expired" ||
+        code === "platform_balance_failed" ||
+        code === "platform_balance_timeout";
+
+      if (!isPlatformError && message.includes("Insufficient balance") && packableActionsRef.current.has(actionType)) {
         try {
           const packed = await runTransportAction("pack", {});
           applyState(packed);
@@ -777,6 +793,7 @@ export function useTeenPattiGame(variant = "classic", enabled = true) {
     loading,
     acting,
     error,
+    errorCode,
     runAction,
     startRound,
     readyNextRound,

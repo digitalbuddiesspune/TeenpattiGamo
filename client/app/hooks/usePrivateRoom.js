@@ -129,6 +129,7 @@ export function usePrivateRoom(initialRoomCode = "", enabled = true) {
   const [loading, setLoading] = useState(false);
   const [acting, setActing] = useState(false);
   const [error, setError] = useState("");
+  const [errorCode, setErrorCode] = useState("");
 
   const sessionRef = useRef(null);
   const socketRef = useRef(null);
@@ -329,7 +330,11 @@ export function usePrivateRoom(initialRoomCode = "", enabled = true) {
               if (message.status === "ok") {
                 pending.resolve(message.data);
               } else {
-                pending.reject(new Error(message.message || "Request failed."));
+                const err = new Error(message.message || "Request failed.");
+                if (message.code) {
+                  err.code = message.code;
+                }
+                pending.reject(err);
               }
               return;
             }
@@ -360,6 +365,7 @@ export function usePrivateRoom(initialRoomCode = "", enabled = true) {
                 return;
               }
               setError(message.message || "Private room action failed.");
+              setErrorCode(message.code || "");
             }
           } catch {
             setError("Unable to process live private room updates.");
@@ -459,7 +465,7 @@ export function usePrivateRoom(initialRoomCode = "", enabled = true) {
       const platformContext = getPlatformLaunchContext();
       const response = platformContext
         ? await createPlatformPrivateRoom(
-            platformContext.token,
+            platformContext,
             platformContext.gameId,
             roomName,
             clientSeed,
@@ -506,7 +512,7 @@ export function usePrivateRoom(initialRoomCode = "", enabled = true) {
       const platformContext = getPlatformLaunchContext();
       const response = platformContext
         ? await joinPlatformPrivateRoom(
-            platformContext.token,
+            platformContext,
             platformContext.gameId,
             code,
             clientSeed
@@ -550,6 +556,7 @@ export function usePrivateRoom(initialRoomCode = "", enabled = true) {
     } catch (err) {
       const msg = err?.message || "Action failed.";
       setError(msg);
+      setErrorCode(err?.code || "");
       throw err;
     } finally {
       setActing(false);
@@ -671,6 +678,7 @@ export function usePrivateRoom(initialRoomCode = "", enabled = true) {
     loading,
     acting,
     error,
+    errorCode,
     createRoom: handleCreateRoom,
     joinRoom: handleJoinRoom,
     runAction,
@@ -679,6 +687,9 @@ export function usePrivateRoom(initialRoomCode = "", enabled = true) {
     startNextRound,
     updateConfig,
     leaveRoom,
-    clearError: () => setError("")
+    clearError: () => {
+      setError("");
+      setErrorCode("");
+    }
   };
 }

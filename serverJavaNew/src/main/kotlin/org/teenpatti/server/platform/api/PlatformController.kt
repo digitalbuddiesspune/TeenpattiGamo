@@ -27,7 +27,7 @@ internal class PlatformController(
 ) {
     @PostMapping("/profile")
     fun getProfile(@RequestBody body: PlatformProfileRequest): Map<String, Any?> {
-        val session = authenticatePlatformSession(body.token, body.gameId)
+        val session = authenticatePlatformSession(body)
         return ApiSupport.ok(
             linkedMapOf(
                 "userId" to session.userId,
@@ -35,6 +35,8 @@ internal class PlatformController(
                 "balance" to session.user.balance,
                 "currency" to session.user.currency,
                 "gameId" to session.gameId,
+                "gid" to session.gameId,
+                "partnerCode" to session.partnerCode,
             ),
         )
     }
@@ -44,7 +46,7 @@ internal class PlatformController(
         @RequestBody body: PlatformSessionRequest,
         request: HttpServletRequest,
     ): Map<String, Any?> {
-        val session = authenticatePlatformSession(body.token, body.gameId)
+        val session = authenticatePlatformSession(body)
         val variant = ApiSupport.normalizeVariantId(body.variant)
         val manager =
             publicTableManagers[variant]
@@ -57,7 +59,7 @@ internal class PlatformController(
         @RequestBody body: PlatformCreatePrivateRoomRequest,
         request: HttpServletRequest,
     ): Map<String, Any?> {
-        val session = authenticatePlatformSession(body.token, body.gameId)
+        val session = authenticatePlatformSession(body)
         return ApiSupport.ok(
             privateRoomManager.createPlatformRoom(
                 body.roomName,
@@ -75,93 +77,196 @@ internal class PlatformController(
         @RequestBody body: PlatformJoinPrivateRoomRequest,
         request: HttpServletRequest,
     ): Map<String, Any?> {
-        val session = authenticatePlatformSession(body.token, body.gameId)
+        val session = authenticatePlatformSession(body)
         return ApiSupport.ok(privateRoomManager.joinPlatformRoom(body.roomCode, session, body.clientSeed, clientIp(request)))
     }
 
     @PostMapping("/transactions/debit")
     fun debitTransactions(@RequestBody body: PlatformTransactionHistoryRequest): Map<String, Any?> {
-        val session = authenticatePlatformSession(body.token, body.gameId)
+        val session = authenticatePlatformSession(body)
         return ApiSupport.ok(platformWalletService.listTransactionHistory(session.userId, "debit", body.offset ?: 0, body.limit ?: 20))
     }
 
     @PostMapping("/transactions/credit")
     fun creditTransactions(@RequestBody body: PlatformTransactionHistoryRequest): Map<String, Any?> {
-        val session = authenticatePlatformSession(body.token, body.gameId)
+        val session = authenticatePlatformSession(body)
         return ApiSupport.ok(platformWalletService.listTransactionHistory(session.userId, "credit", body.offset ?: 0, body.limit ?: 20))
     }
 
     @PostMapping("/history/rounds")
     fun roundHistory(@RequestBody body: PlatformRoundHistoryRequest): Map<String, Any?> {
-        val session = authenticatePlatformSession(body.token, body.gameId)
+        val session = authenticatePlatformSession(body)
         return ApiSupport.ok(platformWalletService.listRoundHistory(session.userId, body.offset ?: 0, body.limit ?: 20))
     }
 
-    private fun authenticatePlatformSession(token: String?, gameId: Int?): PlatformSession {
-        val normalizedToken = token?.trim().orEmpty()
+    private fun authenticatePlatformSession(body: PlatformLaunchRequest): PlatformSession {
+        val normalizedToken = body.token?.trim().orEmpty()
         if (normalizedToken.isBlank()) {
             throw AppException.badRequest("platform_token_required", "Platform token is required.")
         }
-        val normalizedGameId =
-            gameId?.takeIf { it > 0 }
-                ?: env.platformGameId.takeIf { it > 0 }
-                ?: throw AppException.badRequest("platform_game_id_required", "Platform game_id is required.")
-        val user = gatewayClient.getUserDetail(normalizedToken)
-        if (user.userId.isBlank()) {
-            throw AppException.badRequest("platform_user_required", "Platform user detail did not include a user_id.")
+        val normalizedPartnerCode =
+            (body.partner_code ?: body.partnerCode ?: env.operationsDefaultPartnerCode)
+                .trim()
+                .uppercase()
+        if (normalizedPartnerCode.isBlank()) {
+            throw AppException.badRequest("platform_partner_code_required", "Platform partner_code is required.")
         }
+        val normalizedGameId =
+            parsePositiveInt(body.gid)
+                ?: body.gameId?.takeIf { it > 0 }
+                ?: env.platformGameId.takeIf { it > 0 }
+                ?: throw AppException.badRequest("platform_game_id_required", "Platform gid is required.")
+
+        val user =
+            gatewayClient.fetchInitialBalance(
+                token = normalizedToken,
+                partnerCode = normalizedPartnerCode,
+                fallbackUserId = body.user_id ?: body.userId,
+                fallbackUsername = body.username,
+                fallbackCurrency = body.currency,
+            )
         val session = PlatformSession()
         session.userId = user.userId
         session.token = normalizedToken
         session.gameId = normalizedGameId
+        session.partnerCode = normalizedPartnerCode
         session.user = user
         session.issuedAt = clockProvider.nowIso()
         return session
     }
+
+    private fun parsePositiveInt(raw: Any?): Int? =
+        when (raw) {
+            is Number -> raw.toInt().takeIf { it > 0 }
+            is String -> raw.trim().toIntOrNull()?.takeIf { it > 0 }
+            else -> null
+        }
 
     private fun clientIp(request: HttpServletRequest): String? =
         request.getHeader("X-Forwarded-For")?.split(",")?.firstOrNull()?.trim()?.takeIf { it.isNotBlank() }
             ?: request.remoteAddr
 }
 
+internal interface PlatformLaunchRequest {
+    val token: String?
+    val gameId: Int?
+    val gid: Any?
+    val partnerCode: String?
+    val partner_code: String?
+    val gameCode: String?
+    val game_code: String?
+    val username: String?
+    val userId: String?
+    val user_id: String?
+    val currency: String?
+    val lang: String?
+    val extsess: String?
+}
+
 internal class PlatformProfileRequest(
-    val token: String? = null,
-    val gameId: Int? = null,
-)
+    override val token: String? = null,
+    override val gameId: Int? = null,
+    override val gid: Any? = null,
+    override val partnerCode: String? = null,
+    override val partner_code: String? = null,
+    override val gameCode: String? = null,
+    override val game_code: String? = null,
+    override val username: String? = null,
+    override val userId: String? = null,
+    override val user_id: String? = null,
+    override val currency: String? = null,
+    override val lang: String? = null,
+    override val extsess: String? = null,
+) : PlatformLaunchRequest
 
 internal class PlatformSessionRequest(
-    val token: String? = null,
-    val gameId: Int? = null,
+    override val token: String? = null,
+    override val gameId: Int? = null,
     val clientSeed: String? = null,
     val variant: String? = null,
-)
+    override val gid: Any? = null,
+    override val partnerCode: String? = null,
+    override val partner_code: String? = null,
+    override val gameCode: String? = null,
+    override val game_code: String? = null,
+    override val username: String? = null,
+    override val userId: String? = null,
+    override val user_id: String? = null,
+    override val currency: String? = null,
+    override val lang: String? = null,
+    override val extsess: String? = null,
+) : PlatformLaunchRequest
 
 internal class PlatformCreatePrivateRoomRequest(
-    val token: String? = null,
-    val gameId: Int? = null,
+    override val token: String? = null,
+    override val gameId: Int? = null,
     val roomName: String? = null,
     val clientSeed: String? = null,
     val variant: String? = null,
     val bootAmount: Int? = null,
-)
+    override val gid: Any? = null,
+    override val partnerCode: String? = null,
+    override val partner_code: String? = null,
+    override val gameCode: String? = null,
+    override val game_code: String? = null,
+    override val username: String? = null,
+    override val userId: String? = null,
+    override val user_id: String? = null,
+    override val currency: String? = null,
+    override val lang: String? = null,
+    override val extsess: String? = null,
+) : PlatformLaunchRequest
 
 internal class PlatformJoinPrivateRoomRequest(
-    val token: String? = null,
-    val gameId: Int? = null,
+    override val token: String? = null,
+    override val gameId: Int? = null,
     val roomCode: String? = null,
     val clientSeed: String? = null,
-)
+    override val gid: Any? = null,
+    override val partnerCode: String? = null,
+    override val partner_code: String? = null,
+    override val gameCode: String? = null,
+    override val game_code: String? = null,
+    override val username: String? = null,
+    override val userId: String? = null,
+    override val user_id: String? = null,
+    override val currency: String? = null,
+    override val lang: String? = null,
+    override val extsess: String? = null,
+) : PlatformLaunchRequest
 
 internal class PlatformTransactionHistoryRequest(
-    val token: String? = null,
-    val gameId: Int? = null,
+    override val token: String? = null,
+    override val gameId: Int? = null,
     val offset: Int? = null,
     val limit: Int? = null,
-)
+    override val gid: Any? = null,
+    override val partnerCode: String? = null,
+    override val partner_code: String? = null,
+    override val gameCode: String? = null,
+    override val game_code: String? = null,
+    override val username: String? = null,
+    override val userId: String? = null,
+    override val user_id: String? = null,
+    override val currency: String? = null,
+    override val lang: String? = null,
+    override val extsess: String? = null,
+) : PlatformLaunchRequest
 
 internal class PlatformRoundHistoryRequest(
-    val token: String? = null,
-    val gameId: Int? = null,
+    override val token: String? = null,
+    override val gameId: Int? = null,
     val offset: Int? = null,
     val limit: Int? = null,
-)
+    override val gid: Any? = null,
+    override val partnerCode: String? = null,
+    override val partner_code: String? = null,
+    override val gameCode: String? = null,
+    override val game_code: String? = null,
+    override val username: String? = null,
+    override val userId: String? = null,
+    override val user_id: String? = null,
+    override val currency: String? = null,
+    override val lang: String? = null,
+    override val extsess: String? = null,
+) : PlatformLaunchRequest

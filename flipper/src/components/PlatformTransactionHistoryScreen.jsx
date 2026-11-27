@@ -5,7 +5,12 @@ import {
   fetchPlatformRoundHistory,
 } from "../lib/api";
 import { navigatePush } from "../lib/navigation";
-import { getPlatformLaunchContext, withLaunchQuery } from "../lib/platformLaunch";
+import {
+  formatCurrencyAmount,
+  getPlatformLaunchContext,
+  resolveFormattingLocale,
+  withLaunchQuery,
+} from "../lib/platformLaunch";
 
 const TABS = [
   {
@@ -25,7 +30,7 @@ const TABS = [
   },
 ];
 
-function formatTimestamp(value) {
+function formatTimestamp(value, lang = "en", currency = "INR") {
   if (!value) {
     return "Pending";
   }
@@ -35,18 +40,14 @@ function formatTimestamp(value) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("en-IN", {
+  return new Intl.DateTimeFormat(resolveFormattingLocale(lang, currency), {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
 }
 
-function formatAmount(value) {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) {
-    return "0";
-  }
-  return amount.toLocaleString("en-IN");
+function formatAmount(value, currency = "INR", lang = "en") {
+  return formatCurrencyAmount(value, currency, lang);
 }
 
 function shortenId(value, size = 10) {
@@ -107,7 +108,7 @@ function TabButton({ tab, active, onClick }) {
   );
 }
 
-function RoundHistoryCard({ item }) {
+function RoundHistoryCard({ item, currency = "INR", lang = "en" }) {
   const playerWon = item.outcome === "win";
 
   return (
@@ -118,7 +119,7 @@ function RoundHistoryCard({ item }) {
             {playerWon ? "You Won" : "You Lost"}
           </span>
           <strong className={`mt-1 block text-[1.2rem] font-black ${playerWon ? "text-[#9bffb0]" : "text-[#ffe6a0]"}`}>
-            {playerWon ? "+" : "−"}{formatAmount(item.resultAmount)}
+            {playerWon ? "+" : "−"}{formatAmount(item.resultAmount, currency, lang)}
           </strong>
         </div>
         <div className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
@@ -136,23 +137,23 @@ function RoundHistoryCard({ item }) {
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Metric label="Round ID" value={shortenId(item.roundId, 14)} />
-        <Metric label="Settled" value={formatTimestamp(item.settledAt)} />
-        <Metric label="Your Contribution" value={formatAmount(item.yourContribution)} tone="accent" />
-        <Metric label="Payout Credited" value={formatAmount(item.payout)} tone={playerWon ? "win" : "default"} />
-        <Metric label="Table Pot" value={formatAmount(item.potAmount)} />
+        <Metric label="Settled" value={formatTimestamp(item.settledAt, lang, currency)} />
+        <Metric label="Your Contribution" value={formatAmount(item.yourContribution, currency, lang)} tone="accent" />
+        <Metric label="Payout Credited" value={formatAmount(item.payout, currency, lang)} tone={playerWon ? "win" : "default"} />
+        <Metric label="Table Pot" value={formatAmount(item.potAmount, currency, lang)} />
         <Metric label="Winning Hand" value={item.winningHand || "N/A"} />
-        <Metric label="Dealer Tip" value={formatAmount(item.dealerTip)} />
-        <Metric label="Before Tip" value={formatAmount(item.winnerReceivableBeforeTip)} />
-        <Metric label="Boot Commission" value={formatAmount(item.bootCommission)} />
-        <Metric label="Win Commission" value={formatAmount(item.winCommission)} />
-        <Metric label="Casino Total" value={formatAmount(item.casinoCommissionTotal)} />
-        <Metric label="Net Result" value={formatAmount(item.resultAmount)} tone={playerWon ? "win" : "loss"} />
+        <Metric label="Dealer Tip" value={formatAmount(item.dealerTip, currency, lang)} />
+        <Metric label="Before Tip" value={formatAmount(item.winnerReceivableBeforeTip, currency, lang)} />
+        <Metric label="Boot Commission" value={formatAmount(item.bootCommission, currency, lang)} />
+        <Metric label="Win Commission" value={formatAmount(item.winCommission, currency, lang)} />
+        <Metric label="Casino Total" value={formatAmount(item.casinoCommissionTotal, currency, lang)} />
+        <Metric label="Net Result" value={formatAmount(item.resultAmount, currency, lang)} tone={playerWon ? "win" : "loss"} />
       </div>
     </article>
   );
 }
 
-function WalletTransactionCard({ item, txnType }) {
+function WalletTransactionCard({ item, txnType, currency = "INR", lang = "en" }) {
   const isCredit = txnType === "credit";
 
   return (
@@ -163,7 +164,7 @@ function WalletTransactionCard({ item, txnType }) {
             {isCredit ? "Wallet Credit" : "Wallet Debit"}
           </span>
           <strong className={`mt-1 block text-[1.2rem] font-black ${isCredit ? "text-[#9bffb0]" : "text-[#ffe6a0]"}`}>
-            {isCredit ? "+" : "−"}{formatAmount(item.amount)}
+            {isCredit ? "+" : "−"}{formatAmount(item.amount, currency, lang)}
           </strong>
         </div>
         <div className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
@@ -184,9 +185,9 @@ function WalletTransactionCard({ item, txnType }) {
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Metric label="Txn ID" value={shortenId(item.txnId, 14)} />
         <Metric label="Round ID" value={shortenId(item.roundId, 14)} />
-        <Metric label="Created" value={formatTimestamp(item.createdAt)} />
-        <Metric label="Updated" value={formatTimestamp(item.updatedAt)} />
-        <Metric label="Amount" value={formatAmount(item.amount)} tone={isCredit ? "win" : "accent"} />
+        <Metric label="Created" value={formatTimestamp(item.createdAt, lang, currency)} />
+        <Metric label="Updated" value={formatTimestamp(item.updatedAt, lang, currency)} />
+        <Metric label="Amount" value={formatAmount(item.amount, currency, lang)} tone={isCredit ? "win" : "accent"} />
         <Metric label="Status" value={item.status || "—"} tone={statusTone(item.status)} />
         <Metric label="Txn Ref" value={item.txnRefId ? shortenId(item.txnRefId, 16) : "—"} />
         <Metric label="Type" value={isCredit ? "Credit" : "Debit"} tone={isCredit ? "win" : "accent"} />
@@ -206,14 +207,14 @@ function createEmptyState() {
   };
 }
 
-async function fetchTabPage(tabId, token, gameId, offset, limit = 20) {
+async function fetchTabPage(tabId, launchContext, offset, limit = 20) {
   if (tabId === "debit") {
-    return fetchPlatformDebitTransactions(token, gameId, offset, limit);
+    return fetchPlatformDebitTransactions(launchContext, launchContext.gameId, offset, limit);
   }
   if (tabId === "credit") {
-    return fetchPlatformCreditTransactions(token, gameId, offset, limit);
+    return fetchPlatformCreditTransactions(launchContext, launchContext.gameId, offset, limit);
   }
-  return fetchPlatformRoundHistory(token, gameId, offset, limit);
+  return fetchPlatformRoundHistory(launchContext, launchContext.gameId, offset, limit);
 }
 
 export default function PlatformTransactionHistoryScreen({ initialTab = "rounds" }) {
@@ -225,6 +226,7 @@ export default function PlatformTransactionHistoryScreen({ initialTab = "rounds"
     TABS.some((tab) => tab.id === initialTab) ? initialTab : "rounds",
   );
   const [authMissing, setAuthMissing] = useState(false);
+  const [sessionMeta, setSessionMeta] = useState({ currency: "INR", lang: "en" });
   const [state, setState] = useState(createEmptyState);
 
   const loadTab = useCallback(async (tabId, { append = false, offset = 0 } = {}) => {
@@ -248,7 +250,7 @@ export default function PlatformTransactionHistoryScreen({ initialTab = "rounds"
     }
 
     try {
-      const response = await fetchTabPage(tabId, launchContext.token, launchContext.gameId, offset, 20);
+      const response = await fetchTabPage(tabId, launchContext, offset, 20);
       setState((current) => ({
         loading: false,
         loadingMore: false,
@@ -283,6 +285,13 @@ export default function PlatformTransactionHistoryScreen({ initialTab = "rounds"
 
     setAuthMissing(false);
     launchContextRef.current = launchContext;
+    setSessionMeta({
+      currency: launchContext.currency || "INR",
+      lang: launchContext.lang || "en",
+    });
+    if (typeof document !== "undefined" && launchContext.lang) {
+      document.documentElement.lang = launchContext.lang;
+    }
     void loadTab(activeTabRef.current);
     return undefined;
   }, [loadTab]);
@@ -405,7 +414,7 @@ export default function PlatformTransactionHistoryScreen({ initialTab = "rounds"
 
               {authMissing ? (
                 <div className="mt-5 rounded-[22px] border border-[#ffcf99]/22 bg-[rgba(58,34,10,0.72)] px-4 py-5 text-[0.82rem] leading-[1.5] text-[#ffe6a0]">
-                  Launch the game with a platform session (id and game_id) to load your transaction history.
+                  Launch the game with a platform session (token and gid) to load your transaction history.
                 </div>
               ) : null}
 
@@ -437,13 +446,20 @@ export default function PlatformTransactionHistoryScreen({ initialTab = "rounds"
                 <div className="mt-5 grid gap-3">
                   {activeTab === "rounds"
                     ? state.items.map((item) => (
-                      <RoundHistoryCard key={item.roundId || item.settledAt} item={item} />
+                      <RoundHistoryCard
+                        key={item.roundId || item.settledAt}
+                        item={item}
+                        currency={sessionMeta.currency}
+                        lang={sessionMeta.lang}
+                      />
                     ))
                     : state.items.map((item) => (
                       <WalletTransactionCard
                         key={item.txnId || `${item.roundId}-${item.createdAt}`}
                         item={item}
                         txnType={activeTab}
+                        currency={sessionMeta.currency}
+                        lang={sessionMeta.lang}
                       />
                     ))}
                 </div>

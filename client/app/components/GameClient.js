@@ -12,7 +12,10 @@ import { clearStoredPublicSession, useTeenPattiGame } from "../hooks/useTeenPatt
 import { clearStoredPrivateSession, readStoredPrivateSession, usePrivateRoom } from "../hooks/usePrivateRoom";
 import { fetchPlatformProfile, fetchPublicLobbyConfig } from "../lib/api";
 import {
+  exitGame,
+  formatCurrencyAmount,
   getPlatformLaunchContext,
+  isSessionExpiredError,
   PLATFORM_LAUNCH_CONTEXT_STORAGE_KEY,
   PLATFORM_PROFILE_STORAGE_KEY,
   withLaunchQuery,
@@ -194,9 +197,20 @@ const LOBBY_MENU_OPTIONS = [
   },
 ];
 
-function LobbyMenuDropdown({ open, anchorRef, onSelect, onClose }) {
+function LobbyMenuDropdown({ open, anchorRef, onSelect, onClose, hasCloseUrl = false }) {
   const panelRef = useRef(null);
   const [coords, setCoords] = useState({ top: 0, right: 0 });
+
+  const options = hasCloseUrl
+    ? [
+        ...LOBBY_MENU_OPTIONS,
+        {
+          id: "exit_lobby",
+          label: "Exit to Home",
+          hint: "Return to operator lobby",
+        },
+      ]
+    : LOBBY_MENU_OPTIONS;
 
   useEffect(() => {
     if (!open) {
@@ -270,7 +284,7 @@ function LobbyMenuDropdown({ open, anchorRef, onSelect, onClose }) {
       aria-label="Lobby menu"
       style={{ top: `${coords.top}px`, right: `${coords.right}px` }}
     >
-      {LOBBY_MENU_OPTIONS.map((option) => (
+      {options.map((option) => (
         <button
           key={option.id}
           type="button"
@@ -314,6 +328,53 @@ function LobbyRulesModal({ open, onClose }) {
         </ul>
       </div>
     </div>
+  );
+}
+
+function SessionExpiredModal({ open, message, closeUrl }) {
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!open || !dialog) return;
+    dialog.showModal();
+    return () => {
+      if (dialog.open) dialog.close();
+    };
+  }, [open]);
+
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="leave-confirm"
+      aria-labelledby="session-expired-title"
+      aria-describedby="session-expired-copy"
+      onCancel={(event) => {
+        event.preventDefault();
+      }}
+    >
+      <div className="leave-confirm__panel">
+        <header className="leave-confirm__header">
+          <h2 id="session-expired-title">Session Expired</h2>
+        </header>
+        <p id="session-expired-copy" className="leave-confirm__copy">
+          {message || "Your game session is invalid or has expired. Wagering has been paused."}
+        </p>
+        <div className="leave-confirm__actions">
+          <button
+            type="button"
+            className="leave-confirm__button leave-confirm__button--leave"
+            onClick={() => exitGame(closeUrl)}
+          >
+            {closeUrl ? "Return to Lobby" : "Close Game"}
+          </button>
+        </div>
+      </div>
+    </dialog>
   );
 }
 
@@ -659,6 +720,7 @@ export default function GameClient({
   const [customRoomInitialMode, setCustomRoomInitialMode] = useState(() => initialRoomCode ? "join" : "create");
   const [customRoomBusy, setCustomRoomBusy] = useState(false);
   const [customRoomError, setCustomRoomError] = useState("");
+  const [sessionExpiredMessage, setSessionExpiredMessage] = useState("");
 
   const isPrivateRoomView = view === "private-room" || Boolean(activePrivateRoomCode);
   const isPublicTableView = view === "public-table" && !isPrivateRoomView;
@@ -671,6 +733,7 @@ export default function GameClient({
     loading: publicLoading,
     acting: publicActing,
     error: publicError,
+    errorCode: publicErrorCode,
     runAction: publicRunAction,
     readyNextRound: publicReadyNextRound,
     leaveTable: leavePublicTable,
@@ -683,6 +746,7 @@ export default function GameClient({
     loading: privateLoading,
     acting: privateActing,
     error: privateError,
+    errorCode: privateErrorCode,
     createRoom: createPrivateRoomAction,
     joinRoom: joinPrivateRoomAction,
     runAction: privateRunAction,
@@ -720,7 +784,15 @@ export default function GameClient({
     totalContributed: 0
   })) : []);
 
-  const canonicalSeats = rawSeats;
+  const canonicalSeats = rawSeats.map((seat) => {
+    if (seat?.isUser && platformLaunchContext?.username) {
+      const currentName = String(seat.name || "").trim();
+      if (!currentName || /^guest/i.test(currentName) || /^player\s*\d*$/i.test(currentName)) {
+        return { ...seat, name: platformLaunchContext.username };
+      }
+    }
+    return seat;
+  });
   const { seats: namedSeats, nameById } = withDisplayNames(canonicalSeats);
   const displaySeats = rotateSeatsForViewer(namedSeats);
   const resolveMappedName = (playerId, fallback) =>
@@ -784,11 +856,22 @@ export default function GameClient({
     : true;
   const platformLaunchToken = platformLaunchContext?.token || "";
   const platformLaunchGameId = platformLaunchContext?.gameId || 0;
-  const isPlatformLaunch = Boolean(platformLaunchToken && platformLaunchGameId > 0);
+  const platformLaunchGid = platformLaunchContext?.gid || "";
+  const platformLaunchUsername = platformLaunchContext?.username || "";
+  const platformCloseUrl = platformLaunchContext?.closeUrl || "";
+  const activeCurrency = platformProfile?.currency || platformLaunchContext?.currency || "INR";
+  const activeLang = platformLaunchContext?.lang || "en";
+  const isPlatformLaunch = Boolean(platformLaunchToken && (platformLaunchGameId > 0 || platformLaunchGid));
 
   useEffect(() => {
     setPlatformLaunchContext(getPlatformLaunchContext());
   }, [view, variant]);
+
+  useEffect(() => {
+    if (typeof document !== "undefined" && activeLang) {
+      document.documentElement.lang = activeLang;
+    }
+  }, [activeLang]);
 
   const commitPlatformProfile = useCallback((profile) => {
     setPlatformProfile(profile);
@@ -840,7 +923,7 @@ export default function GameClient({
   }, [isPublicMenuView]);
 
   const syncPlatformProfile = useCallback(async () => {
-    if (!platformLaunchToken || !platformLaunchGameId) {
+    if (!platformLaunchToken || (!platformLaunchGameId && !platformLaunchGid)) {
       return null;
     }
 
@@ -848,7 +931,10 @@ export default function GameClient({
     const requestId = platformProfileRequestIdRef.current + 1;
     platformProfileRequestIdRef.current = requestId;
     try {
-      const profile = await fetchPlatformProfile(platformLaunchToken, platformLaunchGameId);
+      const profile = await fetchPlatformProfile(
+        platformLaunchContext || { token: platformLaunchToken, gameId: platformLaunchGameId, gid: platformLaunchGid },
+        platformLaunchGameId,
+      );
       if (requestId !== platformProfileRequestIdRef.current) {
         return profile;
       }
@@ -859,10 +945,10 @@ export default function GameClient({
         setPlatformProfileLoading(false);
       }
     }
-  }, [commitPlatformProfile, platformLaunchGameId, platformLaunchToken]);
+  }, [commitPlatformProfile, platformLaunchContext, platformLaunchGameId, platformLaunchGid, platformLaunchToken]);
 
   useEffect(() => {
-    if (!platformLaunchToken || !platformLaunchGameId) {
+    if (!platformLaunchToken || (!platformLaunchGameId && !platformLaunchGid)) {
       setPlatformProfileLoading(false);
       return undefined;
     }
@@ -872,7 +958,10 @@ export default function GameClient({
     const requestId = platformProfileRequestIdRef.current + 1;
     platformProfileRequestIdRef.current = requestId;
 
-    fetchPlatformProfile(platformLaunchToken, platformLaunchGameId)
+    fetchPlatformProfile(
+      platformLaunchContext || { token: platformLaunchToken, gameId: platformLaunchGameId, gid: platformLaunchGid },
+      platformLaunchGameId,
+    )
       .then((profile) => {
         if (cancelled || requestId !== platformProfileRequestIdRef.current) {
           return;
@@ -880,9 +969,13 @@ export default function GameClient({
 
         commitPlatformProfile(profile);
       })
-      .catch(() => {
-        if (!cancelled && requestId === platformProfileRequestIdRef.current && isPublicMenuView) {
-          setPlatformProfile(null);
+      .catch((err) => {
+        if (!cancelled && requestId === platformProfileRequestIdRef.current) {
+          if (isSessionExpiredError(err)) {
+            setSessionExpiredMessage(err?.message || "Your session is invalid or has expired.");
+          } else if (isPublicMenuView) {
+            setPlatformProfile(null);
+          }
         }
       })
       .finally(() => {
@@ -896,7 +989,9 @@ export default function GameClient({
     };
   }, [
     isPublicMenuView,
+    platformLaunchContext,
     platformLaunchGameId,
+    platformLaunchGid,
     platformLaunchToken,
     screen,
     variant,
@@ -914,14 +1009,17 @@ export default function GameClient({
     return result;
   }, [platformLaunchGameId, platformLaunchToken, syncPlatformProfile]);
 
-  const handleGameplayAction = useCallback((actionType, payload) => (
-    refreshPlatformProfileAfterAction(() => {
+  const handleGameplayAction = useCallback((actionType, payload) => {
+    if (sessionExpiredMessage) {
+      return Promise.resolve();
+    }
+    return refreshPlatformProfileAfterAction(() => {
       if (isPrivateRoomView) {
         return privateRunAction(actionType, payload);
       }
       return publicRunAction(actionType, payload);
-    })
-  ), [isPrivateRoomView, privateRunAction, publicRunAction, refreshPlatformProfileAfterAction]);
+    });
+  }, [isPrivateRoomView, privateRunAction, publicRunAction, refreshPlatformProfileAfterAction, sessionExpiredMessage]);
 
   useEffect(() => {
     if (!platformLaunchToken || !platformLaunchGameId || screen !== "table" || !round?.id) {
@@ -942,7 +1040,10 @@ export default function GameClient({
     const requestId = platformProfileRequestIdRef.current + 1;
     platformProfileRequestIdRef.current = requestId;
 
-    fetchPlatformProfile(platformLaunchToken, platformLaunchGameId)
+    fetchPlatformProfile(
+      platformLaunchContext || { token: platformLaunchToken, gameId: platformLaunchGameId, gid: platformLaunchGid },
+      platformLaunchGameId,
+    )
       .then((profile) => {
         if (requestId !== platformProfileRequestIdRef.current) {
           return;
@@ -956,7 +1057,9 @@ export default function GameClient({
   }, [
     commitPlatformProfile,
     isPrivateRoomView,
+    platformLaunchContext,
     platformLaunchGameId,
+    platformLaunchGid,
     platformLaunchToken,
     round?.id,
     round?.status,
@@ -1012,6 +1115,11 @@ export default function GameClient({
 
     if (actionId === "refresh") {
       void syncPlatformProfile().catch(() => {});
+      return;
+    }
+
+    if (actionId === "exit_lobby" && platformCloseUrl) {
+      exitGame(platformCloseUrl);
     }
   }
 
@@ -1058,6 +1166,9 @@ export default function GameClient({
         router.replace(withLaunchQuery(`/public?room=${encodeURIComponent(room.roomCode)}`));
       }
     } catch (err) {
+      if (isSessionExpiredError(err)) {
+        setSessionExpiredMessage(err?.message || "Your session is invalid or has expired.");
+      }
       setCustomRoomError(err?.message || "Failed to create custom room. Please try again.");
     } finally {
       setCustomRoomBusy(false);
@@ -1082,6 +1193,9 @@ export default function GameClient({
         router.replace(withLaunchQuery(`/public?room=${encodeURIComponent(room.roomCode)}`));
       }
     } catch (err) {
+      if (isSessionExpiredError(err)) {
+        setSessionExpiredMessage(err?.message || "Your session is invalid or has expired.");
+      }
       setCustomRoomError(err?.message || "Failed to join custom room. Please check the code and try again.");
     } finally {
       setCustomRoomBusy(false);
@@ -1316,6 +1430,13 @@ export default function GameClient({
   const activeLoading = isPrivateRoomView ? privateLoading : publicLoading;
   const activeActing = isPrivateRoomView ? privateActing : publicActing;
   const activeError = isPrivateRoomView ? privateError : publicError;
+  const activeErrorCode = isPrivateRoomView ? privateErrorCode : publicErrorCode;
+  const isSessionExpired = Boolean(
+    sessionExpiredMessage || isSessionExpiredError(activeError, activeErrorCode),
+  );
+  const resolvedSessionExpiredMessage =
+    sessionExpiredMessage ||
+    (isSessionExpiredError(activeError, activeErrorCode) ? activeError : "");
   const platformBalanceFallback = isPrivateRoomView
     ? privateRoomState?.viewerPlatformBalance
     : publicTableState?.viewerPlatformBalance;
@@ -1335,12 +1456,12 @@ export default function GameClient({
       ? null
     : lobbyInitialBalance;
   const displayedUsername = platformProfile?.username
+    || platformLaunchUsername
     || platformNameFallback
     || (isPlatformLaunch && platformProfileLoading ? "Loading..." : "Player");
-  const headerChipBalanceLabel = platformProfileLoading && isPlatformLaunch && displayedChipBalance == null
+  const walletBalanceLabel = platformProfileLoading && isPlatformLaunch && displayedChipBalance == null
     ? "..."
-    : (typeof displayedChipBalance === "number" ? displayedChipBalance : 0).toLocaleString("en-IN");
-  const walletBalanceLabel = `₹ ${headerChipBalanceLabel}`;
+    : formatCurrencyAmount(typeof displayedChipBalance === "number" ? displayedChipBalance : 0, activeCurrency, activeLang);
   const minimumBootAmount = isPrivateRoomView
     ? (privateRoomState?.config?.bootAmount || round?.bootAmount || 0)
     : (publicTableState?.config?.bootAmount || round?.bootAmount || 0);
@@ -1499,6 +1620,7 @@ export default function GameClient({
                 anchorRef={lobbyMenuAnchorRef}
                 onSelect={handleMenuAction}
                 onClose={closeLobbyMenu}
+                hasCloseUrl={Boolean(platformCloseUrl)}
               />
 
               <LobbyRulesModal open={lobbyRulesOpen} onClose={closeLobbyRules} />
@@ -1514,6 +1636,17 @@ export default function GameClient({
                     />
                   ))}
                 </section>
+                {platformCloseUrl ? (
+                  <div className="lobby-exit">
+                    <button
+                      type="button"
+                      className="lobby-exit__button"
+                      onClick={() => exitGame(platformCloseUrl)}
+                    >
+                      Home / Exit
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               <div className="sr-only" aria-live="polite">
@@ -1552,6 +1685,8 @@ export default function GameClient({
                 variant={isPrivateRoomView ? (privateRoomState?.config?.variant || variant) : (publicTableState?.config?.variant || null)}
                 variantState={round?.variantState || null}
                 chipBalance={displayedChipBalance || 0}
+                currency={activeCurrency}
+                lang={activeLang}
                 maxPotAmount={isPrivateRoomView ? (privateRoomState?.config?.maxPotAmount || 0) : (publicTableState?.config?.maxPotAmount || 0)}
                 isPublicTable={isPublicTableView}
                 isPrivateMode={isPrivateRoomView}
@@ -1561,7 +1696,7 @@ export default function GameClient({
                 canStartNextRound={canStartNextRound}
               />
 
-              {round?.status === "active" && !waitingForSeat && userSeat ? (
+              {round?.status === "active" && !waitingForSeat && userSeat && !isSessionExpired ? (
                 <TableControls
                   round={tableRound}
                   seats={displaySeats}
@@ -1637,6 +1772,11 @@ export default function GameClient({
         confirming={leaveConfirming}
         error={leaveError}
       />
+      <SessionExpiredModal
+        open={isSessionExpired}
+        message={resolvedSessionExpiredMessage}
+        closeUrl={platformCloseUrl}
+      />
       <CustomRoomModal
         open={customRoomModalOpen}
         roomState={privateRoomState}
@@ -1645,6 +1785,8 @@ export default function GameClient({
         initialMode={customRoomInitialMode}
         initialRoomCode={initialRoomCode || activePrivateRoomCode}
         globalBootAmount={globalBootAmount}
+        currency={activeCurrency}
+        lang={activeLang}
         onClose={handleCloseCustomRoomModal}
         onCreateRoom={handleCreateCustomRoomSubmit}
         onJoinRoom={handleJoinCustomRoomSubmit}

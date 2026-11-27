@@ -1,59 +1,154 @@
 package org.teenpatti.server.platform
 
+import org.springframework.core.ParameterizedTypeReference
+import org.springframework.http.MediaType
+import org.springframework.http.client.JdkClientHttpRequestFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.teenpatti.server.common.AppException
 import org.teenpatti.server.config.AppEnvironment
+import java.net.http.HttpClient
+import java.time.Duration
 
 @Component
 internal class PlatformGatewayClient(
     private val env: AppEnvironment,
 ) {
-    private val operatorClient: RestClient? =
-        env.platformUserDetailUrl.trim().takeIf { it.isNotBlank() }?.let { RestClient.builder().build() }
-
-    fun getUserDetail(token: String): PlatformUser {
-        requireEnabled()
-        val response =
-            client()
-                .get()
-                .uri(env.platformUserDetailUrl.trim())
-                .header("token", token)
-                .retrieve()
-                .body(PlatformEnvelope::class.java)
-                ?: throw AppException.badRequest("platform_user_detail_failed", "Platform user detail returned an empty response.")
-        if (!response.status) {
-            throw AppException.badRequest("platform_user_detail_failed", response.msg ?: "Unable to fetch platform user.")
+    private val operationsClient: RestClient? =
+        env.operationsBalanceUrl.trim().takeIf { it.isNotBlank() }?.let {
+            val httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
+            val factory =
+                JdkClientHttpRequestFactory(httpClient).apply {
+                    setReadTimeout(Duration.ofSeconds(8))
+                }
+            RestClient.builder().requestFactory(factory).build()
         }
-        val data = response.data ?: emptyMap()
-        val userDataCandidates =
+
+    /**
+     * Fetches the player's initial wallet balance via Operations internal endpoint (triggers opType 2051):
+     * POST /api/v1/wallet/balance with X-Internal-Key and {"token", "partner_code"}.
+     */
+    fun fetchInitialBalance(
+        token: String,
+        partnerCode: String,
+        fallbackUserId: String? = null,
+        fallbackUsername: String? = null,
+        fallbackCurrency: String? = null,
+    ): PlatformUser {
+        requireEnabled()
+        val normalizedToken = token.trim()
+        val normalizedPartnerCode = partnerCode.trim().uppercase()
+        if (normalizedToken.isBlank()) {
+            throw AppException.badRequest("platform_token_required", "Platform token is required.")
+        }
+        if (normalizedPartnerCode.isBlank()) {
+            throw AppException.badRequest("platform_partner_code_required", "Platform partner_code is required.")
+        }
+        val internalKey = requireInternalServiceKey()
+        val response = postBalanceWithRetry(normalizedToken, normalizedPartnerCode, internalKey)
+
+        val dataMap = mapValue(response["data"])
+        val candidates =
             listOfNotNull(
-                mapValue(data["data"]),
-                mapValue(data["user"]),
-                response.user,
-                data,
+                dataMap?.let { mapValue(it["data"]) },
+                dataMap?.let { mapValue(it["wallet"]) },
+                dataMap?.let { mapValue(it["user"]) },
+                mapValue(response["wallet"]),
+                mapValue(response["user"]),
+                dataMap,
+                response,
             )
-        val userData = userDataCandidates.firstOrNull() ?: data
+
         val user = PlatformUser()
-        user.userId =
-            firstStringValue(userDataCandidates, "user_id", "userId", "id", "_id", "uid")
-                ?: ""
-        user.username =
-            firstStringValue(userDataCandidates, "username", "user_name", "name", "displayName")
-                ?: user.userId
+        val resolvedUsername =
+            firstStringValue(candidates, "username", "user_name", "name", "displayName")
+                ?: fallbackUsername?.trim()?.takeIf { it.isNotBlank() }
+        val resolvedUserId =
+            firstStringValue(candidates, "user_id", "userId", "id", "_id", "uid")
+                ?: fallbackUserId?.trim()?.takeIf { it.isNotBlank() }
+                ?: resolvedUsername?.let { "$normalizedPartnerCode:$it" }
+                ?: normalizedToken
+
+        user.userId = resolvedUserId
+        user.username = resolvedUsername ?: resolvedUserId
         user.balance =
             firstNumberValue(
-                userDataCandidates,
+                candidates,
                 "wallet_balance",
                 "walletBalance",
                 "total_wallet_balance",
                 "totalWalletBalance",
-                "coins",
                 "balance",
+                "coins",
+                "amount",
             ) ?: 0
-        user.currency = firstStringValue(userDataCandidates, "currency", "currency_code", "currencyCode") ?: ""
-        user.operatorId = firstStringValue(userDataCandidates, "operator_id", "operatorId", "operatorID") ?: ""
+        user.currency =
+            (
+                firstStringValue(candidates, "currency", "currency_code", "currencyCode")
+                    ?: fallbackCurrency?.trim()?.takeIf { it.isNotBlank() }
+                    ?: "INR"
+            ).uppercase()
+        user.operatorId =
+            (
+                firstStringValue(candidates, "partner_code", "partnerCode", "operator_id", "operatorId")
+                    ?: normalizedPartnerCode
+            ).uppercase()
         return user
+    }
+
+    private fun postBalanceWithRetry(
+        token: String,
+        partnerCode: String,
+        internalKey: String,
+    ): Map<String, Any?> {
+        val maxAttempts = 2
+        var lastFailure: OperationsErrorSupport.ClassifiedFailure? = null
+        for (attempt in 1..maxAttempts) {
+            try {
+                val response =
+                    client()
+                        .post()
+                        .uri(env.operationsBalanceUrl.trim())
+                        .header("X-Internal-Key", internalKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(OperationsBalanceRequest(token, partnerCode))
+                        .retrieve()
+                        .body(object : ParameterizedTypeReference<Map<String, Any?>>() {})
+                        ?: throw AppException.badRequest(
+                            "platform_balance_failed",
+                            "Operations wallet balance returned an empty response.",
+                        )
+                if (OperationsErrorSupport.isFailurePayload(response)) {
+                    val failure =
+                        OperationsErrorSupport.classifyPayloadFailure(
+                            response,
+                            "Unable to fetch initial balance from operations.",
+                        )
+                    lastFailure = failure
+                    if (!failure.retryable || attempt >= maxAttempts) {
+                        throw AppException.badRequest(failure.appCode, failure.message)
+                    }
+                    continue
+                }
+                return response
+            } catch (error: AppException) {
+                throw error
+            } catch (error: Exception) {
+                val failure =
+                    OperationsErrorSupport.classifyException(
+                        error,
+                        "Unable to fetch initial balance from operations.",
+                    )
+                lastFailure = failure
+                if (!failure.retryable || attempt >= maxAttempts) {
+                    throw AppException.badRequest(failure.appCode, failure.message)
+                }
+            }
+        }
+        throw AppException.badRequest(
+            lastFailure?.appCode ?: "platform_balance_failed",
+            lastFailure?.message ?: "Unable to fetch initial balance from operations.",
+        )
     }
 
     private fun requireEnabled() {
@@ -62,21 +157,28 @@ internal class PlatformGatewayClient(
         }
     }
 
-    private fun client(): RestClient =
-        operatorClient
+    private fun requireInternalServiceKey(): String =
+        env.internalServiceKey.trim().takeIf { it.isNotBlank() }
             ?: throw AppException.badRequest(
-                "platform_user_detail_url_missing",
-                "Platform user detail URL is not configured.",
+                "platform_internal_key_missing",
+                "INTERNAL_SERVICE_KEY is not configured.",
+            )
+
+    private fun client(): RestClient =
+        operationsClient
+            ?: throw AppException.badRequest(
+                "platform_balance_url_missing",
+                "Operations wallet balance URL is not configured.",
             )
 
     private fun mapValue(value: Any?): Map<*, *>? = value as? Map<*, *>
 
-    private fun stringValue(value: Any?): String? = value?.toString()?.takeIf { it.isNotBlank() }
+    private fun stringValue(value: Any?): String? = value?.toString()?.trim()?.takeIf { it.isNotBlank() }
 
     private fun numberValue(value: Any?): Int? =
         when (value) {
             is Number -> value.toInt()
-            is String -> value.toDoubleOrNull()?.toInt()
+            is String -> value.trim().toDoubleOrNull()?.toInt()
             else -> null
         }
 

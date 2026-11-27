@@ -242,6 +242,7 @@ internal class PrivateRoom(
         if (round != null && round.seats.any { it.id == playerId && !it.packed }) {
             runtime.forcePack(playerId, "${player.name} left the room.", "leave_pack")
             syncRuntimeToRoom()
+            creditWinnerIfNeeded()
         }
         when {
             state.players.isEmpty() -> markClosed()
@@ -261,12 +262,17 @@ internal class PrivateRoom(
             throw AppException.badRequest("private_room_min_players", "At least 2 connected players are required.")
         }
         val roundId = idGenerator.newId()
-        debitBootsIfNeeded(participants, roundId)
-        runtime.clearTimers()
-        runtime.startRound(participants, roundId)
-        syncRuntimeToRoom()
-        state.status = "active"
-        state.acceptedNextRoundPlayerIds = mutableListOf()
+        val debitedPlayers = debitBootsIfNeeded(participants, roundId)
+        try {
+            runtime.clearTimers()
+            runtime.startRound(participants, roundId)
+            syncRuntimeToRoom()
+            state.status = "active"
+            state.acceptedNextRoundPlayerIds = mutableListOf()
+        } catch (error: Exception) {
+            refundDebitedBoots(debitedPlayers, roundId, roomGameConfig().bootAmount)
+            throw error
+        }
         return serializeForPlayer(requestingPlayerId)
     }
 
@@ -318,10 +324,48 @@ internal class PrivateRoom(
         return serializeForPlayer(requestingPlayerId)
     }
 
+    private data class DebitedActionRef(
+        val roundId: String,
+        val operationKey: String,
+        val amount: Int,
+        val player: PrivateRoomPlayer,
+    )
+
     @Synchronized
     fun performAction(playerId: String, type: String, payload: Map<String, Any?>): Map<String, Any?> {
-        debitActionIfNeeded(playerId, type, payload)
-        runtime.performAction(playerId, type, payload)
+        val debitedAction = debitActionIfNeeded(playerId, type, payload)
+        try {
+            runtime.performAction(playerId, type, payload)
+        } catch (error: Exception) {
+            if (debitedAction != null) {
+                try {
+                    platformWalletService?.refund(
+                        platformRef(debitedAction.player),
+                        debitedAction.roundId,
+                        "${debitedAction.operationKey}:refund",
+                        debitedAction.amount,
+                        TeenPattiWalletStatement.description(
+                            debitedAction.amount,
+                            "credited",
+                            "$type refund",
+                            debitedAction.roundId,
+                            state.roomCode,
+                        ),
+                        debitedAction.operationKey,
+                    )
+                } catch (refundError: Exception) {
+                    GameEventLog.error(
+                        "wallet_action_refund_failed",
+                        refundError,
+                        "playerId" to debitedAction.player.id,
+                        "roundId" to debitedAction.roundId,
+                        "roomCode" to state.roomCode,
+                        "amount" to debitedAction.amount,
+                    )
+                }
+            }
+            throw error
+        }
         syncRuntimeToRoom()
         creditWinnerIfNeeded()
         if (state.round?.status == "complete") {
@@ -330,23 +374,67 @@ internal class PrivateRoom(
         return serializeForPlayer(playerId)
     }
 
-    private fun debitBootsIfNeeded(participants: List<RoundParticipant>, roundId: String) {
-        for (participant in participants) {
-            val player = getPlayerById(participant.id) ?: continue
-            platformWalletService?.debit(
-                platformRef(player),
-                roundId,
-                "tp:$roundId:${player.id}:boot",
-                roomGameConfig().bootAmount,
-                TeenPattiWalletStatement.description(roomGameConfig().bootAmount, "debited", "boot", roundId, state.roomCode),
-            )
+    private fun debitBootsIfNeeded(
+        participants: List<RoundParticipant>,
+        roundId: String,
+    ): List<PrivateRoomPlayer> {
+        val bootAmount = roomGameConfig().bootAmount
+        val debited = mutableListOf<PrivateRoomPlayer>()
+        try {
+            for (participant in participants) {
+                val player = getPlayerById(participant.id) ?: continue
+                platformWalletService?.debit(
+                    platformRef(player),
+                    roundId,
+                    "tp:$roundId:${player.id}:boot",
+                    bootAmount,
+                    TeenPattiWalletStatement.description(bootAmount, "debited", "boot", roundId, state.roomCode),
+                )
+                debited.add(player)
+            }
+        } catch (error: Exception) {
+            refundDebitedBoots(debited, roundId, bootAmount)
+            throw error
+        }
+        return debited
+    }
+
+    private fun refundDebitedBoots(
+        debited: List<PrivateRoomPlayer>,
+        roundId: String,
+        bootAmount: Int,
+    ) {
+        debited.forEach { player ->
+            try {
+                platformWalletService?.refund(
+                    platformRef(player),
+                    roundId,
+                    "tp:$roundId:${player.id}:boot-refund",
+                    bootAmount,
+                    TeenPattiWalletStatement.description(bootAmount, "credited", "boot refund", roundId, state.roomCode),
+                    "tp:$roundId:${player.id}:boot",
+                )
+            } catch (refundError: Exception) {
+                GameEventLog.error(
+                    "wallet_boot_refund_failed",
+                    refundError,
+                    "playerId" to player.id,
+                    "roundId" to roundId,
+                    "roomCode" to state.roomCode,
+                    "amount" to bootAmount,
+                )
+            }
         }
     }
 
-    private fun debitActionIfNeeded(playerId: String, type: String, payload: Map<String, Any?> = emptyMap()) {
+    private fun debitActionIfNeeded(
+        playerId: String,
+        type: String,
+        payload: Map<String, Any?> = emptyMap(),
+    ): DebitedActionRef? {
         val amount = runtime.quoteDebitForAction(playerId, type, payload)
         if (amount <= 0) {
-            return
+            return null
         }
         val roundId = runtime.currentRoundId() ?: throw IllegalStateException("No active round is available.")
         val actionIndex = runtime.currentActionLogSize()
@@ -364,6 +452,7 @@ internal class PrivateRoom(
             amount,
             TeenPattiWalletStatement.description(amount, "debited", type, roundId, state.roomCode),
         )
+        return DebitedActionRef(roundId, operationKey, amount, player)
     }
 
     private fun creditWinnerIfNeeded() {

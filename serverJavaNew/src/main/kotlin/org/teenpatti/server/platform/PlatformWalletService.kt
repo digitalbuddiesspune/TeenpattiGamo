@@ -1,6 +1,9 @@
 package org.teenpatti.server.platform
 
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.core.ParameterizedTypeReference
 import org.springframework.http.MediaType
+import org.springframework.http.client.JdkClientHttpRequestFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.teenpatti.server.common.AppException
@@ -8,17 +11,22 @@ import org.teenpatti.server.common.ClockProvider
 import org.teenpatti.server.common.GameEventLog
 import org.teenpatti.server.config.AppEnvironment
 import org.teenpatti.server.game.RoundHistoryEntry
+import org.teenpatti.server.infrastructure.persistence.RoundHistoryRepository
 import org.teenpatti.server.infrastructure.persistence.WalletTransaction
 import org.teenpatti.server.infrastructure.persistence.WalletTransactionRepository
-import org.teenpatti.server.infrastructure.persistence.RoundHistoryRepository
+import java.net.http.HttpClient
+import java.time.Duration
 
 @Component
-internal class PlatformWalletService(
+internal class PlatformWalletService @Autowired constructor(
     private val env: AppEnvironment,
     private val transactionRepository: WalletTransactionRepository,
     private val roundHistoryRepository: RoundHistoryRepository,
     private val clockProvider: ClockProvider,
 ) {
+    internal var maxRetryAttempts: Int = 3
+    internal var retryDelayMs: Long = 150L
+
     internal class WalletTransactionHistoryItem {
         var txnId: String = ""
         var roundId: String = ""
@@ -64,20 +72,29 @@ internal class PlatformWalletService(
         var hasMore: Boolean = false
     }
 
-    private val debitClient: RestClient? =
-        env.platformDebitUrl.trim().takeIf { it.isNotBlank() }?.let { RestClient.builder().build() }
-
-    private val creditClient: RestClient? =
-        env.platformCreditUrl.trim().takeIf { it.isNotBlank() }?.let { RestClient.builder().build() }
+    private val creditTransferClient: RestClient? =
+        env.operationsCreditTransferUrl.trim().takeIf { it.isNotBlank() }?.let {
+            val httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
+            val factory =
+                JdkClientHttpRequestFactory(httpClient).apply {
+                    setReadTimeout(Duration.ofSeconds(8))
+                }
+            RestClient.builder().requestFactory(factory).build()
+        }
 
     fun enabled(): Boolean = env.platformEnabled
 
+    /**
+     * Debits a player bet via Operations credit-transfer (triggers opType 2052):
+     * POST /api/v1/wallet/credit-transfer with bet = amount, win = 0, game_type = "spin" (or gamble), ttype = 1.
+     */
     fun debit(
         player: PlatformPlayerRef,
         roundId: String,
         operationKey: String,
         amount: Int,
         description: String,
+        gameType: OperationsGameType = OperationsGameType.SPIN,
     ) {
         if (skipsWallet(player, amount)) {
             return
@@ -85,35 +102,174 @@ internal class PlatformWalletService(
         val platformUserId = requirePlatformUserId(player)
         val platformGameId = requirePlatformGameId(player)
         val platformToken = requirePlatformToken(player)
-        val operatorId = requirePlatformOperatorId(player)
-        val transaction = loadOrCreate(operationKey, "debit", player.playerId, platformUserId, operatorId, roundId, amount, null)
+        val partnerCode = requirePartnerCode(player)
+        val transaction = loadOrCreate(operationKey, "debit", player.playerId, platformUserId, partnerCode, roundId, amount, null)
         if (transaction.status == "succeeded" || transaction.status == "applied") {
             return
         }
-        val request = balanceRequest(transaction.txnId, amount, description, platformUserId, platformGameId, player.ip, null, 0, operatorId)
-        GameEventLog.info("wallet_debit_sent", "playerId" to player.playerId, "roundId" to roundId, "transactionId" to transaction.txnId, "amount" to amount)
-        transaction.requestPayload = requestToPayload(request)
+        val request =
+            OperationsCreditTransferRequest(
+                token = platformToken,
+                partner_code = partnerCode,
+                gid = platformGameId,
+                bet = amount,
+                win = 0,
+                game_type = gameType.code,
+                tranid = transaction.txnId,
+                ttype = gameType.ttype,
+                roundid = roundId,
+            )
+        GameEventLog.info(
+            "wallet_debit_sent",
+            "playerId" to player.playerId,
+            "roundId" to roundId,
+            "transactionId" to transaction.txnId,
+            "amount" to amount,
+            "gameType" to gameType.code,
+            "ttype" to gameType.ttype,
+        )
+        transaction.requestPayload = transferRequestToPayload(request, description)
         transaction.status = "sent"
         transaction.updatedAt = clockProvider.nowIso()
         transactionRepository.save(transaction)
         try {
-            postDebit(request, platformToken)
-            transaction.responsePayload = mutableMapOf("posted" to true)
+            val response = postCreditTransferWithRetry(request)
+            transaction.responsePayload = response.toMutableMap().apply { putIfAbsent("posted", true) }
             transaction.status = "succeeded"
             transaction.updatedAt = clockProvider.nowIso()
             transactionRepository.save(transaction)
-            GameEventLog.info("wallet_debit_succeeded", "playerId" to player.playerId, "roundId" to roundId, "transactionId" to transaction.txnId, "amount" to amount)
+            GameEventLog.info(
+                "wallet_debit_succeeded",
+                "playerId" to player.playerId,
+                "roundId" to roundId,
+                "transactionId" to transaction.txnId,
+                "amount" to amount,
+            )
         } catch (error: Exception) {
             transaction.status = "failed"
             transaction.responsePayload = mutableMapOf("error" to (error.message ?: "Platform debit failed."))
             transaction.updatedAt = clockProvider.nowIso()
             transactionRepository.save(transaction)
-            GameEventLog.error("wallet_debit_failed", error, "playerId" to player.playerId, "roundId" to roundId, "transactionId" to transaction.txnId, "amount" to amount)
+            GameEventLog.error(
+                "wallet_debit_failed",
+                error,
+                "playerId" to player.playerId,
+                "roundId" to roundId,
+                "transactionId" to transaction.txnId,
+                "amount" to amount,
+            )
             throw error
         }
     }
 
+    /**
+     * Credits a player win/feature payout via Operations credit-transfer (triggers opType 2052):
+     * POST /api/v1/wallet/credit-transfer with bet = 0, win = amount.
+     * Supports late win settlement after session close using token OR (partner_code + user_id).
+     */
     fun credit(
+        player: PlatformPlayerRef,
+        roundId: String,
+        operationKey: String,
+        amount: Int,
+        description: String,
+        txnRefId: String? = null,
+        gameType: OperationsGameType = OperationsGameType.SPIN,
+    ) {
+        if (skipsWallet(player, amount)) {
+            return
+        }
+        val platformUserId = requirePlatformUserId(player)
+        val platformGameId = requirePlatformGameId(player)
+        val platformToken = player.platformToken?.trim()?.takeIf { it.isNotBlank() }
+        val partnerCode = requirePartnerCode(player)
+        if (platformToken == null && platformUserId.isBlank()) {
+            throw AppException.badRequest("platform_token_required", "Platform token or partner_code + user_id is required for credit.")
+        }
+        val resolvedTxnRefId =
+            txnRefId?.takeIf { it.isNotBlank() }
+                ?: transactionRepository.loadMostRecentDebit(player.playerId, roundId)?.txnId
+        val transaction = loadOrCreate(operationKey, "credit", player.playerId, platformUserId, partnerCode, roundId, amount, resolvedTxnRefId)
+        if (transaction.status == "applied") {
+            return
+        }
+        if (transaction.status != "succeeded") {
+            val request =
+                OperationsCreditTransferRequest(
+                    token = platformToken,
+                    partner_code = partnerCode,
+                    user_id = if (platformToken == null) platformUserId else null,
+                    gid = platformGameId,
+                    bet = 0,
+                    win = amount,
+                    game_type = gameType.code,
+                    tranid = transaction.txnId,
+                    ttype = gameType.ttype,
+                    roundid = roundId,
+                )
+            GameEventLog.info(
+                "wallet_credit_sent",
+                "playerId" to player.playerId,
+                "roundId" to roundId,
+                "transactionId" to transaction.txnId,
+                "amount" to amount,
+                "gameType" to gameType.code,
+                "ttype" to gameType.ttype,
+            )
+            transaction.requestPayload = transferRequestToPayload(request, description)
+            transaction.status = "sent"
+            transaction.updatedAt = clockProvider.nowIso()
+            transactionRepository.save(transaction)
+            try {
+                val response = postCreditTransferWithRetry(request)
+                transaction.responsePayload = response.toMutableMap().apply { putIfAbsent("posted", true) }
+                transaction.status = "succeeded"
+                transaction.updatedAt = clockProvider.nowIso()
+                transactionRepository.save(transaction)
+                GameEventLog.info(
+                    "wallet_credit_succeeded",
+                    "playerId" to player.playerId,
+                    "roundId" to roundId,
+                    "transactionId" to transaction.txnId,
+                    "amount" to amount,
+                )
+            } catch (error: Exception) {
+                transaction.status = "failed"
+                transaction.responsePayload = mutableMapOf("error" to (error.message ?: "Platform credit failed."))
+                transaction.updatedAt = clockProvider.nowIso()
+                transactionRepository.save(transaction)
+                GameEventLog.error(
+                    "wallet_credit_failed",
+                    error,
+                    "playerId" to player.playerId,
+                    "roundId" to roundId,
+                    "transactionId" to transaction.txnId,
+                    "amount" to amount,
+                )
+                if (error is AppException && error.code == "platform_session_expired") {
+                    throw error
+                }
+                throw AppException("platform_payout_pending", "Payout credit is pending. Please retry before starting the next round.", error)
+            }
+        }
+        transaction.status = "applied"
+        transaction.updatedAt = clockProvider.nowIso()
+        transactionRepository.save(transaction)
+        GameEventLog.info(
+            "wallet_credit_applied",
+            "playerId" to player.playerId,
+            "roundId" to roundId,
+            "transactionId" to transaction.txnId,
+            "amount" to amount,
+        )
+    }
+
+    /**
+     * Reverses a bet for an aborted/crashed round via Operations 2052 refund:
+     * {"token","partner_code","gid","bet":amount,"win":0,"game_type":"refund","ttype":2,"tranid","roundid"}.
+     * Supports late refunds after session close using token OR (partner_code + user_id).
+     */
+    fun refund(
         player: PlatformPlayerRef,
         roundId: String,
         operationKey: String,
@@ -125,44 +281,137 @@ internal class PlatformWalletService(
             return
         }
         val platformUserId = requirePlatformUserId(player)
-        val platformToken = requirePlatformToken(player)
-        val operatorId = requirePlatformOperatorId(player)
-        val gameName = requirePlatformGameName()
+        val platformGameId = requirePlatformGameId(player)
+        val platformToken = player.platformToken?.trim()?.takeIf { it.isNotBlank() }
+        val partnerCode = requirePartnerCode(player)
         val resolvedTxnRefId =
             txnRefId?.takeIf { it.isNotBlank() }
                 ?: transactionRepository.loadMostRecentDebit(player.playerId, roundId)?.txnId
-                ?: throw AppException.badRequest("platform_debit_reference_required", "A successful debit transaction is required before credit.")
-        val transaction = loadOrCreate(operationKey, "credit", player.playerId, platformUserId, operatorId, roundId, amount, resolvedTxnRefId)
-        if (transaction.status == "applied") {
+        val transaction = loadOrCreate(operationKey, "credit", player.playerId, platformUserId, partnerCode, roundId, amount, resolvedTxnRefId)
+        if (transaction.status == "applied" || transaction.status == "succeeded") {
             return
         }
-        if (transaction.status != "succeeded") {
-            val request = creditRequest(platformUserId, gameName, amount, description)
-            GameEventLog.info("wallet_credit_sent", "playerId" to player.playerId, "roundId" to roundId, "transactionId" to transaction.txnId, "amount" to amount)
-            transaction.requestPayload = creditRequestToPayload(request)
-            transaction.status = "sent"
-            transaction.updatedAt = clockProvider.nowIso()
-            transactionRepository.save(transaction)
-            try {
-                postCredit(request, platformToken)
-                transaction.responsePayload = mutableMapOf("posted" to true)
-                transaction.status = "succeeded"
-                transaction.updatedAt = clockProvider.nowIso()
-                transactionRepository.save(transaction)
-                GameEventLog.info("wallet_credit_succeeded", "playerId" to player.playerId, "roundId" to roundId, "transactionId" to transaction.txnId, "amount" to amount)
-            } catch (error: Exception) {
-                transaction.status = "failed"
-                transaction.responsePayload = mutableMapOf("error" to (error.message ?: "Platform credit failed."))
-                transaction.updatedAt = clockProvider.nowIso()
-                transactionRepository.save(transaction)
-                GameEventLog.error("wallet_credit_failed", error, "playerId" to player.playerId, "roundId" to roundId, "transactionId" to transaction.txnId, "amount" to amount)
-                throw AppException("platform_payout_pending", "Payout credit is pending. Please retry before starting the next round.", error)
-            }
-        }
-        transaction.status = "applied"
+        val request =
+            OperationsCreditTransferRequest(
+                token = platformToken,
+                partner_code = partnerCode,
+                user_id = if (platformToken == null) platformUserId else null,
+                gid = platformGameId,
+                bet = amount,
+                win = 0,
+                game_type = OperationsGameType.REFUND.code,
+                tranid = transaction.txnId,
+                ttype = OperationsGameType.REFUND.ttype,
+                roundid = roundId,
+            )
+        GameEventLog.info(
+            "wallet_refund_sent",
+            "playerId" to player.playerId,
+            "roundId" to roundId,
+            "transactionId" to transaction.txnId,
+            "amount" to amount,
+            "gameType" to OperationsGameType.REFUND.code,
+            "ttype" to OperationsGameType.REFUND.ttype,
+        )
+        transaction.requestPayload = transferRequestToPayload(request, description)
+        transaction.status = "sent"
         transaction.updatedAt = clockProvider.nowIso()
         transactionRepository.save(transaction)
-        GameEventLog.info("wallet_credit_applied", "playerId" to player.playerId, "roundId" to roundId, "transactionId" to transaction.txnId, "amount" to amount)
+        try {
+            val response = postCreditTransferWithRetry(request)
+            transaction.responsePayload = response.toMutableMap().apply { putIfAbsent("posted", true) }
+            transaction.status = "applied"
+            transaction.updatedAt = clockProvider.nowIso()
+            transactionRepository.save(transaction)
+            GameEventLog.info(
+                "wallet_refund_succeeded",
+                "playerId" to player.playerId,
+                "roundId" to roundId,
+                "transactionId" to transaction.txnId,
+                "amount" to amount,
+            )
+        } catch (error: Exception) {
+            transaction.status = "failed"
+            transaction.responsePayload = mutableMapOf("error" to (error.message ?: "Platform refund failed."))
+            transaction.updatedAt = clockProvider.nowIso()
+            transactionRepository.save(transaction)
+            GameEventLog.error(
+                "wallet_refund_failed",
+                error,
+                "playerId" to player.playerId,
+                "roundId" to roundId,
+                "transactionId" to transaction.txnId,
+                "amount" to amount,
+            )
+            throw error
+        }
+    }
+
+    /**
+     * Settles a combined bet/win transfer (e.g. spin with bet & win, freespin, bonus, gamble, gamble_collect, or refund)
+     * in a single 2052 call to POST /api/v1/wallet/credit-transfer.
+     */
+    fun settleTransfer(
+        player: PlatformPlayerRef,
+        roundId: String,
+        operationKey: String,
+        bet: Int,
+        win: Int,
+        gameType: OperationsGameType,
+        description: String,
+        txnRefId: String? = null,
+    ) {
+        if (!env.platformEnabled || player.isBot || !player.walletLinked || (bet <= 0 && win <= 0)) {
+            return
+        }
+        val platformUserId = requirePlatformUserId(player)
+        val platformGameId = requirePlatformGameId(player)
+        val platformToken = player.platformToken?.trim()?.takeIf { it.isNotBlank() }
+        val partnerCode = requirePartnerCode(player)
+        val allowsTokenlessFallback = win > 0 || gameType == OperationsGameType.REFUND
+        if (platformToken == null && !allowsTokenlessFallback) {
+            throw AppException.badRequest("platform_token_required", "Platform token is required for wallet play.")
+        }
+        val txnType = if (win > 0 || gameType == OperationsGameType.REFUND) "credit" else "debit"
+        val ledgerAmount = if (win > 0) win else bet
+        val resolvedTxnRefId =
+            txnRefId?.takeIf { it.isNotBlank() }
+                ?: if (txnType == "credit") transactionRepository.loadMostRecentDebit(player.playerId, roundId)?.txnId else null
+        val transaction =
+            loadOrCreate(operationKey, txnType, player.playerId, platformUserId, partnerCode, roundId, ledgerAmount, resolvedTxnRefId)
+        if (transaction.status == "succeeded" || transaction.status == "applied") {
+            return
+        }
+        val request =
+            OperationsCreditTransferRequest(
+                token = platformToken,
+                partner_code = partnerCode,
+                user_id = if (platformToken == null) platformUserId else null,
+                gid = platformGameId,
+                bet = bet.coerceAtLeast(0),
+                win = win.coerceAtLeast(0),
+                game_type = gameType.code,
+                tranid = transaction.txnId,
+                ttype = gameType.ttype,
+                roundid = roundId,
+            )
+        transaction.requestPayload = transferRequestToPayload(request, description)
+        transaction.status = "sent"
+        transaction.updatedAt = clockProvider.nowIso()
+        transactionRepository.save(transaction)
+        try {
+            val response = postCreditTransferWithRetry(request)
+            transaction.responsePayload = response.toMutableMap().apply { putIfAbsent("posted", true) }
+            transaction.status = if (txnType == "credit") "applied" else "succeeded"
+            transaction.updatedAt = clockProvider.nowIso()
+            transactionRepository.save(transaction)
+        } catch (error: Exception) {
+            transaction.status = "failed"
+            transaction.responsePayload = mutableMapOf("error" to (error.message ?: "Platform transfer failed."))
+            transaction.updatedAt = clockProvider.nowIso()
+            transactionRepository.save(transaction)
+            throw error
+        }
     }
 
     fun listTransactionHistory(
@@ -229,7 +478,7 @@ internal class PlatformWalletService(
         txnType: String,
         playerId: String,
         platformUserId: String,
-        platformOperatorId: String,
+        partnerCode: String,
         roundId: String,
         amount: Int,
         txnRefId: String?,
@@ -245,7 +494,7 @@ internal class PlatformWalletService(
         transaction.operationKey = operationKey
         transaction.playerId = playerId
         transaction.platformUserId = platformUserId
-        transaction.platformOperatorId = platformOperatorId
+        transaction.platformOperatorId = partnerCode
         transaction.roundId = roundId
         transaction.txnType = txnType
         transaction.amount = amount
@@ -256,116 +505,115 @@ internal class PlatformWalletService(
         return transactionRepository.save(transaction)
     }
 
-    private fun balanceRequest(
-        txnId: String,
-        amount: Int,
-        description: String,
-        platformUserId: String,
-        platformGameId: Int,
-        ip: String?,
-        txnRefId: String?,
-        txnType: Int,
-        operatorId: String,
-    ): PlatformBalanceRequest {
-        val request = PlatformBalanceRequest()
-        request.txn_id = txnId
-        request.amount = amount
-        request.description = description
-        request.txn_type = txnType
-        request.ip = ip?.takeIf { it.isNotBlank() } ?: "0.0.0.0"
-        request.game_id = platformGameId
-        request.user_id = platformUserId
-        request.txn_ref_id = txnRefId
-        request.operator_id = operatorId
-        return request
-    }
+    /**
+     * Posts a 2052 credit-transfer request and retries with the EXACT SAME tranid on network timeouts,
+     * HTTP 502/503/504, or ERR-0020 / ERR-0021. Never retries session-expired (ERR-0011/0012/0013)
+     * or operator business refusals (400 status: false).
+     */
+    private fun postCreditTransferWithRetry(request: OperationsCreditTransferRequest): Map<String, Any?> {
+        val url = env.operationsCreditTransferUrl.trim()
+        val internalKey = requireInternalServiceKey()
+        val client =
+            creditTransferClient
+                ?: throw AppException.badRequest("platform_balance_url_missing", "Operations credit-transfer URL is not configured.")
+        val attempts = maxRetryAttempts.coerceAtLeast(1)
+        var lastFailure: OperationsErrorSupport.ClassifiedFailure? = null
 
-    private fun creditRequest(
-        userId: String,
-        gameName: String,
-        amount: Int,
-        description: String,
-    ): PlatformCreditRequest {
-        val request = PlatformCreditRequest()
-        request.userId = userId
-        request.gameName = gameName
-        request.amount = amount
-        request.description = description
-        return request
-    }
-
-    private fun postDebit(request: PlatformBalanceRequest, token: String) {
-        postBalance(env.platformDebitUrl.trim(), debitClient, request, token, "Platform debit URL is not configured.", "Platform debit failed.")
-    }
-
-    private fun postCredit(request: PlatformCreditRequest, token: String) {
-        try {
-            val response =
-                (creditClient ?: throw AppException.badRequest("platform_balance_url_missing", "Platform credit URL is not configured."))
-                    .post()
-                    .uri(env.platformCreditUrl.trim())
-                    .header("Authorization", bearerToken(token))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(request)
-                    .retrieve()
-                    .body(PlatformEnvelope::class.java)
-            if (response != null && !response.status) {
-                throw AppException.badRequest("platform_balance_failed", response.msg ?: "Platform credit failed.")
+        for (attempt in 1..attempts) {
+            try {
+                val response =
+                    client
+                        .post()
+                        .uri(url)
+                        .header("X-Internal-Key", internalKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(request)
+                        .retrieve()
+                        .body(object : ParameterizedTypeReference<Map<String, Any?>>() {})
+                        ?: emptyMap()
+                if (OperationsErrorSupport.isFailurePayload(response)) {
+                    val failure =
+                        OperationsErrorSupport.classifyPayloadFailure(
+                            response,
+                            "Operations credit transfer failed.",
+                        )
+                    lastFailure = failure
+                    if (!failure.retryable || attempt >= attempts) {
+                        throw AppException.badRequest(failure.appCode, failure.message)
+                    }
+                    GameEventLog.info(
+                        "wallet_transfer_retrying",
+                        "tranid" to request.tranid,
+                        "roundId" to request.roundid,
+                        "attempt" to attempt,
+                        "reason" to failure.message,
+                    )
+                    sleepBeforeRetry(attempt)
+                    continue
+                }
+                return response
+            } catch (error: AppException) {
+                throw error
+            } catch (error: Exception) {
+                val failure =
+                    OperationsErrorSupport.classifyException(
+                        error,
+                        "Operations credit transfer failed.",
+                    )
+                lastFailure = failure
+                if (!failure.retryable || attempt >= attempts) {
+                    throw AppException.badRequest(failure.appCode, failure.message)
+                }
+                GameEventLog.info(
+                    "wallet_transfer_retrying",
+                    "tranid" to request.tranid,
+                    "roundId" to request.roundid,
+                    "attempt" to attempt,
+                    "reason" to failure.message,
+                )
+                sleepBeforeRetry(attempt)
             }
-        } catch (error: AppException) {
-            throw error
-        } catch (error: Exception) {
-            throw AppException.badRequest("platform_balance_failed", error.message ?: "Platform credit failed.")
-        }
-    }
-
-    private fun bearerToken(token: String): String =
-        if (token.startsWith("Bearer ", ignoreCase = true)) {
-            token
-        } else {
-            "Bearer $token"
         }
 
-    private fun postBalance(
-        url: String,
-        client: RestClient?,
-        request: PlatformBalanceRequest,
-        token: String,
-        missingUrlMessage: String,
-        failureMessage: String,
-    ) {
-        try {
-            val response =
-                (client ?: throw AppException.badRequest("platform_balance_url_missing", missingUrlMessage))
-                    .post()
-                    .uri(url)
-                    .header("token", token)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(request)
-                    .retrieve()
-                    .body(PlatformEnvelope::class.java)
-            if (response != null && !response.status) {
-                throw AppException.badRequest("platform_balance_failed", response.msg ?: failureMessage)
-            }
-        } catch (error: AppException) {
-            throw error
-        } catch (error: Exception) {
-            throw AppException.badRequest("platform_balance_failed", error.message ?: failureMessage)
-        }
-    }
-
-    private fun requestToPayload(request: PlatformBalanceRequest): MutableMap<String, Any?> =
-        linkedMapOf(
-            "txn_id" to request.txn_id,
-            "amount" to request.amount,
-            "description" to request.description,
-            "txn_type" to request.txn_type,
-            "ip" to request.ip,
-            "game_id" to request.game_id,
-            "user_id" to request.user_id,
-            "txn_ref_id" to request.txn_ref_id,
-            "operator_id" to request.operator_id,
+        throw AppException.badRequest(
+            lastFailure?.appCode ?: "platform_balance_failed",
+            lastFailure?.message ?: "Operations credit transfer failed.",
         )
+    }
+
+    private fun sleepBeforeRetry(attempt: Int) {
+        val delay = retryDelayMs * attempt
+        if (delay <= 0L) {
+            return
+        }
+        try {
+            Thread.sleep(delay)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
+    }
+
+    private fun transferRequestToPayload(
+        request: OperationsCreditTransferRequest,
+        description: String,
+    ): MutableMap<String, Any?> =
+        linkedMapOf<String, Any?>(
+            "token" to request.token,
+            "partner_code" to request.partner_code,
+            "user_id" to request.user_id,
+            "gid" to request.gid,
+            "bet" to request.bet,
+            "win" to request.win,
+            "game_type" to request.game_type,
+            "tranid" to request.tranid,
+            "ttype" to request.ttype,
+            "roundid" to request.roundid,
+            "description" to description,
+        )
+
+    private fun requireInternalServiceKey(): String =
+        env.internalServiceKey.trim().takeIf { it.isNotBlank() }
+            ?: throw AppException.badRequest("platform_internal_key_missing", "INTERNAL_SERVICE_KEY is not configured.")
 
     private fun requirePlatformUserId(player: PlatformPlayerRef): String =
         player.platformUserId?.takeIf { it.isNotBlank() }
@@ -378,23 +626,12 @@ internal class PlatformWalletService(
     private fun requirePlatformGameId(player: PlatformPlayerRef): Int =
         player.platformGameId?.takeIf { it > 0 }
             ?: env.platformGameId.takeIf { it > 0 }
-            ?: throw AppException.badRequest("platform_game_id_required", "Platform game_id is required for wallet play.")
+            ?: throw AppException.badRequest("platform_game_id_required", "Platform gid is required for wallet play.")
 
-    private fun requirePlatformOperatorId(player: PlatformPlayerRef): String =
-        player.platformOperatorId?.takeIf { it.isNotBlank() }
-            ?: throw AppException.badRequest("platform_operator_id_required", "Platform operatorId is required for wallet play.")
-
-    private fun creditRequestToPayload(request: PlatformCreditRequest): MutableMap<String, Any?> =
-        linkedMapOf(
-            "userId" to request.userId,
-            "gameName" to request.gameName,
-            "amount" to request.amount,
-            "description" to request.description,
-        )
-
-    private fun requirePlatformGameName(): String =
-        env.platformGameName.trim().takeIf { it.isNotBlank() }
-            ?: throw AppException.badRequest("platform_game_name_required", "Platform game name is required for wallet play.")
+    private fun requirePartnerCode(player: PlatformPlayerRef): String =
+        player.partnerCode
+            ?: env.operationsDefaultPartnerCode.takeIf { it.isNotBlank() }
+            ?: throw AppException.badRequest("platform_partner_code_required", "Platform partner_code is required for wallet play.")
 
     private fun WalletTransaction.description(): String? =
         (responsePayload["description"] as? String)?.takeIf { it.isNotBlank() }

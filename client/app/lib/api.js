@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:4000/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:4100/api";
 const REQUEST_TIMEOUT_MS = 10000;
 
 export class ApiError extends Error {
@@ -17,6 +17,29 @@ function buildApiUrl(path, variant = "classic") {
   return url.toString();
 }
 
+function buildPlatformSessionPayload(tokenOrSession, gameId) {
+  if (tokenOrSession && typeof tokenOrSession === "object") {
+    const session = tokenOrSession;
+    return {
+      token: session.token,
+      gameId: session.gameId,
+      ...(session.gid ? { gid: session.gid } : {}),
+      ...(session.partnerCode ? { partnerCode: session.partnerCode, partner_code: session.partnerCode } : {}),
+      ...(session.gameCode ? { gameCode: session.gameCode, game_code: session.gameCode } : {}),
+      ...(session.username ? { username: session.username } : {}),
+      ...(session.userId ? { userId: session.userId, user_id: session.userId } : {}),
+      ...(session.currency ? { currency: session.currency } : {}),
+      ...(session.lang ? { lang: session.lang } : {}),
+      ...(session.extsess ? { extsess: session.extsess } : {}),
+    };
+  }
+
+  return {
+    token: tokenOrSession,
+    gameId,
+  };
+}
+
 async function fetchJson(url, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -25,7 +48,7 @@ async function fetchJson(url, options = {}) {
     const response = await fetch(url, {
       ...options,
       signal: controller.signal,
-      cache: "no-store"
+      cache: "no-store",
     });
     const data = await response.json();
 
@@ -49,8 +72,8 @@ async function request(path, options = {}, variant = "classic") {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      ...(options.headers || {})
-    }
+      ...(options.headers || {}),
+    },
   });
 }
 
@@ -85,53 +108,67 @@ export function getPrivateRoomWebSocketUrl() {
 }
 
 export function createPrivateRoom(roomName, playerName, clientSeed, variant, bootAmount) {
-  return request("/private-rooms", {
-    method: "POST",
-    body: JSON.stringify({
-      roomName,
-      playerName,
-      clientSeed,
-      variant,
-      ...(typeof bootAmount === "number" ? { bootAmount } : {})
-    })
-  }, null);
+  return request(
+    "/private-rooms",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        roomName,
+        playerName,
+        clientSeed,
+        variant,
+        ...(typeof bootAmount === "number" ? { bootAmount } : {}),
+      }),
+    },
+    null,
+  );
 }
 
 export function joinPrivateRoom(roomCode, playerName, clientSeed) {
-  return request("/private-rooms/join", {
-    method: "POST",
-    body: JSON.stringify({
-      roomCode,
-      playerName,
-      clientSeed
-    })
-  }, null);
+  return request(
+    "/private-rooms/join",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        roomCode,
+        playerName,
+        clientSeed,
+      }),
+    },
+    null,
+  );
 }
 
-export function createPlatformPrivateRoom(token, gameId, roomName, clientSeed, variant, bootAmount) {
-  return request("/platform/private-rooms", {
-    method: "POST",
-    body: JSON.stringify({
-      token,
-      gameId,
-      roomName,
-      clientSeed,
-      variant,
-      ...(typeof bootAmount === "number" ? { bootAmount } : {})
-    })
-  }, null);
+export function createPlatformPrivateRoom(tokenOrSession, gameId, roomName, clientSeed, variant, bootAmount) {
+  return request(
+    "/platform/private-rooms",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...buildPlatformSessionPayload(tokenOrSession, gameId),
+        roomName,
+        clientSeed,
+        variant,
+        ...(typeof bootAmount === "number" ? { bootAmount } : {}),
+      }),
+    },
+    null,
+  );
 }
 
-export function joinPlatformPrivateRoom(token, gameId, roomCode, clientSeed) {
-  return request("/platform/private-rooms/join", {
-    method: "POST",
-    body: JSON.stringify({
-      token,
-      gameId,
-      roomCode,
-      clientSeed
-    })
-  }, null);
+export function joinPlatformPrivateRoom(tokenOrSession, gameId, roomCode, clientSeed) {
+  return request(
+    "/platform/private-rooms/join",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...buildPlatformSessionPayload(tokenOrSession, gameId),
+        roomCode,
+        clientSeed,
+      }),
+    },
+    null,
+  );
 }
 
 export function fetchPrivateRoomSession(roomCode, playerId, playerToken) {
@@ -141,96 +178,116 @@ export function fetchPrivateRoomSession(roomCode, playerId, playerToken) {
 
   return fetchJson(url.toString(), {
     headers: {
-      "Content-Type": "application/json"
-    }
+      "Content-Type": "application/json",
+    },
   });
 }
 
 export function leavePrivateRoom(roomCode, playerId, playerToken) {
-  return request(`/private-rooms/${encodeURIComponent(roomCode)}/leave`, {
-    method: "POST",
-    body: JSON.stringify({
-      playerId,
-      playerToken
-    })
-  }, null);
+  return request(
+    `/private-rooms/${encodeURIComponent(roomCode)}/leave`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        playerId,
+        playerToken,
+      }),
+    },
+    null,
+  );
 }
-
 
 export function fetchTable(variant) {
   return request("/table", {}, variant);
 }
 
 export function joinPublicTable(playerName, clientSeed, variant) {
-  return request("/public/join", {
-    method: "POST",
-    body: JSON.stringify({
-      playerName,
-      clientSeed
-    })
-  }, variant);
+  return request(
+    "/public/join",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        playerName,
+        clientSeed,
+      }),
+    },
+    variant,
+  );
 }
 
 export function fetchPublicLobbyConfig() {
   return request("/public/config", {}, null);
 }
 
-export function fetchPlatformProfile(token, gameId) {
-  return request("/platform/profile", {
-    method: "POST",
-    body: JSON.stringify({
-      token,
-      gameId
-    })
-  }, null);
+export function fetchPlatformProfile(tokenOrSession, gameId) {
+  return request(
+    "/platform/profile",
+    {
+      method: "POST",
+      body: JSON.stringify(buildPlatformSessionPayload(tokenOrSession, gameId)),
+    },
+    null,
+  );
 }
 
-export function createPlatformPublicSession(token, gameId, clientSeed, variant) {
-  return request("/platform/session", {
-    method: "POST",
-    body: JSON.stringify({
-      token,
-      gameId,
-      clientSeed,
-      variant
-    })
-  }, null);
+export function createPlatformPublicSession(tokenOrSession, gameId, clientSeed, variant) {
+  return request(
+    "/platform/session",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...buildPlatformSessionPayload(tokenOrSession, gameId),
+        clientSeed,
+        variant,
+      }),
+    },
+    null,
+  );
 }
 
-export function fetchPlatformDebitTransactions(token, gameId, offset = 0, limit = 20) {
-  return request("/platform/transactions/debit", {
-    method: "POST",
-    body: JSON.stringify({
-      token,
-      gameId,
-      offset,
-      limit
-    })
-  }, null);
+export function fetchPlatformDebitTransactions(tokenOrSession, gameId, offset = 0, limit = 20) {
+  return request(
+    "/platform/transactions/debit",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...buildPlatformSessionPayload(tokenOrSession, gameId),
+        offset,
+        limit,
+      }),
+    },
+    null,
+  );
 }
 
-export function fetchPlatformCreditTransactions(token, gameId, offset = 0, limit = 20) {
-  return request("/platform/transactions/credit", {
-    method: "POST",
-    body: JSON.stringify({
-      token,
-      gameId,
-      offset,
-      limit
-    })
-  }, null);
+export function fetchPlatformCreditTransactions(tokenOrSession, gameId, offset = 0, limit = 20) {
+  return request(
+    "/platform/transactions/credit",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...buildPlatformSessionPayload(tokenOrSession, gameId),
+        offset,
+        limit,
+      }),
+    },
+    null,
+  );
 }
 
-export function fetchPlatformRoundHistory(token, gameId, offset = 0, limit = 20) {
-  return request("/platform/history/rounds", {
-    method: "POST",
-    body: JSON.stringify({
-      token,
-      gameId,
-      offset,
-      limit
-    })
-  }, null);
+export function fetchPlatformRoundHistory(tokenOrSession, gameId, offset = 0, limit = 20) {
+  return request(
+    "/platform/history/rounds",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...buildPlatformSessionPayload(tokenOrSession, gameId),
+        offset,
+        limit,
+      }),
+    },
+    null,
+  );
 }
 
 export function fetchPublicSession(playerId, playerToken, variant) {
@@ -240,48 +297,64 @@ export function fetchPublicSession(playerId, playerToken, variant) {
 
   return fetchJson(url.toString(), {
     headers: {
-      "Content-Type": "application/json"
-    }
+      "Content-Type": "application/json",
+    },
   });
 }
 
 export function performPublicAction(playerId, playerToken, actionType, payload = {}, variant) {
-  return request("/public/action", {
-    method: "POST",
-    body: JSON.stringify({
-      playerId,
-      playerToken,
-      actionType,
-      payload
-    })
-  }, variant);
+  return request(
+    "/public/action",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        playerId,
+        playerToken,
+        actionType,
+        payload,
+      }),
+    },
+    variant,
+  );
 }
 
 export function leavePublicTable(playerId, playerToken, variant) {
-  return request("/public/leave", {
-    method: "POST",
-    body: JSON.stringify({
-      playerId,
-      playerToken
-    })
-  }, variant);
+  return request(
+    "/public/leave",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        playerId,
+        playerToken,
+      }),
+    },
+    variant,
+  );
 }
 
 export function startRound(variant) {
-  return request("/round/start", {
-    method: "POST"
-  }, variant);
+  return request(
+    "/round/start",
+    {
+      method: "POST",
+    },
+    variant,
+  );
 }
 
 export function performAction(actionType, payload = {}, variant) {
-  return request("/action", {
-    method: "POST",
-    body: JSON.stringify({
-      playerId: "user-1",
-      actionType,
-      payload
-    })
-  }, variant);
+  return request(
+    "/action",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        playerId: "user-1",
+        actionType,
+        payload,
+      }),
+    },
+    variant,
+  );
 }
 
 export function fetchHistory(variant) {
@@ -289,16 +362,24 @@ export function fetchHistory(variant) {
 }
 
 export function startAutoplay(settings, variant) {
-  return request("/autoplay/start", {
-    method: "POST",
-    body: JSON.stringify(settings)
-  }, variant);
+  return request(
+    "/autoplay/start",
+    {
+      method: "POST",
+      body: JSON.stringify(settings),
+    },
+    variant,
+  );
 }
 
 export function stopAutoplay(variant) {
-  return request("/autoplay/stop", {
-    method: "POST"
-  }, variant);
+  return request(
+    "/autoplay/stop",
+    {
+      method: "POST",
+    },
+    variant,
+  );
 }
 
 export function buildEventSourceUrl(variant) {

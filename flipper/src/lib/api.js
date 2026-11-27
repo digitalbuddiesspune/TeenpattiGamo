@@ -19,6 +19,29 @@ function buildApiUrl(path, variant = DEFAULT_VARIANT_ID) {
   return url.toString();
 }
 
+function buildPlatformSessionPayload(tokenOrSession, gameId) {
+  if (tokenOrSession && typeof tokenOrSession === "object") {
+    const session = tokenOrSession;
+    return {
+      token: session.token,
+      gameId: session.gameId,
+      ...(session.gid ? { gid: session.gid } : {}),
+      ...(session.partnerCode ? { partnerCode: session.partnerCode, partner_code: session.partnerCode } : {}),
+      ...(session.gameCode ? { gameCode: session.gameCode, game_code: session.gameCode } : {}),
+      ...(session.username ? { username: session.username } : {}),
+      ...(session.userId ? { userId: session.userId, user_id: session.userId } : {}),
+      ...(session.currency ? { currency: session.currency } : {}),
+      ...(session.lang ? { lang: session.lang } : {}),
+      ...(session.extsess ? { extsess: session.extsess } : {}),
+    };
+  }
+
+  return {
+    token: tokenOrSession,
+    gameId,
+  };
+}
+
 async function fetchJson(url, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -119,7 +142,7 @@ export function joinPrivateRoom(roomCode, playerName, clientSeed) {
 }
 
 export function createPlatformPrivateRoom(
-  token,
+  tokenOrSession,
   gameId,
   roomName,
   clientSeed,
@@ -131,8 +154,7 @@ export function createPlatformPrivateRoom(
     {
       method: "POST",
       body: JSON.stringify({
-        token,
-        gameId,
+        ...buildPlatformSessionPayload(tokenOrSession, gameId),
         roomName,
         clientSeed,
         variant,
@@ -143,14 +165,13 @@ export function createPlatformPrivateRoom(
   );
 }
 
-export function joinPlatformPrivateRoom(token, gameId, roomCode, clientSeed) {
+export function joinPlatformPrivateRoom(tokenOrSession, gameId, roomCode, clientSeed) {
   return request(
     "/platform/private-rooms/join",
     {
       method: "POST",
       body: JSON.stringify({
-        token,
-        gameId,
+        ...buildPlatformSessionPayload(tokenOrSession, gameId),
         roomCode,
         clientSeed,
       }),
@@ -207,28 +228,24 @@ export function fetchPublicLobbyConfig() {
   return request("/public/config", {}, null);
 }
 
-export function fetchPlatformProfile(token, gameId) {
+export function fetchPlatformProfile(tokenOrSession, gameId) {
   return request(
     "/platform/profile",
     {
       method: "POST",
-      body: JSON.stringify({
-        token,
-        gameId,
-      }),
+      body: JSON.stringify(buildPlatformSessionPayload(tokenOrSession, gameId)),
     },
     null,
   );
 }
 
-export function createPlatformPublicSession(token, gameId, clientSeed, variant = DEFAULT_VARIANT_ID) {
+export function createPlatformPublicSession(tokenOrSession, gameId, clientSeed, variant = DEFAULT_VARIANT_ID) {
   return request(
     "/platform/session",
     {
       method: "POST",
       body: JSON.stringify({
-        token,
-        gameId,
+        ...buildPlatformSessionPayload(tokenOrSession, gameId),
         clientSeed,
         variant,
       }),
@@ -237,14 +254,13 @@ export function createPlatformPublicSession(token, gameId, clientSeed, variant =
   );
 }
 
-export function fetchPlatformDebitTransactions(token, gameId, offset = 0, limit = 20) {
+export function fetchPlatformDebitTransactions(tokenOrSession, gameId, offset = 0, limit = 20) {
   return request(
     "/platform/transactions/debit",
     {
       method: "POST",
       body: JSON.stringify({
-        token,
-        gameId,
+        ...buildPlatformSessionPayload(tokenOrSession, gameId),
         offset,
         limit,
       }),
@@ -253,14 +269,13 @@ export function fetchPlatformDebitTransactions(token, gameId, offset = 0, limit 
   );
 }
 
-export function fetchPlatformCreditTransactions(token, gameId, offset = 0, limit = 20) {
+export function fetchPlatformCreditTransactions(tokenOrSession, gameId, offset = 0, limit = 20) {
   return request(
     "/platform/transactions/credit",
     {
       method: "POST",
       body: JSON.stringify({
-        token,
-        gameId,
+        ...buildPlatformSessionPayload(tokenOrSession, gameId),
         offset,
         limit,
       }),
@@ -269,14 +284,13 @@ export function fetchPlatformCreditTransactions(token, gameId, offset = 0, limit
   );
 }
 
-export function fetchPlatformRoundHistory(token, gameId, offset = 0, limit = 20) {
+export function fetchPlatformRoundHistory(tokenOrSession, gameId, offset = 0, limit = 20) {
   return request(
     "/platform/history/rounds",
     {
       method: "POST",
       body: JSON.stringify({
-        token,
-        gameId,
+        ...buildPlatformSessionPayload(tokenOrSession, gameId),
         offset,
         limit,
       }),
