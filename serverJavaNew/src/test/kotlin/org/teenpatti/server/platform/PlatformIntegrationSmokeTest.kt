@@ -131,6 +131,55 @@ internal class PlatformIntegrationSmokeTest {
     }
 
     @Test
+    fun platformProfileReadsBalanceFromStatusTrueMessagePayload() {
+        withPlatformServer { server ->
+            server.respondJson("/api/v1/wallet/balance") {
+                """{"status":true,"message":100000}"""
+            }
+            val controller = platformController(server.baseUrl())
+
+            @Suppress("UNCHECKED_CAST")
+            val payload =
+                controller.getProfile(
+                    PlatformProfileRequest(
+                        token = "platform-token",
+                        gid = 1001,
+                        partner_code = "ALPHA-TEST",
+                        username = "PlayerOne",
+                        currency = "INR",
+                    ),
+                )["data"] as Map<String, Any?>
+
+            assertEquals(100000, payload["balance"])
+            assertEquals("INR", payload["currency"])
+        }
+    }
+
+    @Test
+    fun platformProfileReadsBalanceFromCombinedMessageAndBalancePayload() {
+        withPlatformServer { server ->
+            server.respondJson("/api/v1/wallet/balance") {
+                """{"status":true,"success":true,"message":100000,"balance":100000,"currency":"INR"}"""
+            }
+            val controller = platformController(server.baseUrl())
+
+            @Suppress("UNCHECKED_CAST")
+            val payload =
+                controller.getProfile(
+                    PlatformProfileRequest(
+                        token = "platform-token",
+                        gid = 1001,
+                        partner_code = "ALPHA-TEST",
+                        username = "PlayerOne",
+                    ),
+                )["data"] as Map<String, Any?>
+
+            assertEquals(100000, payload["balance"])
+            assertEquals("INR", payload["currency"])
+        }
+    }
+
+    @Test
     fun platformSessionRejectsMissingTokenBeforeOperationsCall() {
         withPlatformServer { server ->
             val controller = platformController(server.baseUrl())

@@ -48,6 +48,7 @@ internal class PlatformGatewayClient(
         val response = postBalanceWithRetry(normalizedToken, normalizedPartnerCode, internalKey)
 
         val dataMap = mapValue(response["data"])
+        val messageMap = mapValue(response["message"])
         val candidates =
             listOfNotNull(
                 dataMap?.let { mapValue(it["data"]) },
@@ -55,6 +56,7 @@ internal class PlatformGatewayClient(
                 dataMap?.let { mapValue(it["user"]) },
                 mapValue(response["wallet"]),
                 mapValue(response["user"]),
+                messageMap,
                 dataMap,
                 response,
             )
@@ -81,7 +83,10 @@ internal class PlatformGatewayClient(
                 "balance",
                 "coins",
                 "amount",
-            ) ?: 0
+            )
+                ?: (if (isSuccessStatus(response)) numberValue(response["message"]) else null)
+                ?: numberValue(response["data"])
+                ?: 0
         user.currency =
             (
                 firstStringValue(candidates, "currency", "currency_code", "currencyCode")
@@ -170,6 +175,14 @@ internal class PlatformGatewayClient(
                 "platform_balance_url_missing",
                 "Operations wallet balance URL is not configured.",
             )
+
+    private fun isSuccessStatus(response: Map<String, Any?>): Boolean {
+        val status = response["status"]
+        return status == true ||
+            (status is String && (status.equals("true", ignoreCase = true) || status.equals("success", ignoreCase = true) || status.equals("ok", ignoreCase = true))) ||
+            response["success"] == true ||
+            response["ok"] == true
+    }
 
     private fun mapValue(value: Any?): Map<*, *>? = value as? Map<*, *>
 
